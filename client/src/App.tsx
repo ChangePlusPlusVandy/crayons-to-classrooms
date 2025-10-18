@@ -1,5 +1,6 @@
 import './App.css';
 
+var unused = 0;
 function App() {
   return (
     <div className="App">
