@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import pool from './db.js';
+import testRoutes from './routes/testRoutes.js';
 
 dotenv.config();
 
@@ -14,9 +15,13 @@ app.get('/', (req, res) => {
 });
 
 const PORT = process.env.PORT || 5000;
+
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
+
+// Mount the test routes under /api/test
+app.use('/api/test', testRoutes);
 
 // test database connection
 app.get('/test-db', async (_req, res) => {
