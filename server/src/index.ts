@@ -3,6 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import pool from './db.js';
 import testRoutes from './routes/testRoutes.js';
+import warehouseRoutes from './routes/warehouseRoutes.js';
 
 dotenv.config();
 
@@ -14,7 +15,7 @@ app.get('/', (req, res) => {
   res.send('Server is running');
 });
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5001;
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
@@ -22,6 +23,9 @@ app.listen(PORT, () => {
 
 // Mount the test routes under /api/test
 app.use('/api/test', testRoutes);
+
+//Mount the warehouse routest under /api/warehouse
+app.use('/api/warehouse', warehouseRoutes);
 
 // test database connection
 app.get('/test-db', async (_req, res) => {
