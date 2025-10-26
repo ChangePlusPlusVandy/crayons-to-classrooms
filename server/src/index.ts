@@ -3,6 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import pool from './db.js';
 import testRoutes from './routes/testRoutes.js';
+import usersRoutes from './routes/usersRoutes.js';
 
 dotenv.config();
 
@@ -17,6 +18,8 @@ app.get('/', (_req, res) => {
 
 // Mount example test routes
 app.use('/api/test', testRoutes);
+
+app.use('/api/users', usersRoutes);
 
 // Start server
 const PORT = process.env.PORT || 5001;
