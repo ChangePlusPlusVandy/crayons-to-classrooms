@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import pool from './db.js';
 import testRoutes from './routes/testRoutes.js';
 import { itemsRoutes } from './routes/itemRoutes.js';
+import storageLocationRoutes from './routes/storageLocationRoutes.js';
 
 dotenv.config();
 
@@ -20,6 +21,8 @@ app.get('/', (_req, res) => {
 app.use('/api/test', testRoutes);
 
 app.use('/api/items', itemsRoutes);
+
+app.use('/api/storage-locations', storageLocationRoutes);
 
 // Start server
 const PORT = process.env.PORT || 5001;
