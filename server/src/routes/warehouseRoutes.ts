@@ -12,7 +12,7 @@ import {
 const router = express.Router();
 
 router.get('/', getAllWarehouse); // GET /api/warehouse
-router.get('/id/:id', getWarehouseById); // GET /api/warehouse/id/:id 
+router.get('/:id', getWarehouseById); // GET /api/warehouse/:id
 router.get('/name/:name', getWarehouseByName); // GET /api/warehouse/name/:name
 router.post('/', createWarehouse); // POST /api/warehouse
 router.put('/:id/name', updateWarehouseName); // PUT /api/warehouse/:id/name

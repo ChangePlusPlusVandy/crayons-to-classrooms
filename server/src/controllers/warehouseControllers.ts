@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import pool from '../db.js';
 
-// GET all rows
+// GET all warehouses
 export async function getAllWarehouse(req: Request, res: Response): Promise<void> {
   try {
     const result = await pool.query('SELECT * FROM warehouse;');
@@ -12,7 +12,7 @@ export async function getAllWarehouse(req: Request, res: Response): Promise<void
   }
 }
 
-// GET a single row by id
+// GET a single warehouse by id
 export async function getWarehouseById(req: Request<{ id: string }>, res: Response): Promise<void> {
   const { id } = req.params;
   try {
@@ -28,8 +28,11 @@ export async function getWarehouseById(req: Request<{ id: string }>, res: Respon
   }
 }
 
-// GET a single row by name
-export async function getWarehouseByName(req: Request<{ name: string }>, res: Response): Promise<void> {
+// GET a single warehouse by name
+export async function getWarehouseByName(
+  req: Request<{ name: string }>,
+  res: Response
+): Promise<void> {
   const { name } = req.params;
   try {
     const result = await pool.query('SELECT * FROM warehouse WHERE name = $1;', [name]);
@@ -44,17 +47,17 @@ export async function getWarehouseByName(req: Request<{ name: string }>, res: Re
   }
 }
 
-// POST (create) a new row
+// POST (create) a new warehouse
 export async function createWarehouse(
   req: Request<{}, {}, { name: string; address: string }>,
   res: Response
 ): Promise<void> {
   const { name, address } = req.body;
   try {
-    const result = await pool.query('INSERT INTO warehouse (name, address) VALUES ($1, $2) RETURNING *;', [
-      name,
-      address,
-    ]);
+    const result = await pool.query(
+      'INSERT INTO warehouse (name, address) VALUES ($1, $2) RETURNING *;',
+      [name, address]
+    );
     res.status(201).json(result.rows[0]);
   } catch (error) {
     console.error(error);
@@ -62,7 +65,7 @@ export async function createWarehouse(
   }
 }
 
-// PUT (update name only) by id
+// PUT (update name of a warehouse only) by id
 export async function updateWarehouseName(
   req: Request<{ id: string }, {}, { name: string }>,
   res: Response
@@ -87,7 +90,7 @@ export async function updateWarehouseName(
   }
 }
 
-// PUT (update address only) by id
+// PUT (update warehouse address only) by id
 export async function updateWarehouseAddress(
   req: Request<{ id: string }, {}, { address: string }>,
   res: Response
@@ -112,8 +115,7 @@ export async function updateWarehouseAddress(
   }
 }
 
-
-// DELETE a row by id
+// DELETE a warehouse by id
 export async function deleteWarehouse(req: Request<{ id: string }>, res: Response): Promise<void> {
   const { id } = req.params;
   try {

@@ -24,8 +24,8 @@ app.listen(PORT, () => {
 // Mount the test routes under /api/test
 app.use('/api/test', testRoutes);
 
-//Mount the warehouse routest under /api/warehouse
-app.use('/api/warehouse', warehouseRoutes);
+// Mount the warehouse routest under /api/warehouses
+app.use('/api/warehouses', warehouseRoutes);
 
 // test database connection
 app.get('/test-db', async (_req, res) => {
