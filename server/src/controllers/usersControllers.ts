@@ -96,7 +96,7 @@ export async function getUsersBySchool(req: Request<{ school: string }>, res: Re
    if (result.rows.length === 0) {
      res.status(404).json({ error: 'Not found' });
    } else {
-     res.json(result.rows[0]);
+     res.json(result.rows);
    }
  } catch (error) {
    console.error(error);
