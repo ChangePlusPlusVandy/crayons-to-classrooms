@@ -111,7 +111,7 @@ export async function getUsersBySchool(req: Request<{ school: string }>, res: Re
 export async function getUsersByDistrict(req: Request<{ district: string }>, res: Response): Promise<void> {
  const { district } = req.params;
  try {
-   const result = await pool.query('SELECT * FROM users WHERE school = $1;', [district]);
+   const result = await pool.query('SELECT * FROM users WHERE district = $1;', [district]);
    if (result.rows.length === 0) {
      res.status(404).json({ error: 'Not found' });
    } else {
