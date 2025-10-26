@@ -79,7 +79,7 @@ export async function getUsersByRole(req: Request<{ role: string }>, res: Respon
    if (result.rows.length === 0) {
      res.status(404).json({ error: 'Not found' });
    } else {
-     res.json(result.rows[0]);
+     res.json(result.rows);
    }
  } catch (error) {
    console.error(error);
