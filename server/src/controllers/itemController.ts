@@ -10,7 +10,7 @@ import { validate as isUuid } from 'uuid';
  */
 const countRows = (rows: any[], res: Response) => {
   if (rows.length === 0) {
-    res.status(404).json({ error: 'No items found' });
+    res.status(404).json({ error: 'No entries found' });
     return false;
   }
   return true;
