@@ -16,6 +16,7 @@ import {
 
 const router = express.Router();
 
+router.get('/:id', getMovementById); // GET /api/inventory-movement/:id
 router.get('/', getAllInventoryMovements); // GET /api/inventory-movement
 router.get('/action/:action', getMovementsByAction); // GET /api/inventory-movement/action/:action
 router.get('/item/:item_id', getMovementsByItemId); // GET /api/inventory-movement/item/:item_id
@@ -27,6 +28,5 @@ router.get('/time/:time', getMovementsByTime); // GET /api/inventory-movement/ti
 router.post('/', createInventoryMovement); // POST /api/inventory-movement
 router.patch('/:id', updateInventoryMovement); // PATCH /api/inventory-movement/:id
 router.delete('/:id', deleteInventoryMovement); // DELETE /api/inventory-movement/:id
-router.get('/:id', getMovementById); // GET /api/inventory-movement/:id
 
 export default router;
