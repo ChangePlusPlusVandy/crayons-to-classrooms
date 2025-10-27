@@ -3,6 +3,20 @@ import pool from '../db.js';
 import { validate as isUuid } from 'uuid';
 
 /**
+ * Checks if the query returned any rows.
+ * @param rows - The rows returned from the database query.
+ * @param res - The Express response object.
+ * @returns True if rows exist, otherwise sends a 404 response and returns false.
+ */
+const countRows = (rows: any[], res: Response) => {
+  if (rows.length === 0) {
+    res.status(404).json({ error: 'No items found' });
+    return false;
+  }
+  return true;
+};
+
+/**
  * Retrieves all items from the database.
  *
  * @param {Request} req - Express request object
@@ -13,6 +27,11 @@ import { validate as isUuid } from 'uuid';
 export const getItems = async (req: Request, res: Response) => {
   try {
     const items = await pool.query('SELECT * FROM items');
+
+    if (!countRows(items.rows, res)) {
+      return;
+    }
+
     res.json(items.rows);
   } catch (error) {
     console.error('Error fetching items:', error);
@@ -34,9 +53,11 @@ export const getItemById = async (req: Request, res: Response) => {
   const { id } = req.params;
   try {
     const item = await pool.query('SELECT * FROM items WHERE id = $1', [id]);
-    if (item.rows.length === 0) {
-      return res.status(404).json({ error: 'Item not found' });
+
+    if (!countRows(item.rows, res)) {
+      return;
     }
+
     res.json(item.rows[0]);
   } catch (error) {
     console.error('Error fetching item by ID:', error);
@@ -57,6 +78,11 @@ export const getItemsByProductId = async (req: Request, res: Response) => {
   const { productId } = req.params;
   try {
     const items = await pool.query('SELECT * FROM items WHERE product_id = $1', [productId]);
+
+    if (!countRows(items.rows, res)) {
+      return;
+    }
+
     res.json(items.rows);
   } catch (error) {
     console.error('Error fetching items by product ID:', error);
@@ -79,6 +105,11 @@ export const getItemsByLocationId = async (req: Request, res: Response) => {
     const items = await pool.query('SELECT * FROM items WHERE current_location_id = $1', [
       locationId,
     ]);
+
+    if (!countRows(items.rows, res)) {
+      return;
+    }
+
     res.json(items.rows);
   } catch (error) {
     console.error('Error fetching items by location ID:', error);
@@ -99,6 +130,9 @@ export const getItemsByStatus = async (req: Request, res: Response) => {
   const { status } = req.query;
   try {
     const items = await pool.query('SELECT * FROM items WHERE status = $1', [status]);
+    if (!countRows(items.rows, res)) {
+      return;
+    }
     res.json(items.rows);
   } catch (error) {
     console.error('Error fetching items by status:', error);
@@ -230,9 +264,11 @@ export const updateItem = async (req: Request, res: Response) => {
 
   try {
     const { rows } = await pool.query(sql, values);
-    if (rows.length === 0) {
-      return res.status(404).json({ error: 'Item not found' });
+
+    if (!countRows(rows, res)) {
+      return;
     }
+
     return res.json(rows[0]);
   } catch (err) {
     console.error('Error updating item:', err);
@@ -254,9 +290,11 @@ export const deleteItem = async (req: Request, res: Response) => {
   const { id } = req.params;
   try {
     const deletedItem = await pool.query('DELETE FROM items WHERE id = $1 RETURNING *', [id]);
-    if (deletedItem.rows.length === 0) {
-      return res.status(404).json({ error: 'Item not found' });
+
+    if (!countRows(deletedItem.rows, res)) {
+      return;
     }
+
     res.json({ message: 'Item deleted successfully' });
   } catch (error) {
     console.error('Error deleting item:', error);
