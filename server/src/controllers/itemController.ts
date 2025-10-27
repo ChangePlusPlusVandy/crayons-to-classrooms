@@ -2,6 +2,14 @@ import { Request, Response } from 'express';
 import pool from '../db.js';
 import { validate as isUuid } from 'uuid';
 
+/**
+ * Retrieves all items from the database.
+ *
+ * @param {Request} req - Express request object
+ * @param {Response} res - Express response object
+ * @returns {Promise<Response>} JSON array of all items or error message
+ * @throws {500} Internal server error if database query fails
+ */
 export const getItems = async (req: Request, res: Response) => {
   try {
     const items = await pool.query('SELECT * FROM items');
@@ -12,6 +20,16 @@ export const getItems = async (req: Request, res: Response) => {
   }
 };
 
+/**
+ * Retrieves a single item by its unique ID.
+ *
+ * @param {Request} req - Express request object with:
+ *   - id: UUID of the item (in params)
+ * @param {Response} res - Express response object
+ * @returns {Promise<Response>} JSON object of the requested item or error message
+ * @throws {404} Item not found if no item matches the provided ID
+ * @throws {500} Internal server error if database query fails
+ */
 export const getItemById = async (req: Request, res: Response) => {
   const { id } = req.params;
   try {
@@ -26,6 +44,15 @@ export const getItemById = async (req: Request, res: Response) => {
   }
 };
 
+/**
+ * Retrieves all items associated with a specific product ID.
+ *
+ * @param {Request} req - Express request object with:
+ *   - productId: UUID of the product (in params)
+ * @param {Response} res - Express response object
+ * @returns {Promise<Response>} JSON array of items matching the product ID or error message
+ * @throws {500} Internal server error if database query fails
+ */
 export const getItemsByProductId = async (req: Request, res: Response) => {
   const { productId } = req.params;
   try {
@@ -37,6 +64,15 @@ export const getItemsByProductId = async (req: Request, res: Response) => {
   }
 };
 
+/**
+ * Retrieves all items currently at a specific location.
+ *
+ * @param {Request} req - Express request object with:
+ *   - locationId: UUID of the location (in params)
+ * @param {Response} res - Express response object
+ * @returns {Promise<Response>} JSON array of items at the specified location or error message
+ * @throws {500} Internal server error if database query fails
+ */
 export const getItemsByLocationId = async (req: Request, res: Response) => {
   const { locationId } = req.params;
   try {
@@ -50,6 +86,15 @@ export const getItemsByLocationId = async (req: Request, res: Response) => {
   }
 };
 
+/**
+ * Retrieves all items with a specific status.
+ *
+ * @param {Request} req - Express request object with:
+ *   - status: Status of the items to filter by (in query)
+ * @param {Response} res - Express response object
+ * @returns {Promise<Response>} JSON array of items with the specified status or error message
+ * @throws {500} Internal server error if database query fails
+ */
 export const getItemsByStatus = async (req: Request, res: Response) => {
   const { status } = req.query;
   try {
@@ -61,6 +106,21 @@ export const getItemsByStatus = async (req: Request, res: Response) => {
   }
 };
 
+/**
+ * Creates a new item in the database.
+ * Validates foreign key constraints for product_id, current_location_id, and created_by.
+ *
+ * @param {Request} req - Express request object with:
+ *   - product_id: UUID of the product (in body)
+ *   - quantity: Number of items (in body)
+ *   - current_location_id: UUID of the current location (in body)
+ *   - status: Current status of the item ie ('active', 'inactive', 'discontinued', 'checked out') (in body)
+ *   - created_by: UUID of the user creating the item (in body)
+ * @param {Response} res - Express response object
+ * @returns {Promise<Response>} JSON object of the newly created item or error message
+ * @throws {400} Invalid foreign key if product_id, current_location_id, or created_by doesn't exist
+ * @throws {500} Internal server error if validation or creation fails
+ */
 export const createItem = async (req: Request, res: Response) => {
   const { product_id, quantity, current_location_id, status, created_by } = req.body;
 
@@ -90,7 +150,7 @@ export const createItem = async (req: Request, res: Response) => {
   try {
     const newItem = await pool.query(
       'INSERT INTO items (product_id, quantity, current_location_id, status, created_by, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, NOW(), NOW()) RETURNING *',
-      [product_id, quantity, current_location_id, status, created_by]
+      [product_id, quantity, current_location_id, status.toLowerCase(), created_by]
     );
     res.status(201).json(newItem.rows[0]);
   } catch (error) {
@@ -99,6 +159,22 @@ export const createItem = async (req: Request, res: Response) => {
   }
 };
 
+/**
+ * Updates an existing item in the database.
+ * Only updates fields that are provided in the request body.
+ * Allowed fields: product_id, quantity, current_location_id, status.
+ *
+ * @param {Request} req - Express request object with:
+ *   - id: UUID of the item to update (in params)
+ *   - Updatable fields in body (product_id, quantity, current_location_id, status)
+ * @param {Response} res - Express response object
+ * @returns {Promise<Response>} JSON object of the updated item or error message
+ * @throws {400} Invalid id or product_id (must be valid UUIDs)
+ * @throws {400} Invalid product_id if product doesn't exist in database
+ * @throws {400} No updatable fields provided if request body is empty or contains no allowed fields
+ * @throws {404} Item not found if no item matches the provided ID
+ * @throws {500} Internal server error if database query fails
+ */
 export const updateItem = async (req: Request, res: Response) => {
   const { id } = req.params;
 
@@ -164,6 +240,16 @@ export const updateItem = async (req: Request, res: Response) => {
   }
 };
 
+/**
+ * Deletes an item from the database by its ID.
+ *
+ * @param {Request} req - Express request object with:
+ *   - id: UUID of the item to delete (in params)
+ * @param {Response} res - Express response object
+ * @returns {Promise<Response>} Success message or error message
+ * @throws {404} Item not found if no item matches the provided ID
+ * @throws {500} Internal server error if database query fails
+ */
 export const deleteItem = async (req: Request, res: Response) => {
   const { id } = req.params;
   try {
