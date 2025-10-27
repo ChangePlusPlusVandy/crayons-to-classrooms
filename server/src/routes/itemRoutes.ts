@@ -31,7 +31,6 @@ itemsRoutes.get('/product/:productId', getItemsByProductId);
 itemsRoutes.get('/:id', getItemById);
 
 // update an existing item
-// toDo: remove desc - edit each individual field (not ID or the created timestamps but make sure to update the updated timestamp when something is updated)
 itemsRoutes.patch('/update/:id', updateItem);
 
 // delete an item
