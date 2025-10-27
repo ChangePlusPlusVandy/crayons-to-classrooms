@@ -59,7 +59,6 @@ export async function getMovementsByAction(
       'SELECT * FROM "inventory movement" WHERE inventory_action = $1;',
       [validAction]
     );
-    // res.json(result.rows);
     if (result.rows.length === 0) {
       res.status(404).json({ error: 'No movement with that action found' });
     } else {
