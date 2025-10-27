@@ -97,8 +97,16 @@ export const updateItem = async (req: Request, res: Response) => {
   for (const [key, value] of Object.entries(req.body ?? {})) {
     if (!allowed[key]) continue;
 
-    if (key === 'product_id' && value != null && !isUuid(String(value))) {
-      return res.status(400).json({ error: 'Invalid product_id (UUID required)' });
+    if (key === 'product_id' && value != null) {
+      if (!isUuid(String(value))) {
+        return res.status(400).json({ error: 'Invalid product_id (UUID required)' });
+      }
+
+      // check if product_id exists
+      const productCheck = await pool.query('SELECT id FROM products WHERE id = $1', [value]);
+      if (productCheck.rows.length === 0) {
+        return res.status(400).json({ error: 'Invalid product_id' });
+      }
     }
 
     // insert parameter and increment index
