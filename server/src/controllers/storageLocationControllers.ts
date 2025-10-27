@@ -5,7 +5,7 @@ import pool from '../db.js';
 export async function getAllStorageLocations(req: Request, res: Response): Promise<void> {
     try {
         const result = await pool.query(
-            'SELECT * FROM storage locations ORDER BY created_at DESC'
+            'SELECT * FROM storage_locations ORDER BY created_at DESC'
         );
         res.json(result.rows);
     } catch (error) {
@@ -18,7 +18,7 @@ export async function getAllStorageLocations(req: Request, res: Response): Promi
 export async function getStorageLocationById(req: Request<{ id: string }>, res: Response): Promise<void> {
     const { id } = req.params;
     try {
-        const result = await pool.query('SELECT * FROM storage locations WHERE id = $1', [
+        const result = await pool.query('SELECT * FROM storage_locations WHERE id = $1', [
             id,
         ]);
         if (result.rows.length === 0) {
@@ -36,7 +36,7 @@ export async function getStorageLocationById(req: Request<{ id: string }>, res: 
 export async function getStorageLocationByLocationCode (req: Request<{ locationCode: string }>, res: Response): Promise<void> {
     const { locationCode } = req.params;
     try {
-        const result = await pool.query('SELECT * FROM storage locations WHERE location_code = $1', [
+        const result = await pool.query('SELECT * FROM storage_locations WHERE location_code = $1', [
             locationCode,
         ]);
         if (result.rows.length == 0) {
@@ -58,7 +58,7 @@ export async function createStorageLocation(
     const { aisle, fixture, location_code, active, extra_info, warehouse_id } = req.body;
     try {
         const result = await pool.query(
-            'INSERT INTO storage locations (aisle, fixture, location_code, active, extra_info, warehouse_id) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *;',
+            'INSERT INTO storage_locations (aisle, fixture, location_code, active, extra_info, warehouse_id) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *;',
             [aisle, fixture, location_code, active, extra_info, warehouse_id]
         );
         res.status(201).json(result.rows[0]);
@@ -78,7 +78,7 @@ export async function updateStorageLocation(
   
     try {
       const result = await pool.query(
-        'UPDATE storage locations SET aisle = COALESCE($1, aisle), fixture = COALESCE($2, fixture), location_code = COALESCE($3, location_code), active = COALESCE($4, active), extra_info = COALESCE($5, extra_info), warehouse_id = COALESCE($6, warehouse_id) WHERE id = $7 RETURNING *;',
+        'UPDATE storage_locations SET aisle = COALESCE($1, aisle), fixture = COALESCE($2, fixture), location_code = COALESCE($3, location_code), active = COALESCE($4, active), extra_info = COALESCE($5, extra_info), warehouse_id = COALESCE($6, warehouse_id) WHERE id = $7 RETURNING *;',
         [aisle, fixture, location_code, active, extra_info, warehouse_id, id]
       );
   
@@ -97,7 +97,7 @@ export async function updateStorageLocation(
 export async function deleteStorageLocation(req: Request<{ id: string }>, res: Response): Promise<void> {
     const { id } = req.params;
     try {
-      const result = await pool.query('DELETE FROM storage locations WHERE id = $1 RETURNING *;', [id]);
+    const result = await pool.query('DELETE FROM storage_locations WHERE id = $1 RETURNING *;', [id]);
       if (result.rows.length === 0) {
         res.status(404).json({ error: 'Not found' });
       } else {

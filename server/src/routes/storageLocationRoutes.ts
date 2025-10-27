@@ -11,7 +11,7 @@ import {
 const router = express.Router();
 
 router.get('/', getAllStorageLocations); // GET /api/storage-locations
-router.get('/code/:locationCode', getStorageLocationByLocationCode); // GET /api/storage-locations/code/:locationCode
+router.get('/by-code/:locationCode', getStorageLocationByLocationCode);
 router.get('/:id', getStorageLocationById); // GET /api/storage-locations/:id
 router.post('/', createStorageLocation); // POST /api/storage-locations
 router.put('/:id', updateStorageLocation); // PUT /api/storage-locations/:id
