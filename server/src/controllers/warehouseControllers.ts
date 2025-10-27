@@ -65,43 +65,18 @@ export async function createWarehouse(
   }
 }
 
-// PUT (update name of a warehouse only) by id
-export async function updateWarehouseName(
-  req: Request<{ id: string }, {}, { name: string }>,
+// POST (update a warehouse's name or address) by id
+export async function updateWarehouse(
+  req: Request<{ id: string }, {}, { name: string, address?: string}>,
   res: Response
 ): Promise<void> {
   const { id } = req.params;
-  const { name } = req.body;
+  const { name, address } = req.body;
 
   try {
     const result = await pool.query(
-      'UPDATE warehouse SET name = COALESCE($1, name) WHERE id = $2 RETURNING *;',
-      [name, id]
-    );
-
-    if (result.rows.length === 0) {
-      res.status(404).json({ error: 'Not found' });
-    } else {
-      res.json(result.rows[0]);
-    }
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Internal Server Error' });
-  }
-}
-
-// PUT (update warehouse address only) by id
-export async function updateWarehouseAddress(
-  req: Request<{ id: string }, {}, { address: string }>,
-  res: Response
-): Promise<void> {
-  const { id } = req.params;
-  const { address } = req.body;
-
-  try {
-    const result = await pool.query(
-      'UPDATE warehouse SET address = COALESCE($1, address) WHERE id = $2 RETURNING *;',
-      [address, id]
+      'UPDATE warehouse SET name = COALESCE($1, name), address = COALESCE($2, address) WHERE id = $3 RETURNING *;',
+      [name, address, id]
     );
 
     if (result.rows.length === 0) {
