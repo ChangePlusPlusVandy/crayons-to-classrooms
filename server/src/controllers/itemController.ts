@@ -64,6 +64,29 @@ export const getItemsByStatus = async (req: Request, res: Response) => {
 export const createItem = async (req: Request, res: Response) => {
   const { product_id, quantity, current_location_id, status, created_by } = req.body;
 
+  // check if product_id, current_location_id, created_by exist in tables
+  try {
+    const productCheck = await pool.query('SELECT id FROM products WHERE id = $1', [product_id]);
+    if (productCheck.rows.length === 0) {
+      return res.status(400).json({ error: 'Invalid product_id' });
+    }
+
+    const locationCheck = await pool.query('SELECT id FROM locations WHERE id = $1', [
+      current_location_id,
+    ]);
+    if (locationCheck.rows.length === 0) {
+      return res.status(400).json({ error: 'Invalid current_location_id' });
+    }
+
+    const userCheck = await pool.query('SELECT id FROM users WHERE id = $1', [created_by]);
+    if (userCheck.rows.length === 0) {
+      return res.status(400).json({ error: 'Invalid created_by user id' });
+    }
+  } catch (error) {
+    console.error('Error validating foreign keys:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+
   try {
     const newItem = await pool.query(
       'INSERT INTO items (product_id, quantity, current_location_id, status, created_by, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, NOW(), NOW()) RETURNING *',
