@@ -22,6 +22,8 @@ app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
 
+// Mount inventory movement routes
+app.use('/api/inventory-movement', inventoryMovementRoutes);
 // Mount example test routes
 app.use('/api/test', testRoutes);
 
