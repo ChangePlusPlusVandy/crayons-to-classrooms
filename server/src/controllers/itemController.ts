@@ -165,7 +165,7 @@ export const createItem = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Invalid product_id' });
     }
 
-    const locationCheck = await pool.query('SELECT id FROM locations WHERE id = $1', [
+    const locationCheck = await pool.query('SELECT id FROM storage_locations WHERE id = $1', [
       current_location_id,
     ]);
     if (locationCheck.rows.length === 0) {
@@ -213,7 +213,7 @@ export const updateItem = async (req: Request, res: Response) => {
   const { id } = req.params;
 
   if (!isUuid(id)) {
-    return res.status(400).json({ error: 'Invalid id (UUID required)' });
+    return res.status(400).json({ error: 'Invalid id' });
   }
 
   const allowed: Record<string, true> = {
@@ -232,7 +232,7 @@ export const updateItem = async (req: Request, res: Response) => {
 
     if (key === 'product_id' && value != null) {
       if (!isUuid(String(value))) {
-        return res.status(400).json({ error: 'Invalid product_id (UUID required)' });
+        return res.status(400).json({ error: 'Invalid product_id' });
       }
 
       // check if product_id exists
