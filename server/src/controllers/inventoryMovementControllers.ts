@@ -369,7 +369,7 @@ export async function deleteInventoryMovement(
     if (result.rows.length === 0) {
       res.status(404).json({ error: 'Inventory movement not found' });
     } else {
-      res.json({ message: 'Deleted Sucessfully', deleted: result.rows[0] });
+      res.json({ message: 'Deleted Successfully', deleted: result.rows[0] });
     }
   } catch (error) {
     console.error(error);
