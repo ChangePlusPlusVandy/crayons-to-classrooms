@@ -16,6 +16,18 @@ const countRows = (rows: any[], res: Response) => {
   return true;
 };
 
+const validateStatus = (status: string, res: Response) => {
+  if (
+    !status ||
+    typeof status !== 'string' ||
+    !['active', 'inactive', 'discontinued', 'checked out'].includes(status.toLowerCase())
+  ) {
+    res.status(400).json({ error: 'Invalid status value' });
+    return false;
+  }
+  return true;
+};
+
 /**
  * Retrieves all items from the database.
  *
@@ -128,6 +140,11 @@ export const getItemsByLocationId = async (req: Request, res: Response) => {
  */
 export const getItemsByStatus = async (req: Request, res: Response) => {
   const { status } = req.query;
+
+  if (!validateStatus(String(status), res)) {
+    return;
+  }
+
   try {
     const items = await pool.query('SELECT * FROM items WHERE status = $1', [status]);
     if (!countRows(items.rows, res)) {
@@ -175,6 +192,10 @@ export const createItem = async (req: Request, res: Response) => {
     const userCheck = await pool.query('SELECT id FROM users WHERE id = $1', [created_by]);
     if (userCheck.rows.length === 0) {
       return res.status(400).json({ error: 'Invalid created_by user id' });
+    }
+
+    if (!validateStatus(status, res)) {
+      return;
     }
   } catch (error) {
     console.error('Error validating foreign keys:', error);
