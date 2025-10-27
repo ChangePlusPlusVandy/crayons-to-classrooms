@@ -3,6 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import pool from './db.js';
 import testRoutes from './routes/testRoutes.js';
+import inventoryMovementRoutes from './routes/inventoryMovementRoutes.js';
 
 dotenv.config();
 
@@ -15,11 +16,12 @@ app.get('/', (_req, res) => {
   res.send('Server is running');
 });
 
-// Mount example test routes
-app.use('/api/test', testRoutes);
-
 // Start server
 const PORT = process.env.PORT || 5001;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
+
+// Mount example test routes
+app.use('/api/test', testRoutes);
+
