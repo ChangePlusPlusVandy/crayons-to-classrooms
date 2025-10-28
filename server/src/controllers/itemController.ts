@@ -1,6 +1,5 @@
 import { Request, Response } from 'express';
 import pool from '../db.js';
-import { validate as isUuid } from 'uuid';
 
 /**
  * Checks if the query returned any rows.
@@ -233,10 +232,6 @@ export const createItem = async (req: Request, res: Response) => {
 export const updateItem = async (req: Request, res: Response) => {
   const { id } = req.params;
 
-  if (!isUuid(id)) {
-    return res.status(400).json({ error: 'Invalid id' });
-  }
-
   const allowed: Record<string, true> = {
     product_id: true,
     quantity: true,
@@ -252,10 +247,6 @@ export const updateItem = async (req: Request, res: Response) => {
     if (!allowed[key]) continue;
 
     if (key === 'product_id' && value != null) {
-      if (!isUuid(String(value))) {
-        return res.status(400).json({ error: 'Invalid product_id' });
-      }
-
       // check if product_id exists
       const productCheck = await pool.query('SELECT id FROM products WHERE id = $1', [value]);
       if (productCheck.rows.length === 0) {
