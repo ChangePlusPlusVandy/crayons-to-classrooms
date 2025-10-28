@@ -119,6 +119,10 @@ export const getItemsByProductId = async (req: Request, res: Response) => {
 
     res.json(items.rows);
   } catch (error) {
+    if (error instanceof ZodError) {
+      return handleValidationError(error, res);
+    }
+
     console.error('Error fetching items by product ID:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
@@ -146,6 +150,10 @@ export const getItemsByLocationId = async (req: Request, res: Response) => {
 
     res.json(items.rows);
   } catch (error) {
+    if (error instanceof ZodError) {
+      return handleValidationError(error, res);
+    }
+
     console.error('Error fetching items by location ID:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
