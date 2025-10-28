@@ -20,7 +20,7 @@ export const locationIdParamSchema = z.object({
 /**
  * Valid status values for items
  */
-export const ItemStatus = z.enum(['active', 'inactive', 'discontinued', 'checked out']);
+export const ItemStatus = z.enum(['active', 'inactive', 'discontinued', 'checked_out']);
 
 /**
  * Schema for validating item creation
@@ -41,7 +41,7 @@ export const createItemSchema = z.object({
 export const updateItemSchema = z
   .object({
     product_id: z.uuid().optional(),
-    quantity: z.number().int().positive('Quantity must be a positive integer').optional(),
+    quantity: z.number().int().nonnegative('Quantity cannot be negative').optional(),
     current_location_id: z.uuid().optional(),
     status: ItemStatus.optional(),
   })

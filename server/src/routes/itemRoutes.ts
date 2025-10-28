@@ -12,11 +12,11 @@ import express from 'express';
 
 export const itemsRoutes = express.Router();
 
-// get all items
-itemsRoutes.get('/', getItems);
-
 // get items by status
 itemsRoutes.get('/status', getItemsByStatus);
+
+// get all items
+itemsRoutes.get('/', getItems);
 
 // create a new item
 itemsRoutes.post('/', createItem);
