@@ -19,7 +19,7 @@ itemsRoutes.get('/', getItems);
 itemsRoutes.get('/status', getItemsByStatus);
 
 // create a new item
-itemsRoutes.post('/add', createItem);
+itemsRoutes.post('/', createItem);
 
 // get items by current location
 itemsRoutes.get('/location/:locationId', getItemsByLocationId);
@@ -31,7 +31,7 @@ itemsRoutes.get('/product/:productId', getItemsByProductId);
 itemsRoutes.get('/:id', getItemById);
 
 // update an existing item
-itemsRoutes.patch('/update/:id', updateItem);
+itemsRoutes.patch('/:id', updateItem);
 
 // delete an item
 itemsRoutes.delete('/:id', deleteItem);
