@@ -208,24 +208,21 @@ export const createItem = async (req: Request, res: Response) => {
     const { product_id, current_location_id, created_by, quantity, status }: CreateItemInput =
       createItemSchema.parse(req.body);
 
-    // Check if product_id, current_location_id, created_by exist in tables
-    const productCheck = await pool.query('SELECT id FROM products WHERE id = $1', [product_id]);
+    // Check if product_id, current_location_id, created_by exist in tables (in parallel)
+    const [productCheck, locationCheck, userCheck] = await Promise.all([
+      pool.query('SELECT id FROM products WHERE id = $1', [product_id]),
+      pool.query('SELECT id FROM storage_locations WHERE id = $1', [current_location_id]),
+      pool.query('SELECT id FROM users WHERE id = $1', [created_by]),
+    ]);
     if (productCheck.rows.length === 0) {
       return res.status(400).json({ error: 'Invalid product_id' });
     }
-
-    const locationCheck = await pool.query('SELECT id FROM storage_locations WHERE id = $1', [
-      current_location_id,
-    ]);
     if (locationCheck.rows.length === 0) {
       return res.status(400).json({ error: 'Invalid current_location_id' });
     }
-
-    const userCheck = await pool.query('SELECT id FROM users WHERE id = $1', [created_by]);
     if (userCheck.rows.length === 0) {
       return res.status(400).json({ error: 'Invalid created_by user id' });
     }
-
     const newItem = await pool.query(
       'INSERT INTO items (product_id, quantity, current_location_id, status, created_by, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, NOW(), NOW()) RETURNING *',
       [product_id, quantity, current_location_id, status, created_by]
