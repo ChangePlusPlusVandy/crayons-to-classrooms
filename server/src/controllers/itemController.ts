@@ -1,5 +1,16 @@
 import { Request, Response } from 'express';
 import pool from '../db.js';
+import {
+  createItemSchema,
+  updateItemSchema,
+  statusQuerySchema,
+  itemIdParamSchema,
+  productIdParamSchema,
+  locationIdParamSchema,
+  CreateItemInput,
+  UpdateItemInput,
+} from '../utils/itemsModel.js';
+import { ZodError } from 'zod';
 
 /**
  * Checks if the query returned any rows.
@@ -15,16 +26,23 @@ const countRows = (rows: any[], res: Response) => {
   return true;
 };
 
-const validateStatus = (status: string, res: Response) => {
-  if (
-    !status ||
-    typeof status !== 'string' ||
-    !['active', 'inactive', 'discontinued', 'checked out'].includes(status.toLowerCase())
-  ) {
-    res.status(400).json({ error: 'Invalid status value' });
-    return false;
+/**
+ * Handles Zod validation errors and sends appropriate error response
+ * @param error - The error object
+ * @param res - The Express response object
+ */
+const handleValidationError = (error: unknown, res: Response) => {
+  if (error instanceof ZodError) {
+    return res.status(400).json({
+      error: 'Validation error',
+      details: error.issues.map((err) => ({
+        field: err.path.join('.'),
+        message: err.message,
+      })),
+    });
   }
-  return true;
+  console.error('Unexpected error:', error);
+  return res.status(500).json({ error: 'Internal server error' });
 };
 
 /**
@@ -61,8 +79,9 @@ export const getItems = async (req: Request, res: Response) => {
  * @throws {500} Internal server error if database query fails
  */
 export const getItemById = async (req: Request, res: Response) => {
-  const { id } = req.params;
   try {
+    const { id } = itemIdParamSchema.parse(req.params);
+
     const item = await pool.query('SELECT * FROM items WHERE id = $1', [id]);
 
     if (!countRows(item.rows, res)) {
@@ -71,6 +90,9 @@ export const getItemById = async (req: Request, res: Response) => {
 
     res.json(item.rows[0]);
   } catch (error) {
+    if (error instanceof ZodError) {
+      return handleValidationError(error, res);
+    }
     console.error('Error fetching item by ID:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
@@ -86,8 +108,9 @@ export const getItemById = async (req: Request, res: Response) => {
  * @throws {500} Internal server error if database query fails
  */
 export const getItemsByProductId = async (req: Request, res: Response) => {
-  const { productId } = req.params;
   try {
+    const { productId } = productIdParamSchema.parse(req.params);
+
     const items = await pool.query('SELECT * FROM items WHERE product_id = $1', [productId]);
 
     if (!countRows(items.rows, res)) {
@@ -111,8 +134,8 @@ export const getItemsByProductId = async (req: Request, res: Response) => {
  * @throws {500} Internal server error if database query fails
  */
 export const getItemsByLocationId = async (req: Request, res: Response) => {
-  const { locationId } = req.params;
   try {
+    const { locationId } = locationIdParamSchema.parse(req.params);
     const items = await pool.query('SELECT * FROM items WHERE current_location_id = $1', [
       locationId,
     ]);
@@ -138,19 +161,20 @@ export const getItemsByLocationId = async (req: Request, res: Response) => {
  * @throws {500} Internal server error if database query fails
  */
 export const getItemsByStatus = async (req: Request, res: Response) => {
-  const { status } = req.query;
-
-  if (!validateStatus(String(status), res)) {
-    return;
-  }
-
   try {
+    const { status } = statusQuerySchema.parse(req.query);
+
     const items = await pool.query('SELECT * FROM items WHERE status = $1', [status]);
+
     if (!countRows(items.rows, res)) {
       return;
     }
+
     res.json(items.rows);
   } catch (error) {
+    if (error instanceof ZodError) {
+      return handleValidationError(error, res);
+    }
     console.error('Error fetching items by status:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
@@ -172,10 +196,11 @@ export const getItemsByStatus = async (req: Request, res: Response) => {
  * @throws {500} Internal server error if validation or creation fails
  */
 export const createItem = async (req: Request, res: Response) => {
-  const { product_id, quantity, current_location_id, status, created_by } = req.body;
-
-  // check if product_id, current_location_id, created_by exist in tables
   try {
+    const { product_id, current_location_id, created_by, quantity, status }: CreateItemInput =
+      createItemSchema.parse(req.body);
+
+    // Check if product_id, current_location_id, created_by exist in tables
     const productCheck = await pool.query('SELECT id FROM products WHERE id = $1', [product_id]);
     if (productCheck.rows.length === 0) {
       return res.status(400).json({ error: 'Invalid product_id' });
@@ -193,21 +218,16 @@ export const createItem = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Invalid created_by user id' });
     }
 
-    if (!validateStatus(status, res)) {
-      return;
-    }
-  } catch (error) {
-    console.error('Error validating foreign keys:', error);
-    return res.status(500).json({ error: 'Internal server error' });
-  }
-
-  try {
     const newItem = await pool.query(
       'INSERT INTO items (product_id, quantity, current_location_id, status, created_by, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, NOW(), NOW()) RETURNING *',
-      [product_id, quantity, current_location_id, status.toLowerCase(), created_by]
+      [product_id, quantity, current_location_id, status, created_by]
     );
+
     res.status(201).json(newItem.rows[0]);
   } catch (error) {
+    if (error instanceof ZodError) {
+      return handleValidationError(error, res);
+    }
     console.error('Error creating item:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
@@ -230,51 +250,39 @@ export const createItem = async (req: Request, res: Response) => {
  * @throws {500} Internal server error if database query fails
  */
 export const updateItem = async (req: Request, res: Response) => {
-  const { id } = req.params;
+  try {
+    const { id } = itemIdParamSchema.parse(req.params);
+    const validatedData: UpdateItemInput = updateItemSchema.parse(req.body);
 
-  const allowed: Record<string, true> = {
-    product_id: true,
-    quantity: true,
-    current_location_id: true,
-    status: true,
-  };
-
-  const setClauses: string[] = [];
-  const values: any[] = [];
-  let idx = 1;
-
-  for (const [key, value] of Object.entries(req.body ?? {})) {
-    if (!allowed[key]) continue;
-
-    if (key === 'product_id' && value != null) {
-      // check if product_id exists
-      const productCheck = await pool.query('SELECT id FROM products WHERE id = $1', [value]);
+    // If product_id is being updated, verify it exists
+    if (validatedData.product_id) {
+      const productCheck = await pool.query('SELECT id FROM products WHERE id = $1', [
+        validatedData.product_id,
+      ]);
       if (productCheck.rows.length === 0) {
         return res.status(400).json({ error: 'Invalid product_id' });
       }
     }
 
-    // insert parameter and increment index
-    setClauses.push(`${key} = $${idx++}`);
+    const setClauses: string[] = [];
+    const values: any[] = [];
+    let idx = 1;
 
-    values.push(value);
-  }
+    for (const [key, value] of Object.entries(validatedData)) {
+      setClauses.push(`${key} = $${idx++}`);
+      values.push(value);
+    }
 
-  if (setClauses.length === 0) {
-    return res.status(400).json({ error: 'No updatable fields provided' });
-  } else {
     setClauses.push(`updated_at = NOW()`);
-  }
 
-  const sql = `
-    UPDATE items
-    SET ${setClauses.join(', ')}
-    WHERE id = $${idx}
-    RETURNING *;
-  `;
-  values.push(id);
+    const sql = `
+      UPDATE items
+      SET ${setClauses.join(', ')}
+      WHERE id = $${idx}
+      RETURNING *;
+    `;
+    values.push(id);
 
-  try {
     const { rows } = await pool.query(sql, values);
 
     if (!countRows(rows, res)) {
@@ -282,8 +290,11 @@ export const updateItem = async (req: Request, res: Response) => {
     }
 
     return res.json(rows[0]);
-  } catch (err) {
-    console.error('Error updating item:', err);
+  } catch (error) {
+    if (error instanceof ZodError) {
+      return handleValidationError(error, res);
+    }
+    console.error('Error updating item:', error);
     return res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -299,8 +310,9 @@ export const updateItem = async (req: Request, res: Response) => {
  * @throws {500} Internal server error if database query fails
  */
 export const deleteItem = async (req: Request, res: Response) => {
-  const { id } = req.params;
   try {
+    const { id } = itemIdParamSchema.parse(req.params);
+
     const deletedItem = await pool.query('DELETE FROM items WHERE id = $1 RETURNING *', [id]);
 
     if (!countRows(deletedItem.rows, res)) {
@@ -309,6 +321,9 @@ export const deleteItem = async (req: Request, res: Response) => {
 
     res.json({ message: 'Item deleted successfully' });
   } catch (error) {
+    if (error instanceof ZodError) {
+      return handleValidationError(error, res);
+    }
     console.error('Error deleting item:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
