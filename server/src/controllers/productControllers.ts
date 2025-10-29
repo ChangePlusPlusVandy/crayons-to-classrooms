@@ -8,8 +8,7 @@ import {
   productDescriptionParamSchema,
   CreateProductInput,
   UpdateProductInput,
-} from '../utils/productRoutes.js';
-
+} from '../utils/productsModel.js';
 import { ZodError } from 'zod';
 
 /**
@@ -166,35 +165,45 @@ export const getProductByDescription = async (req: Request, res: Response) => {
 
 /**
  * Creates a new product in the database.
- * Validates foreign key constraint for created_by.
  *
  * @param {Request} req - Express request object with:
  *   - name: Product name (in body)
  *   - description: Product description (optional, in body)
- *   - sku: Stock keeping unit (optional, in body)
+ *   - unit_of_measure: Unit of measure (e.g., "each", "box", "kg") (in body)
+ *   - value: Product value/price (in body)
+ *   - item_limit: Maximum item limit (in body)
  *   - category: Product category (optional, in body)
- *   - created_by: UUID of the user creating the product (in body)
+ *   - total_count: Total count (in body, defaults to 0)
  * @param {Response} res - Express response object
  * @returns {Promise<Response>} JSON object of the newly created product or error message
- * @throws {400} Invalid created_by if user doesn't exist
+ * @throws {400} Validation error if required fields are missing or invalid
  * @throws {500} Internal server error if validation or creation fails
  */
 export const createProduct = async (req: Request, res: Response) => {
   try {
-    const { name, description, sku, category, created_by }: CreateProductInput =
-      createProductSchema.parse(req.body);
-
-    // Check if created_by user exists
-    const userCheck = await pool.query('SELECT id FROM users WHERE id = $1', [created_by]);
-    if (userCheck.rows.length === 0) {
-      return res.status(400).json({ error: 'Invalid created_by user id' });
-    }
+    const {
+      name,
+      description,
+      unit_of_measure,
+      value,
+      item_limit,
+      category,
+      total_count,
+    }: CreateProductInput = createProductSchema.parse(req.body);
 
     const newProduct = await pool.query(
-      `INSERT INTO products (name, description, sku, category, created_by, created_at, updated_at) 
-       VALUES ($1, $2, $3, $4, $5, NOW(), NOW()) 
+      `INSERT INTO products (name, description, unit_of_measure, value, item_limit, category, total_count) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7) 
        RETURNING *`,
-      [name, description || null, sku || null, category || null, created_by]
+      [
+        name,
+        description || null,
+        unit_of_measure,
+        value,
+        item_limit,
+        category || null,
+        total_count || 0,
+      ]
     );
 
     res.status(201).json(newProduct.rows[0]);
@@ -210,11 +219,11 @@ export const createProduct = async (req: Request, res: Response) => {
 /**
  * Updates an existing product in the database.
  * Only updates fields that are provided in the request body.
- * Allowed fields: name, description, sku, category.
+ * Allowed fields: name, description, unit_of_measure, value, item_limit, category, total_count.
  *
  * @param {Request} req - Express request object with:
  *   - id: UUID of the product to update (in params)
- *   - Updatable fields in body (name, description, sku, category)
+ *   - Updatable fields in body
  * @param {Response} res - Express response object
  * @returns {Promise<Response>} JSON object of the updated product or error message
  * @throws {400} Invalid id format (must be valid UUID)
@@ -235,8 +244,6 @@ export const updateProduct = async (req: Request, res: Response) => {
       setClauses.push(`${key} = $${idx++}`);
       values.push(value);
     }
-
-    setClauses.push(`updated_at = NOW()`);
 
     const sql = `
       UPDATE products

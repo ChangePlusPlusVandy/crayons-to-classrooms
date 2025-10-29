@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import pool from './db.js';
 import testRoutes from './routes/testRoutes.js';
 import { productRoutes } from './routes/productRoutes.js';
+import { itemsRoutes } from './routes/itemRoutes.js';
 
 dotenv.config();
 
@@ -19,6 +20,9 @@ app.get('/', (_req, res) => {
 // Mount example test routes
 app.use('/api/test', testRoutes);
 app.use('/api/products', productRoutes);
+
+app.use('/api/items', itemsRoutes);
+
 // Start server
 const PORT = process.env.PORT || 5001;
 app.listen(PORT, () => {
