@@ -283,9 +283,7 @@ export const deleteProduct = async (req: Request, res: Response) => {
   try {
     const { id } = productIdParamSchema.parse(req.params);
 
-    const deletedProduct = await pool.query('DELETE FROM products WHERE id = $1 RETURNING *', [
-      id,
-    ]);
+    const deletedProduct = await pool.query('DELETE FROM products WHERE id = $1 RETURNING *', [id]);
 
     if (!countRows(deletedProduct.rows, res)) {
       return;

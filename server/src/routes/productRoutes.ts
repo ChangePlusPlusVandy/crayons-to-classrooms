@@ -1,12 +1,12 @@
 import express from 'express';
 import {
-    getAllProducts,
-    createProduct,
-    getProductById,
-    getProductByName,
-    getProductByDescription,
-    updateProduct,
-    deleteProduct,
+  getAllProducts,
+  createProduct,
+  getProductById,
+  getProductByName,
+  getProductByDescription,
+  updateProduct,
+  deleteProduct,
 } from '../controllers/productControllers.js';
 
 export const productRoutes = express.Router();
@@ -18,7 +18,7 @@ productRoutes.get('/', getAllProducts);
 productRoutes.post('/', createProduct);
 
 // get product by name
-productRoutes.get('/search/name/:name', getProductByName); 
+productRoutes.get('/search/name/:name', getProductByName);
 
 // get product by description
 productRoutes.get('/search/description/:description', getProductByDescription);
@@ -30,5 +30,4 @@ productRoutes.get('/:id', getProductById);
 productRoutes.patch('/:id', updateProduct);
 
 // delete a product
-productRoutes.delete('/:id', deleteProduct); 
-
+productRoutes.delete('/:id', deleteProduct);

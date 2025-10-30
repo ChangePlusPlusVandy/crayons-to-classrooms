@@ -8,7 +8,11 @@ export const createProductSchema = z.object({
   value: z.number().positive('Value must be a positive number'),
   item_limit: z.number().int().nonnegative('Item limit must be a non-negative integer'),
   category: z.string().optional(),
-  total_count: z.number().int().nonnegative('Total count must be a non-negative integer').default(0),
+  total_count: z
+    .number()
+    .int()
+    .nonnegative('Total count must be a non-negative integer')
+    .default(0),
 });
 
 export const updateProductSchema = z
