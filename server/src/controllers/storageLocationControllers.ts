@@ -68,7 +68,7 @@ export async function createStorageLocation(
     }
 }
 
-//PUT for each field
+//PATCH for each field
 export async function updateStorageLocation(
     req: Request<{ id: string }, {}, { aisle?: string; fixture?: string; location_code?: string; active?: boolean; extra_info?: string; warehouse_id?: number }>,
     res: Response
