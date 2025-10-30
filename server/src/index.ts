@@ -20,6 +20,10 @@ app.get('/', (_req, res) => {
 // Mount example test routes
 app.use('/api/test', testRoutes);
 
+app.use('/api/items', itemsRoutes);
+
+app.use('/api/users', usersRoutes);
+
 // Start server
 const PORT = process.env.PORT || 5001;
 app.listen(PORT, () => {
