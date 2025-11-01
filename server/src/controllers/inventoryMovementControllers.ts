@@ -59,7 +59,6 @@ export async function getMovementsByAction(
       'SELECT * FROM "inventory movement" WHERE inventory_action = $1;',
       [validAction]
     );
-    // res.json(result.rows);
     if (result.rows.length === 0) {
       res.status(404).json({ error: 'No movement with that action found' });
     } else {
@@ -369,9 +368,8 @@ export async function updateInventoryMovement(
     if (result.rows.length === 0) {
       res.status(404).json({ error: 'ID not found' });
       return;
-    } else {
-      res.status(200).json(result.rows[0]);
     }
+    res.status(200).json(result.rows[0]);
   } catch (error) {
     console.error('PATCH /inventory-movement/:id failed:', error);
     res.status(500).json({ error: 'Internal Server Error' });
@@ -391,7 +389,7 @@ export async function deleteInventoryMovement(
     if (result.rows.length === 0) {
       res.status(404).json({ error: 'Inventory movement not found' });
     } else {
-      res.json({ message: 'Deleted Sucessfully', deleted: result.rows[0] });
+      res.json({ message: 'Deleted Successfully', deleted: result.rows[0] });
     }
   } catch (error) {
     console.error(error);

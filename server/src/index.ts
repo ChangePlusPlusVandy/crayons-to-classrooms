@@ -16,14 +16,22 @@ app.get('/', (_req, res) => {
   res.send('Server is running');
 });
 
+// Mount inventory movement routes
+app.use('/api/inventory-movement', inventoryMovementRoutes);
+// Mount example test routes
+app.use('/api/test', testRoutes);
+
 // Start server
 const PORT = process.env.PORT || 5001;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
+<<<<<<< HEAD
 
 // Mount example test routes
 app.use('/api/test', testRoutes);
 // Mount inventory movement routes
 app.use('/api/inventory-movement', inventoryMovementRoutes);
 
+=======
+>>>>>>> 471d8217b9faf39d767933b0d10ec652f16a1a80
