@@ -178,18 +178,40 @@ export async function getMovementsByPerformedId(
   }
 }
 
-// GET rows by time
-export async function getMovementsByTime(
-  req: Request<{ time: string }>,
+// GET rows by date on and before
+export async function getMovementsOnAndBeforeDate(
+  req: Request<{ date: string }>,
   res: Response
 ): Promise<void> {
-  const { time } = req.params;
+  const { date } = req.params;
   try {
-    const result = await pool.query('SELECT * FROM "inventory movement" WHERE performed_at = $1', [
-      time,
+    const result = await pool.query(
+      'SELECT * FROM "inventory movement" WHERE performed_at <= $1::date ORDER BY performed_at DESC;',
+      [date]
+    );
+    if (result.rows.length === 0) {
+      res.status(404).json({ error: 'No movements at that date or before found' });
+    } else {
+      res.json(result.rows);
+    }
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+}
+
+// GET rows by date on and after
+export async function getMovementsOnAndAfterDate(
+  req: Request<{ date: string }>,
+  res: Response
+): Promise<void> {
+  const { date } = req.params;
+  try {
+    const result = await pool.query('SELECT * FROM "inventory movement" WHERE performed_at >= $1::date ORDER BY performed_at ASC;', [
+      date,
     ]);
     if (result.rows.length === 0) {
-      res.status(404).json({ error: 'No movements at that date and time found' });
+      res.status(404).json({ error: 'No movements at that date or later found' });
     } else {
       res.json(result.rows);
     }

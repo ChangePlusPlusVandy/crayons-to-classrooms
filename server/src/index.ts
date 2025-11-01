@@ -24,4 +24,6 @@ app.listen(PORT, () => {
 
 // Mount example test routes
 app.use('/api/test', testRoutes);
+// Mount inventory movement routes
+app.use('/api/inventory-movement', inventoryMovementRoutes);
 
