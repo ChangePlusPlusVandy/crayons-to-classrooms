@@ -126,10 +126,8 @@ export async function updateStorageLocation(req: Request, res: Response) {
     let idx = 1;
 
     for (const [key, value] of Object.entries(validatedData)) {
-      if (value !== undefined) {
-        setClauses.push(`${key} = $${idx++}`);
-        values.push(value);
-      }
+      setClauses.push(`${key} = $${idx++}`);
+      values.push(value);
     }
 
     const sql = `
