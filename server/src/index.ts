@@ -3,7 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import pool from './db.js';
 import testRoutes from './routes/testRoutes.js';
-import { itemsRoutes } from './routes/itemRoutes.js';
+import itemsRoutes from './routes/itemRoutes.js';
 import storageLocationRoutes from './routes/storageLocationRoutes.js';
 import usersRoutes from './routes/usersRoutes.js';
 import inventoryMovementRoutes from './routes/inventoryMovementRoutes.js';

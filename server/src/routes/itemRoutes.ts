@@ -10,28 +10,23 @@ import {
 } from '../controllers/itemController.js';
 import express from 'express';
 
-export const itemsRoutes = express.Router();
+const router = express.Router();
 
 // get items by status
-itemsRoutes.get('/status', getItemsByStatus);
-
+router.get('/status', getItemsByStatus);
 // get all items
-itemsRoutes.get('/', getItems);
-
+router.get('/', getItems);
 // create a new item
-itemsRoutes.post('/', createItem);
-
+router.post('/', createItem);
 // get items by current location
-itemsRoutes.get('/location/:locationId', getItemsByLocationId);
-
+router.get('/location/:locationId', getItemsByLocationId);
 // get items by product id
-itemsRoutes.get('/product/:productId', getItemsByProductId);
-
+router.get('/product/:productId', getItemsByProductId);
 // get item by ID
-itemsRoutes.get('/:id', getItemById);
-
+router.get('/:id', getItemById);
 // update an existing item
-itemsRoutes.patch('/:id', updateItem);
-
+router.patch('/:id', updateItem);
 // delete an item
-itemsRoutes.delete('/:id', deleteItem);
+router.delete('/:id', deleteItem);
+
+export default router;
