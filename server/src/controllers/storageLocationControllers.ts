@@ -22,15 +22,13 @@ const handleValidationError = (error: unknown, res: Response) => {
     });
   }
   console.error('Unexpected error:', error);
-  return res.status(500).json({ error: 'Internal server error' });
+  return res.status(500).json({ error: 'Internal Server Error' });
 };
 
 // GET all storage locations
 export async function getAllStorageLocations(req: Request, res: Response) {
   try {
-    const result = await pool.query(
-      'SELECT * FROM storage_locations ORDER BY created_at DESC'
-    );
+    const result = await pool.query('SELECT * FROM storage_locations ORDER BY created_at DESC');
     res.json(result.rows);
   } catch (error) {
     console.error(error);
@@ -61,10 +59,7 @@ export async function getStorageLocationById(req: Request, res: Response) {
 }
 
 // GET storage location by location code
-export async function getStorageLocationByLocationCode(
-  req: Request,
-  res: Response
-) {
+export async function getStorageLocationByLocationCode(req: Request, res: Response) {
   try {
     const { locationCode } = locationCodeParamSchema.parse(req.params);
 
@@ -99,6 +94,14 @@ export async function createStorageLocation(req: Request, res: Response) {
       warehouse_id,
     }: CreateStorageLocationInput = createStorageLocationSchema.parse(req.body);
 
+    // Check if warehouse_id exists in warehouses table
+    const warehouseCheck = await pool.query('SELECT id FROM warehouses WHERE id = $1', [
+      warehouse_id,
+    ]);
+    if (warehouseCheck.rows.length === 0) {
+      return res.status(400).json({ error: 'Invalid warehouse_id' });
+    }
+
     const result = await pool.query(
       'INSERT INTO storage_locations (aisle, fixture, location_code, active, extra_info, warehouse_id) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *;',
       [aisle, fixture, location_code, active, extra_info, warehouse_id]
@@ -119,6 +122,16 @@ export async function updateStorageLocation(req: Request, res: Response) {
   try {
     const { id } = storageLocationIdParamSchema.parse(req.params);
     const validatedData: UpdateStorageLocationInput = updateStorageLocationSchema.parse(req.body);
+
+    // If warehouse_id is being updated, verify it exists
+    if (validatedData.warehouse_id) {
+      const warehouseCheck = await pool.query('SELECT id FROM warehouses WHERE id = $1', [
+        validatedData.warehouse_id,
+      ]);
+      if (warehouseCheck.rows.length === 0) {
+        return res.status(400).json({ error: 'Invalid warehouse_id' });
+      }
+    }
 
     // Build dynamic UPDATE query (like itemController)
     const setClauses: string[] = [];
