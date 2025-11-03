@@ -5,6 +5,7 @@ import pool from './db.js';
 import testRoutes from './routes/testRoutes.js';
 import { itemsRoutes } from './routes/itemRoutes.js';
 import usersRoutes from './routes/usersRoutes.js';
+import inventoryMovementRoutes from './routes/inventoryMovementRoutes.js';
 
 dotenv.config();
 
@@ -23,6 +24,8 @@ app.use('/api/test', testRoutes);
 app.use('/api/items', itemsRoutes);
 
 app.use('/api/users', usersRoutes);
+
+app.use('/api/inventory-movement', inventoryMovementRoutes);
 
 // Start server
 const PORT = process.env.PORT || 5001;
