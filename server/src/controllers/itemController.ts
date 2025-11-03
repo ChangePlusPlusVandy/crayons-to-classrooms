@@ -1,0 +1,335 @@
+import { Request, Response } from 'express';
+import pool from '../db.js';
+import {
+  createItemSchema,
+  updateItemSchema,
+  statusQuerySchema,
+  itemIdParamSchema,
+  productIdParamSchema,
+  locationIdParamSchema,
+  CreateItemInput,
+  UpdateItemInput,
+} from '../utils/itemsModel.js';
+import { ZodError } from 'zod';
+
+/**
+ * Checks if the query returned any rows.
+ * @param rows - The rows returned from the database query.
+ * @param res - The Express response object.
+ * @returns True if rows exist, otherwise sends a 404 response and returns false.
+ */
+const countRows = (rows: any[], res: Response) => {
+  if (rows.length === 0) {
+    res.status(404).json({ error: 'No entries found' });
+    return false;
+  }
+  return true;
+};
+
+/**
+ * Handles Zod validation errors and sends appropriate error response
+ * @param error - The error object
+ * @param res - The Express response object
+ */
+const handleValidationError = (error: unknown, res: Response) => {
+  if (error instanceof ZodError) {
+    return res.status(400).json({
+      error: 'Validation error',
+      details: error.issues.map((err) => ({
+        field: err.path.join('.'),
+        message: err.message,
+      })),
+    });
+  }
+  console.error('Unexpected error:', error);
+  return res.status(500).json({ error: 'Internal server error' });
+};
+
+/**
+ * Retrieves all items from the database.
+ *
+ * @param {Request} req - Express request object
+ * @param {Response} res - Express response object
+ * @returns {Promise<Response>} JSON array of all items or error message
+ * @throws {500} Internal server error if database query fails
+ */
+export const getItems = async (req: Request, res: Response) => {
+  try {
+    const items = await pool.query('SELECT * FROM items');
+
+    if (!countRows(items.rows, res)) {
+      return;
+    }
+
+    res.json(items.rows);
+  } catch (error) {
+    console.error('Error fetching items:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+/**
+ * Retrieves a single item by its unique ID.
+ *
+ * @param {Request} req - Express request object with:
+ *   - id: UUID of the item (in params)
+ * @param {Response} res - Express response object
+ * @returns {Promise<Response>} JSON object of the requested item or error message
+ * @throws {404} Item not found if no item matches the provided ID
+ * @throws {500} Internal server error if database query fails
+ */
+export const getItemById = async (req: Request, res: Response) => {
+  try {
+    const { id } = itemIdParamSchema.parse(req.params);
+
+    const item = await pool.query('SELECT * FROM items WHERE id = $1', [id]);
+
+    if (!countRows(item.rows, res)) {
+      return;
+    }
+
+    res.json(item.rows[0]);
+  } catch (error) {
+    if (error instanceof ZodError) {
+      return handleValidationError(error, res);
+    }
+    console.error('Error fetching item by ID:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+/**
+ * Retrieves all items associated with a specific product ID.
+ *
+ * @param {Request} req - Express request object with:
+ *   - productId: UUID of the product (in params)
+ * @param {Response} res - Express response object
+ * @returns {Promise<Response>} JSON array of items matching the product ID or error message
+ * @throws {500} Internal server error if database query fails
+ */
+export const getItemsByProductId = async (req: Request, res: Response) => {
+  try {
+    const { productId } = productIdParamSchema.parse(req.params);
+
+    const items = await pool.query('SELECT * FROM items WHERE product_id = $1', [productId]);
+
+    if (!countRows(items.rows, res)) {
+      return;
+    }
+
+    res.json(items.rows);
+  } catch (error) {
+    if (error instanceof ZodError) {
+      return handleValidationError(error, res);
+    }
+
+    console.error('Error fetching items by product ID:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+/**
+ * Retrieves all items currently at a specific location.
+ *
+ * @param {Request} req - Express request object with:
+ *   - locationId: UUID of the location (in params)
+ * @param {Response} res - Express response object
+ * @returns {Promise<Response>} JSON array of items at the specified location or error message
+ * @throws {500} Internal server error if database query fails
+ */
+export const getItemsByLocationId = async (req: Request, res: Response) => {
+  try {
+    const { locationId } = locationIdParamSchema.parse(req.params);
+    const items = await pool.query('SELECT * FROM items WHERE current_location_id = $1', [
+      locationId,
+    ]);
+
+    if (!countRows(items.rows, res)) {
+      return;
+    }
+
+    res.json(items.rows);
+  } catch (error) {
+    if (error instanceof ZodError) {
+      return handleValidationError(error, res);
+    }
+
+    console.error('Error fetching items by location ID:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+/**
+ * Retrieves all items with a specific status.
+ *
+ * @param {Request} req - Express request object with:
+ *   - status: Status of the items to filter by (in query)
+ * @param {Response} res - Express response object
+ * @returns {Promise<Response>} JSON array of items with the specified status or error message
+ * @throws {500} Internal server error if database query fails
+ */
+export const getItemsByStatus = async (req: Request, res: Response) => {
+  try {
+    const { status } = statusQuerySchema.parse(req.query);
+
+    const items = await pool.query('SELECT * FROM items WHERE status = $1', [status]);
+
+    if (!countRows(items.rows, res)) {
+      return;
+    }
+
+    res.json(items.rows);
+  } catch (error) {
+    if (error instanceof ZodError) {
+      return handleValidationError(error, res);
+    }
+    console.error('Error fetching items by status:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+/**
+ * Creates a new item in the database.
+ * Validates foreign key constraints for product_id, current_location_id, and created_by.
+ *
+ * @param {Request} req - Express request object with:
+ *   - product_id: UUID of the product (in body)
+ *   - quantity: Number of items (in body)
+ *   - current_location_id: UUID of the current location (in body)
+ *   - status: Current status of the item ie ('active', 'inactive', 'discontinued', 'checked out') (in body)
+ *   - created_by: UUID of the user creating the item (in body)
+ * @param {Response} res - Express response object
+ * @returns {Promise<Response>} JSON object of the newly created item or error message
+ * @throws {400} Invalid foreign key if product_id, current_location_id, or created_by doesn't exist
+ * @throws {500} Internal server error if validation or creation fails
+ */
+export const createItem = async (req: Request, res: Response) => {
+  try {
+    const { product_id, current_location_id, created_by, quantity, status }: CreateItemInput =
+      createItemSchema.parse(req.body);
+
+    // Check if product_id, current_location_id, created_by exist in tables (in parallel)
+    const [productCheck, locationCheck, userCheck] = await Promise.all([
+      pool.query('SELECT id FROM products WHERE id = $1', [product_id]),
+      pool.query('SELECT id FROM storage_locations WHERE id = $1', [current_location_id]),
+      pool.query('SELECT id FROM users WHERE id = $1', [created_by]),
+    ]);
+    if (productCheck.rows.length === 0) {
+      return res.status(400).json({ error: 'Invalid product_id' });
+    }
+    if (locationCheck.rows.length === 0) {
+      return res.status(400).json({ error: 'Invalid current_location_id' });
+    }
+    if (userCheck.rows.length === 0) {
+      return res.status(400).json({ error: 'Invalid created_by user id' });
+    }
+    const newItem = await pool.query(
+      'INSERT INTO items (product_id, quantity, current_location_id, status, created_by, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, NOW(), NOW()) RETURNING *',
+      [product_id, quantity, current_location_id, status, created_by]
+    );
+
+    res.status(201).json(newItem.rows[0]);
+  } catch (error) {
+    if (error instanceof ZodError) {
+      return handleValidationError(error, res);
+    }
+    console.error('Error creating item:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+/**
+ * Updates an existing item in the database.
+ * Only updates fields that are provided in the request body.
+ * Allowed fields: product_id, quantity, current_location_id, status.
+ *
+ * @param {Request} req - Express request object with:
+ *   - id: UUID of the item to update (in params)
+ *   - Updatable fields in body (product_id, quantity, current_location_id, status)
+ * @param {Response} res - Express response object
+ * @returns {Promise<Response>} JSON object of the updated item or error message
+ * @throws {400} Invalid id or product_id (must be valid UUIDs)
+ * @throws {400} Invalid product_id if product doesn't exist in database
+ * @throws {400} No updatable fields provided if request body is empty or contains no allowed fields
+ * @throws {404} Item not found if no item matches the provided ID
+ * @throws {500} Internal server error if database query fails
+ */
+export const updateItem = async (req: Request, res: Response) => {
+  try {
+    const { id } = itemIdParamSchema.parse(req.params);
+    const validatedData: UpdateItemInput = updateItemSchema.parse(req.body);
+
+    // If product_id is being updated, verify it exists
+    if (validatedData.product_id) {
+      const productCheck = await pool.query('SELECT id FROM products WHERE id = $1', [
+        validatedData.product_id,
+      ]);
+      if (productCheck.rows.length === 0) {
+        return res.status(400).json({ error: 'Invalid product_id' });
+      }
+    }
+
+    const setClauses: string[] = [];
+    const values: any[] = [];
+    let idx = 1;
+
+    for (const [key, value] of Object.entries(validatedData)) {
+      setClauses.push(`${key} = $${idx++}`);
+      values.push(value);
+    }
+
+    setClauses.push(`updated_at = NOW()`);
+
+    const sql = `
+      UPDATE items
+      SET ${setClauses.join(', ')}
+      WHERE id = $${idx}
+      RETURNING *;
+    `;
+    values.push(id);
+
+    const { rows } = await pool.query(sql, values);
+
+    if (!countRows(rows, res)) {
+      return;
+    }
+
+    return res.json(rows[0]);
+  } catch (error) {
+    if (error instanceof ZodError) {
+      return handleValidationError(error, res);
+    }
+    console.error('Error updating item:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+/**
+ * Deletes an item from the database by its ID.
+ *
+ * @param {Request} req - Express request object with:
+ *   - id: UUID of the item to delete (in params)
+ * @param {Response} res - Express response object
+ * @returns {Promise<Response>} Success message or error message
+ * @throws {404} Item not found if no item matches the provided ID
+ * @throws {500} Internal server error if database query fails
+ */
+export const deleteItem = async (req: Request, res: Response) => {
+  try {
+    const { id } = itemIdParamSchema.parse(req.params);
+
+    const deletedItem = await pool.query('DELETE FROM items WHERE id = $1 RETURNING *', [id]);
+
+    if (!countRows(deletedItem.rows, res)) {
+      return;
+    }
+
+    res.json({ message: 'Item deleted successfully' });
+  } catch (error) {
+    if (error instanceof ZodError) {
+      return handleValidationError(error, res);
+    }
+    console.error('Error deleting item:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
