@@ -17,7 +17,6 @@ import {
 
 const router = express.Router();
 
-router.get('/:id', getMovementById); // GET /api/inventory-movement/:id
 router.get('/', getAllInventoryMovements); // GET /api/inventory-movement
 router.get('/:id', getMovementById); // GET /api/inventory-movement/:id
 router.get('/action/:action', getMovementsByAction); // GET /api/inventory-movement/action/:action
