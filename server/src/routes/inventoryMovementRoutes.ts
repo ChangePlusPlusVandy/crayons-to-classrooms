@@ -1,0 +1,34 @@
+import express from 'express';
+import {
+  getAllInventoryMovements,
+  getMovementById,
+  getMovementsByAction,
+  getMovementsByItemId,
+  getMovementsByProductId,
+  getMovementsByStartLocationId,
+  getMovementsByEndLocationId,
+  getMovementsByPerformedId,
+  getMovementsOnAndBeforeDate,
+  getMovementsOnAndAfterDate,
+  createInventoryMovement,
+  updateInventoryMovement,
+  deleteInventoryMovement,
+} from '../controllers/inventoryMovementControllers.js';
+
+const router = express.Router();
+
+router.get('/', getAllInventoryMovements); // GET /api/inventory-movement
+router.get('/:id', getMovementById); // GET /api/inventory-movement/:id
+router.get('/action/:action', getMovementsByAction); // GET /api/inventory-movement/action/:action
+router.get('/item/:item_id', getMovementsByItemId); // GET /api/inventory-movement/item/:item_id
+router.get('/product/:product_id', getMovementsByProductId); // GET /api/inventory-movement/product/:product_id
+router.get('/start-location/:start_location_id', getMovementsByStartLocationId); // GET /api/inventory-movement/start-location/:start_location_id
+router.get('/end-location/:end_location_id', getMovementsByEndLocationId); // GET /api/inventory-movement/end-location/:end_location_id
+router.get('/performed-by/:performed_by_id', getMovementsByPerformedId); // GET /api/inventory-movement/performed-by/:performed_by_id
+router.get('/before/:date', getMovementsOnAndBeforeDate); // GET /api/inventory-movement/before/:date
+router.get('/after/:date', getMovementsOnAndAfterDate); // GET /api/inventory-movement/after/:date
+router.post('/', createInventoryMovement); // POST /api/inventory-movement
+router.patch('/:id', updateInventoryMovement); // PATCH /api/inventory-movement/:id
+router.delete('/:id', deleteInventoryMovement); // DELETE /api/inventory-movement/:id
+
+export default router;
