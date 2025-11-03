@@ -4,9 +4,9 @@ import { z } from 'zod';
 export const createProductSchema = z.object({
   name: z.string().min(1, 'Name is required').max(255, 'Name must be less than 255 characters'),
   description: z.string().optional(),
-  unit_of_measure: z.string().min(1, 'Unit of measure is required'),
+  unit_of_measure: z.string().optional(),
   value: z.number().positive('Value must be a positive number'),
-  item_limit: z.number().int().nonnegative('Item limit must be a non-negative integer'),
+  item_limit: z.number().int().nonnegative('Item limit must be a non-negative integer').optional(),
   category: z.string().optional(),
   total_count: z
     .number()

@@ -236,13 +236,27 @@ export const updateProduct = async (req: Request, res: Response) => {
     const { id } = productIdParamSchema.parse(req.params);
     const validatedData: UpdateProductInput = updateProductSchema.parse(req.body);
 
+    // Whitelist of allowed fields to update
+    const allowedFields = [
+      'name',
+      'description',
+      'unit_of_measure',
+      'value',
+      'item_limit',
+      'category',
+      'total_count'
+    ];
     const setClauses: string[] = [];
     const values: any[] = [];
     let idx = 1;
-
     for (const [key, value] of Object.entries(validatedData)) {
-      setClauses.push(`${key} = $${idx++}`);
-      values.push(value);
+      if (allowedFields.includes(key)) {
+        setClauses.push(`${key} = $${idx++}`);
+        values.push(value);
+      }
+    }
+    if (setClauses.length === 0) {
+      return res.status(400).json({ error: 'No updatable fields provided' });
     }
 
     const sql = `
