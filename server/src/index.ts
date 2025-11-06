@@ -3,6 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import pool from './db.js';
 import testRoutes from './routes/testRoutes.js';
+import warehouseRoutes from './routes/warehouseRoutes.js';
 import itemsRoutes from './routes/itemRoutes.js';
 import storageLocationRoutes from './routes/storageLocationRoutes.js';
 import usersRoutes from './routes/usersRoutes.js';
@@ -25,6 +26,7 @@ app.use('/api/items', itemsRoutes);
 app.use('/api/storage-locations', storageLocationRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/inventory-movement', inventoryMovementRoutes);
+app.use('/api/warehouses', warehouseRoutes);
 
 // Start server
 const PORT = process.env.PORT || 5001;
