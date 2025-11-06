@@ -4,7 +4,9 @@ import pool from '../db.js';
 // GET all rows
 export async function getAllTests(req: Request, res: Response): Promise<void> {
   try {
-    const result = await pool.query('SELECT * FROM test;');
+    const result = await pool.query(
+      'SELECT id, message, created_at FROM test ORDER BY created_at DESC;'
+    );
     res.json(result.rows);
   } catch (error) {
     console.error(error);
@@ -16,7 +18,9 @@ export async function getAllTests(req: Request, res: Response): Promise<void> {
 export async function getTestById(req: Request<{ id: string }>, res: Response): Promise<void> {
   const { id } = req.params;
   try {
-    const result = await pool.query('SELECT * FROM test WHERE id = $1;', [id]);
+    const result = await pool.query('SELECT id, message, created_at FROM test WHERE id = $1;', [
+      id,
+    ]);
     if (result.rows.length === 0) {
       res.status(404).json({ error: 'Not found' });
     } else {
@@ -30,15 +34,15 @@ export async function getTestById(req: Request<{ id: string }>, res: Response): 
 
 // POST (create) a new row
 export async function createTest(
-  req: Request<{}, {}, { name: string; age: number }>,
+  req: Request<{}, {}, { message: string }>,
   res: Response
 ): Promise<void> {
-  const { name, age } = req.body;
+  const { message } = req.body;
   try {
-    const result = await pool.query('INSERT INTO test (name, age) VALUES ($1, $2) RETURNING *;', [
-      name,
-      age,
-    ]);
+    const result = await pool.query(
+      'INSERT INTO test (message) VALUES ($1) RETURNING id, message, created_at;',
+      [message]
+    );
     res.status(201).json(result.rows[0]);
   } catch (error) {
     console.error(error);
@@ -48,16 +52,16 @@ export async function createTest(
 
 // PUT (update) a row by id
 export async function updateTest(
-  req: Request<{ id: string }, {}, { name?: string; age?: number }>,
+  req: Request<{ id: string }, {}, { message?: string }>,
   res: Response
 ): Promise<void> {
   const { id } = req.params;
-  const { name, age } = req.body;
+  const { message } = req.body;
 
   try {
     const result = await pool.query(
-      'UPDATE test SET name = COALESCE($1, name), age = COALESCE($2, age) WHERE id = $3 RETURNING *;',
-      [name, age, id]
+      'UPDATE test SET message = COALESCE($1, message) WHERE id = $2 RETURNING id, message, created_at;',
+      [message, id]
     );
 
     if (result.rows.length === 0) {
@@ -75,7 +79,10 @@ export async function updateTest(
 export async function deleteTest(req: Request<{ id: string }>, res: Response): Promise<void> {
   const { id } = req.params;
   try {
-    const result = await pool.query('DELETE FROM test WHERE id = $1 RETURNING *;', [id]);
+    const result = await pool.query(
+      'DELETE FROM test WHERE id = $1 RETURNING id, message, created_at;',
+      [id]
+    );
     if (result.rows.length === 0) {
       res.status(404).json({ error: 'Not found' });
     } else {
