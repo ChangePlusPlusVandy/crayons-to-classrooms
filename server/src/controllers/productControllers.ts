@@ -198,9 +198,9 @@ export const createProduct = async (req: Request, res: Response) => {
       [
         name,
         description || null,
-        unit_of_measure,
+        unit_of_measure || null,
         value,
-        item_limit,
+        item_limit || null,
         category || null,
         total_count || 0,
       ]
