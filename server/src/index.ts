@@ -4,7 +4,9 @@ import dotenv from 'dotenv';
 import pool from './db.js';
 import testRoutes from './routes/testRoutes.js';
 import { productRoutes } from './routes/productRoutes.js';
-import { itemsRoutes } from './routes/itemRoutes.js';
+import warehouseRoutes from './routes/warehouseRoutes.js';
+import itemsRoutes from './routes/itemRoutes.js';
+import storageLocationRoutes from './routes/storageLocationRoutes.js';
 import usersRoutes from './routes/usersRoutes.js';
 import inventoryMovementRoutes from './routes/inventoryMovementRoutes.js';
 
@@ -24,10 +26,10 @@ app.use('/api/test', testRoutes);
 app.use('/api/products', productRoutes);
 
 app.use('/api/items', itemsRoutes);
-
+app.use('/api/storage-locations', storageLocationRoutes);
 app.use('/api/users', usersRoutes);
-
 app.use('/api/inventory-movement', inventoryMovementRoutes);
+app.use('/api/warehouses', warehouseRoutes);
 
 // Start server
 const PORT = process.env.PORT || 5001;
