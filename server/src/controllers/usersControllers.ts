@@ -10,6 +10,8 @@ const createUserSchema = z.object({
   phone_number: z.string().min(1),
   role: z.string().min(1),
   password_hash: z.string().min(1),
+  school: z.string().min(1).optional(),
+  district: z.string().min(1).optional(),
 });
 
 // Update User schema
@@ -19,6 +21,8 @@ const updateUserSchema = z.object({
   phone_number: z.string().min(1).optional(),
   role: z.string().min(1).optional(),
   password_hash: z.string().min(1).optional(),
+  school: z.string().min(1).optional(),
+  district: z.string().min(1).optional(),
 });
 
 // Type inference using Zod schemas
@@ -138,10 +142,7 @@ export async function createUser(req: Request, res: Response): Promise<void> {
     if (error instanceof z.ZodError) {
       res.status(400).json({
         error: 'Validation failed',
-        details: error.errors.map((e) => ({
-          field: e.path.join('.'),
-          message: e.message,
-        })),
+        details: error.flatten().fieldErrors,
       });
       return;
     }
@@ -171,10 +172,7 @@ export async function updateUser(req: Request<{ id: string }>, res: Response): P
     if (error instanceof z.ZodError) {
       res.status(400).json({
         error: 'Validation failed',
-        details: error.errors.map((e) => ({
-          field: e.path.join('.'),
-          message: e.message,
-        })),
+        details: error.flatten().fieldErrors,
       });
       return;
     }
