@@ -113,7 +113,7 @@ export const getMovementsByAction = async (
       [inventory_action]
     );
     if (!countRows(result.rows, res)) {
-      return
+      return;
     }
     res.json(result.rows);
   } catch (error) {
