@@ -157,12 +157,12 @@ export const getMovementsByItemId = async(
 }
 
 /**
- * Retrieves all items associated with a specific product ID.
+ * Retrieves all inventory movements associated with a specific product ID.
  *
  * @param {Request} req - Express request object with:
  *   - product_id: UUID of the product (in params)
  * @param {Response} res - Express response object
- * @returns {Promise<Response>} JSON array of items matching the product ID or error message
+ * @returns {Promise<Response>} JSON array of inventory movements matching the product ID or error message
  * @throws {500} Internal server error if database query fails
  */
 export const getMovementsByProductId = async (
@@ -439,15 +439,15 @@ export const createInventoryMovement = async (req: Request, res: Response) => {
 };
 
 /**
- * Updates an existing inventory action in the database.
+ * Updates an existing inventory movement in the database.
  * Only updates fields that are provided in the request body.
  * Allowed fields: inventory_action, item_id, product_id, from_location_id, to_location_id, quantity, performed_by, performed_at, note.
  *
  * @param {Request} req - Express request object with:
- *   - id: UUID of the inventory action to update (in params)
+ *   - id: UUID of the inventory movement to update (in params)
  *   - Updatable fields in body (inventory_action, item_id, product_id, from_location_id, to_location_id, quantity, performed_by, performed_at, note)
  * @param {Response} res - Express response object
- * @returns {Promise<Response>} JSON object of the updated inventory action or error message
+ * @returns {Promise<Response>} JSON object of the updated inventory movement or error message
  * @throws {400} Invalid id, item_id, product_id, from_location_id, to_location_id, performed_by (must be valid UUIDs)
  * @throws {400} Invalid product_id if product doesn't exist in database
  * @throws {400} Invalid item_id if item doesn't exist in database
@@ -455,7 +455,7 @@ export const createInventoryMovement = async (req: Request, res: Response) => {
  * @throws {400} Invalid to_location_id if location doesn't exist in database
  * @throws {400} Invalid performed_by if user doesn't exist in database
  * @throws {400} No updatable fields provided if request body is empty or contains no allowed fields
- * @throws {404} Inventory action not found if no inventory action matches the provided ID
+ * @throws {404} Inventory movement not found if no inventory movement matches the provided ID
  * @throws {500} Internal server error if database query fails
  */
 export const updateInventoryMovement = async (req: Request, res: Response) => {
