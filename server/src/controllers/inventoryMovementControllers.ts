@@ -463,26 +463,12 @@ export const updateInventoryMovement = async (req: Request, res: Response) => {
     const { id } = movementIdParamSchema.parse(req.params);
     const validatedData: UpdateInventoryInput = updateInventoryMovementSchema.parse(req.body);
 
-    const allowedFields = [
-      'inventory_action',
-      'item_id',
-      'product_id',
-      'from_location_id',
-      'to_location_id',
-      'quantity',
-      'performed_by',
-      'performed_at',
-      'note',
-    ];
-
     const setClauses: string[] = [];
     const values: any[] = [];
     let idx = 1;
     for (const [key, value] of Object.entries(validatedData)) {
-      if (allowedFields.includes(key)) {
-        setClauses.push(`${key} = $${idx++}`);
-        values.push(value);
-      }
+      setClauses.push(`${key} = $${idx++}`);
+      values.push(value);
     }
     const sql = `
       UPDATE "inventory movement"
