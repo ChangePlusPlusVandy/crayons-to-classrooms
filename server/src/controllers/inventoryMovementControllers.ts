@@ -232,7 +232,6 @@ export const getMovementsByEndLocationId = async (
   req: Request<{ end_location_id: string }>,
   res: Response
 ) => {
-
   try {
     const { end_location_id } = endLocationIdParamSchema.parse(req.params);
     const result = await pool.query(
