@@ -44,7 +44,7 @@ export const createInventoryMovementSchema = z.object({
   product_id: uuidSchema,
   from_location_id: uuidSchema,
   to_location_id: uuidSchema,
-  quantity: z.number().int().nonnegative('Quantity must be a positive integer'),
+  quantity: z.number().int().nonnegative('Quantity must be a nonnegative integer'),
   performed_by: uuidSchema,
   note: z.string().optional(),
 });
@@ -56,7 +56,7 @@ export const updateInventoryMovementSchema = z
     product_id: uuidSchema.optional(),
     from_location_id: uuidSchema.optional(),
     to_location_id: uuidSchema.optional(),
-    quantity: z.number().int().nonnegative('Quantity must be a positive integer').optional(),
+    quantity: z.number().int().nonnegative('Quantity must be a nonnegative integer').optional(),
     performed_by: uuidSchema.optional(),
     performed_at: performedDateParamSchema.optional(),
     note: z.string().optional(),
