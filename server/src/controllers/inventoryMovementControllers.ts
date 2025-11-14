@@ -475,10 +475,6 @@ export const updateInventoryMovement = async (req: Request, res: Response) => {
         values.push(value);
       }
     }
-    if (setClauses.length === 0) {
-      return res.status(400).json({ error: 'No updatable fields provided' });
-    }
-
     const sql = `
       UPDATE "inventory movement"
       SET ${setClauses.join(', ')}
