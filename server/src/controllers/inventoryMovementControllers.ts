@@ -458,7 +458,7 @@ export const createInventoryMovement = async (req: Request, res: Response) => {
  * @throws {500} Internal server error if database query fails
  */
 export const updateInventoryMovement = async (req: Request, res: Response) => {
-  try{
+  try {
     const { id } = movementIdParamSchema.parse(req.params);
     const validatedData: UpdateInventoryInput = updateInventoryMovementSchema.parse(req.body);
 
