@@ -533,9 +533,9 @@ export const deleteInventoryMovement = async (req: Request, res: Response) =>{
     res.json({ message: 'Inventory movement deleted successfully', deleted: result.rows[0] });
   } catch (error) {
     if (error instanceof ZodError) {
-          return handleValidationError(error, res);
-        }
-        console.error('Error deleting inventory movement:', error);
-        res.status(500).json({ error: 'Internal server error' });
+      return handleValidationError(error, res);
+    }
+    console.error('Error deleting inventory movement:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 }
