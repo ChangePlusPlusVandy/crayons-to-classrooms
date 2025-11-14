@@ -352,7 +352,7 @@ export const getMovementsOnAndAfterDate = async (
  * Validates foreign key constraints for item_id, product_id, from_location_id, to_location_id, performed_by_id.
  *
  * @param {Request} req - Express request object with:
- *   - inventory_action: Type of inventory action ie ('ADD', 'MOVE', 'CLOCKOUT', 'DISCARD', 'ADJUSTMENT') (in body)
+ *   - inventory_action: Type of inventory action ie ('ADD', 'MOVE', 'CHECKOUT', 'DISCARD', 'ADJUSTMENT') (in body)
  *   - item_id: UUID of the item (in body)
  *   - product_id: UUID of the product (in body)
  *   - from_location_id: UUID of the start location (in body)
