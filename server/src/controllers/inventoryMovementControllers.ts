@@ -481,7 +481,7 @@ export const updateInventoryMovement = async (req: Request, res: Response) => {
 
     if (!countRows(rows, res)) {
         return;
-      }
+    }
     
       return res.json(rows[0]);
   } catch (error) {
