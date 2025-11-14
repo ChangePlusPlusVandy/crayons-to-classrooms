@@ -507,7 +507,7 @@ export const updateInventoryMovement = async (req: Request, res: Response) => {
       if (error instanceof ZodError) {
         return handleValidationError(error, res);
       }
-      console.error('Error updating inventory action:', error);
+      console.error('Error updating inventory movement:', error);
       return res.status(500).json({ error: 'Internal server error' });
     }
 }
