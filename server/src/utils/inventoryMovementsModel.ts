@@ -57,7 +57,7 @@ export const updateInventoryMovementSchema = z
     from_location_id: uuidSchema.optional(),
     to_location_id: uuidSchema.optional(),
     quantity: z.number().int().nonnegative('Quantity must be a positive integer').optional(),
-    performed_by: uuidSchema,
+    performed_by: uuidSchema.optional(),
     note: z.string().optional(),
   })
   .refine((data) => Object.keys(data).length > 0, {
