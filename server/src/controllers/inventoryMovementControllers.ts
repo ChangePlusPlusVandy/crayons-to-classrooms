@@ -88,7 +88,7 @@ export const getMovementById = async(req: Request, res: Response) => {
     if (error instanceof ZodError) {
       return handleValidationError(error, res);
     }
-    console.error('Error fetching inventory movement by ID:',error);
+    console.error('Error fetching inventory movement by ID:', error);
     res.status(500).json({ error: 'Internal Server Error' });
   }
 };
