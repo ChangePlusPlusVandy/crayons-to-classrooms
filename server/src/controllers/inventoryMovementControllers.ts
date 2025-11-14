@@ -484,13 +484,13 @@ export const updateInventoryMovement = async (req: Request, res: Response) => {
       }
     
       return res.json(rows[0]);
-      } catch (error) {
-      if (error instanceof ZodError) {
-        return handleValidationError(error, res);
-      }
-      console.error('Error updating inventory movement:', error);
-      return res.status(500).json({ error: 'Internal server error' });
+  } catch (error) {
+    if (error instanceof ZodError) {
+      return handleValidationError(error, res);
     }
+    console.error('Error updating inventory movement:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
 }
 
 /**
