@@ -246,12 +246,12 @@ export const getMovementsByEndLocationId = async (
 };
 
 /**
- * Retrieves all items associated with a specific performer ID.
+ * Retrieves all inventory movements associated with a specific performer ID.
  *
  * @param {Request} req - Express request object with:
  *   - performed_by_id: UUID of the performer (in params)
  * @param {Response} res - Express response object
- * @returns {Promise<Response>} JSON array of items matching the performer ID or error message
+ * @returns {Promise<Response>} JSON array of inventory movements matching the performer ID or error message
  * @throws {500} Internal server error if database query fails
  */
 export const getMovementsByPerformedId = async (
