@@ -137,7 +137,7 @@ export const getMovementsByAction = async (
 export const getMovementsByItemId = async(
   req: Request<{ item_id: string }>,
   res: Response
-) =>{
+) => {
   try {
     const { item_id } = itemIdParamSchema.parse(req.params);
     const result = await pool.query('SELECT * FROM "inventory movement" WHERE item_id = $1;', [
