@@ -503,7 +503,7 @@ export const updateInventoryMovement = async (req: Request, res: Response) => {
  * @throws {404} Inventory movement not found if no product matches the provided ID
  * @throws {500} Internal server error if database query fails
  */
-export const deleteInventoryMovement = async (req: Request, res: Response) =>{
+export const deleteInventoryMovement = async (req: Request, res: Response) => {
   try {
     const { id } = movementIdParamSchema.parse(req.params);
 
