@@ -200,7 +200,6 @@ export const getMovementsByStartLocationId = async (
   req: Request<{ start_location_id: string }>,
   res: Response
 ) => {
-  
   try {
     const { start_location_id } = startLocationIdParamSchema.parse(req.params);
     const result = await pool.query(
