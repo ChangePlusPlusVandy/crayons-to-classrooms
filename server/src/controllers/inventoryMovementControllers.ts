@@ -424,7 +424,7 @@ export const createInventoryMovement = async (req: Request, res: Response) => {
     if (error instanceof ZodError) {
       return handleValidationError(error, res);
     }
-    console.error('Error creating inventory action:', error);
+    console.error('Error creating inventory movement:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };
