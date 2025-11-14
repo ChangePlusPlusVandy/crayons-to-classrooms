@@ -1,9 +1,4 @@
-export type Test = {
-  id: string;
-  message: string;
-  created_at: string;
-};
-
+import { Test } from '../types/Test';
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
 
 export async function getAllTests(): Promise<Test[]> {
