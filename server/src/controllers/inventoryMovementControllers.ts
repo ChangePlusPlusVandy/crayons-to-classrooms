@@ -97,7 +97,7 @@ export const getMovementById = async (req: Request, res: Response) => {
  * Retrieves all inventory movements associated with a specific inventory action.
  *
  * @param {Request} req - Express request object with:
- *   - action: UUID of the inventory action (in params)
+ *   - inventory_action: UUID of the inventory action (in params)
  * @param {Response} res - Express response object
  * @returns {Promise<Response>} JSON array of inventory movements matching the action or error message
  * @throws {500} Internal server error if database query fails
