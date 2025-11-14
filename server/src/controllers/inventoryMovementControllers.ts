@@ -317,12 +317,12 @@ export const getMovementsOnAndBeforeDate = async (
 }
 
 /**
- * Retrieves all items associated with a specific date on and after.
+ * Retrieves all inventory movements associated with a specific date on and after.
  *
  * @param {Request} req - Express request object with:
  *   - date: date requested (in params)
  * @param {Response} res - Express response object
- * @returns {Promise<Response>} JSON array of items matching the date on or after or error message
+ * @returns {Promise<Response>} JSON array of inventory movements matching the date on or after, or error message
  * @throws {500} Internal server error if database query fails
  */
 export const getMovementsOnAndAfterDate = async (
