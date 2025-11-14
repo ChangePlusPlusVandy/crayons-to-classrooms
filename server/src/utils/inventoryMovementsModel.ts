@@ -66,7 +66,7 @@ export const updateInventoryMovementSchema = z
   });
 
 /**
- * Schema for validating status query parameter
+ * Schema for validating inventory_action query parameter
  */
 export const actionQuerySchema = z.object({
   inventory_action: ActionParamSchema,
