@@ -221,12 +221,12 @@ export const getMovementsByStartLocationId = async (
 }
 
 /**
- * Retrieves all items associated with a specific start location ID.
+ * Retrieves all inventory movements associated with a specific end location ID.
  *
  * @param {Request} req - Express request object with:
- *   - start_location_id: UUID of the start location (in params)
+ *   - end_location_id: UUID of the end location (in params)
  * @param {Response} res - Express response object
- * @returns {Promise<Response>} JSON array of items matching the start location ID or error message
+ * @returns {Promise<Response>} JSON array of inventory movements matching the end location ID or error message
  * @throws {500} Internal server error if database query fails
  */
 export const getMovementsByEndLocationId = async (
