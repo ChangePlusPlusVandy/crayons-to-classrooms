@@ -73,22 +73,22 @@ export async function getAllInventoryMovements(req: Request, res: Response): Pro
  * @throws {500} Internal server error if database query fails
  */
 // GET single row by id
-export const getMovementById = async(req: Request, res: Response) => {
+export const getMovementById = async (req: Request, res: Response) => {
   try {
     const { id } = movementIdParamSchema.parse(req.params);
 
     const result = await pool.query('SELECT * FROM "inventory movement" WHERE id = $1;', [id]);
-    
+
     if (!countRows(result.rows, res)) {
       return;
-    } 
+    }
 
     res.json(result.rows[0]);
   } catch (error) {
     if (error instanceof ZodError) {
       return handleValidationError(error, res);
     }
-    console.error('Error fetching inventory movement by ID:',error);
+    console.error('Error fetching inventory movement by ID:', error);
     res.status(500).json({ error: 'Internal Server Error' });
   }
 };
@@ -102,10 +102,7 @@ export const getMovementById = async(req: Request, res: Response) => {
  * @returns {Promise<Response>} JSON array of inventory movements matching the action or error message
  * @throws {500} Internal server error if database query fails
  */
-export const getMovementsByAction = async (
-  req: Request,
-  res: Response
-) => {
+export const getMovementsByAction = async (req: Request, res: Response) => {
   try {
     const { inventory_action } = actionQuerySchema.parse(req.params);
     const result = await pool.query(
@@ -113,17 +110,17 @@ export const getMovementsByAction = async (
       [inventory_action]
     );
     if (!countRows(result.rows, res)) {
-      return
+      return;
     }
     res.json(result.rows);
   } catch (error) {
     if (error instanceof ZodError) {
       return handleValidationError(error, res);
     }
-    console.error("Error fetching inventory movements by action:", error);
+    console.error('Error fetching inventory movements by action:', error);
     res.status(500).json({ error: 'Internal Server Error' });
   }
-}
+};
 
 /**
  * Retrieves all items associated with a specific item ID.
@@ -134,10 +131,7 @@ export const getMovementsByAction = async (
  * @returns {Promise<Response>} JSON array of items matching the item ID or error message
  * @throws {500} Internal server error if database query fails
  */
-export const getMovementsByItemId = async(
-  req: Request<{ item_id: string }>,
-  res: Response
-) =>{
+export const getMovementsByItemId = async (req: Request<{ item_id: string }>, res: Response) => {
   try {
     const { item_id } = itemIdParamSchema.parse(req.params);
     const result = await pool.query('SELECT * FROM "inventory movement" WHERE item_id = $1;', [
@@ -151,10 +145,10 @@ export const getMovementsByItemId = async(
     if (error instanceof ZodError) {
       return handleValidationError(error, res);
     }
-    console.error("Error fetching inventory movements by item ID:", error);
+    console.error('Error fetching inventory movements by item ID:', error);
     res.status(500).json({ error: 'Internal Server Error' });
   }
-}
+};
 
 /**
  * Retrieves all items associated with a specific product ID.
@@ -182,10 +176,10 @@ export const getMovementsByProductId = async (
     if (error instanceof ZodError) {
       return handleValidationError(error, res);
     }
-    console.error("Error fetching inventory movements by product ID:", error);
+    console.error('Error fetching inventory movements by product ID:', error);
     res.status(500).json({ error: 'Internal Server Error' });
   }
-}
+};
 
 /**
  * Retrieves all items associated with a specific start location ID.
@@ -200,7 +194,6 @@ export const getMovementsByStartLocationId = async (
   req: Request<{ start_location_id: string }>,
   res: Response
 ) => {
-  
   try {
     const { start_location_id } = startLocationIdParamSchema.parse(req.params);
     const result = await pool.query(
@@ -215,10 +208,10 @@ export const getMovementsByStartLocationId = async (
     if (error instanceof ZodError) {
       return handleValidationError(error, res);
     }
-    console.error("Error fetching inventory movements by start location ID:", error);
+    console.error('Error fetching inventory movements by start location ID:', error);
     res.status(500).json({ error: 'Internal Server Error' });
   }
-}
+};
 
 /**
  * Retrieves all items associated with a specific start location ID.
@@ -233,7 +226,6 @@ export const getMovementsByEndLocationId = async (
   req: Request<{ end_location_id: string }>,
   res: Response
 ) => {
-
   try {
     const { end_location_id } = endLocationIdParamSchema.parse(req.params);
     const result = await pool.query(
@@ -248,10 +240,10 @@ export const getMovementsByEndLocationId = async (
     if (error instanceof ZodError) {
       return handleValidationError(error, res);
     }
-    console.error("Error fetching inventory movements by end location ID:", error);
+    console.error('Error fetching inventory movements by end location ID:', error);
     res.status(500).json({ error: 'Internal Server Error' });
   }
-}
+};
 
 /**
  * Retrieves all items associated with a specific performer ID.
@@ -279,10 +271,10 @@ export const getMovementsByPerformedId = async (
     if (error instanceof ZodError) {
       return handleValidationError(error, res);
     }
-    console.error("Error fetching inventory movements by performed by ID:", error);
+    console.error('Error fetching inventory movements by performed by ID:', error);
     res.status(500).json({ error: 'Internal Server Error' });
   }
-}
+};
 
 /**
  * Retrieves all items associated with a specific date on and before.
@@ -311,10 +303,10 @@ export const getMovementsOnAndBeforeDate = async (
     if (error instanceof ZodError) {
       return handleValidationError(error, res);
     }
-    console.error("Error fetching inventory movements on or before date:", error);
+    console.error('Error fetching inventory movements on or before date:', error);
     res.status(500).json({ error: 'Internal Server Error' });
   }
-}
+};
 
 /**
  * Retrieves all items associated with a specific date on and after.
@@ -325,15 +317,13 @@ export const getMovementsOnAndBeforeDate = async (
  * @returns {Promise<Response>} JSON array of items matching the date on or after or error message
  * @throws {500} Internal server error if database query fails
  */
-export const getMovementsOnAndAfterDate = async (
-  req: Request<{ date: string }>,
-  res: Response
-) => {
+export const getMovementsOnAndAfterDate = async (req: Request<{ date: string }>, res: Response) => {
   try {
     const { date } = performedDateParamSchema.parse(req.params);
-    const result = await pool.query('SELECT * FROM "inventory movement" WHERE performed_at >= $1::date ORDER BY performed_at ASC;', [
-      date,
-    ]);
+    const result = await pool.query(
+      'SELECT * FROM "inventory movement" WHERE performed_at >= $1::date ORDER BY performed_at ASC;',
+      [date]
+    );
     if (!countRows(result.rows, res)) {
       return;
     }
@@ -342,10 +332,10 @@ export const getMovementsOnAndAfterDate = async (
     if (error instanceof ZodError) {
       return handleValidationError(error, res);
     }
-    console.error("Error fetching inventory movements on or after date:", error);
+    console.error('Error fetching inventory movements on or after date:', error);
     res.status(500).json({ error: 'Internal Server Error' });
   }
-}
+};
 
 /**
  * Creates a new inventory movement in the database.
@@ -368,41 +358,42 @@ export const getMovementsOnAndAfterDate = async (
 export const createInventoryMovement = async (req: Request, res: Response) => {
   try {
     const {
-    inventory_action,
-    item_id,
-    product_id,
-    from_location_id,
-    to_location_id,
-    quantity,
-    performed_by,
-    note,
-  }: CreateInventoryInput = createInventoryMovementSchema.parse(req.body);
+      inventory_action,
+      item_id,
+      product_id,
+      from_location_id,
+      to_location_id,
+      quantity,
+      performed_by,
+      note,
+    }: CreateInventoryInput = createInventoryMovementSchema.parse(req.body);
 
-  // Check if item_id, product_id, from_location_id, to_location_id, performed_by_id exist in tables (in parallel)
-  const [itemCheck, productCheck, fromLocationCheck, toLocationCheck, userCheck] = await Promise.all([
-    pool.query('SELECT id FROM items WHERE id = $1', [item_id]),
-    pool.query('SELECT id FROM products WHERE id = $1', [product_id]),
-    pool.query('SELECT id FROM storage_locations WHERE id = $1', [from_location_id]),
-    pool.query('SELECT id FROM storage_locations WHERE id = $1', [to_location_id]),
-    pool.query('SELECT id FROM users WHERE id = $1', [performed_by]),
-  ]);
-  if (itemCheck.rows.length === 0) {
-    return res.status(400).json({ error: 'Invalid item_id' });
-  }
-  if (productCheck.rows.length === 0) {
-    return res.status(400).json({ error: 'Invalid product_id' });
-  }
-  if (fromLocationCheck.rows.length === 0) {
-    return res.status(400).json({ error: 'Invalid from_location_id' });
-  }
-  if (toLocationCheck.rows.length === 0) {
-    return res.status(400).json({ error: 'Invalid to_location_id' });
-  }
-  if (userCheck.rows.length === 0) {
-    return res.status(400).json({ error: 'Invalid performed_by user id' });
-  }
-  const newInventoryAction = await pool.query(
-    `
+    // Check if item_id, product_id, from_location_id, to_location_id, performed_by_id exist in tables (in parallel)
+    const [itemCheck, productCheck, fromLocationCheck, toLocationCheck, userCheck] =
+      await Promise.all([
+        pool.query('SELECT id FROM items WHERE id = $1', [item_id]),
+        pool.query('SELECT id FROM products WHERE id = $1', [product_id]),
+        pool.query('SELECT id FROM storage_locations WHERE id = $1', [from_location_id]),
+        pool.query('SELECT id FROM storage_locations WHERE id = $1', [to_location_id]),
+        pool.query('SELECT id FROM users WHERE id = $1', [performed_by]),
+      ]);
+    if (itemCheck.rows.length === 0) {
+      return res.status(400).json({ error: 'Invalid item_id' });
+    }
+    if (productCheck.rows.length === 0) {
+      return res.status(400).json({ error: 'Invalid product_id' });
+    }
+    if (fromLocationCheck.rows.length === 0) {
+      return res.status(400).json({ error: 'Invalid from_location_id' });
+    }
+    if (toLocationCheck.rows.length === 0) {
+      return res.status(400).json({ error: 'Invalid to_location_id' });
+    }
+    if (userCheck.rows.length === 0) {
+      return res.status(400).json({ error: 'Invalid performed_by user id' });
+    }
+    const newInventoryAction = await pool.query(
+      `
       INSERT INTO "inventory movement" (
       inventory_action, 
       item_id, 
@@ -426,16 +417,16 @@ export const createInventoryMovement = async (req: Request, res: Response) => {
         performed_by,
         note || null,
       ]
-  );
+    );
 
-  res.status(201).json(newInventoryAction.rows[0]);
-    } catch (error) {
-      if (error instanceof ZodError) {
-        return handleValidationError(error, res);
-      }
-      console.error('Error creating inventory action:', error);
-      res.status(500).json({ error: 'Internal server error' });
+    res.status(201).json(newInventoryAction.rows[0]);
+  } catch (error) {
+    if (error instanceof ZodError) {
+      return handleValidationError(error, res);
     }
+    console.error('Error creating inventory action:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 };
 
 /**
@@ -459,7 +450,7 @@ export const createInventoryMovement = async (req: Request, res: Response) => {
  * @throws {500} Internal server error if database query fails
  */
 export const updateInventoryMovement = async (req: Request, res: Response) => {
-  try{
+  try {
     const { id } = movementIdParamSchema.parse(req.params);
     const validatedData: UpdateInventoryInput = updateInventoryMovementSchema.parse(req.body);
 
@@ -499,18 +490,18 @@ export const updateInventoryMovement = async (req: Request, res: Response) => {
     const { rows } = await pool.query(sql, values);
 
     if (!countRows(rows, res)) {
-        return;
-      }
-    
-      return res.json(rows[0]);
-      } catch (error) {
-      if (error instanceof ZodError) {
-        return handleValidationError(error, res);
-      }
-      console.error('Error updating inventory action:', error);
-      return res.status(500).json({ error: 'Internal server error' });
+      return;
     }
-}
+
+    return res.json(rows[0]);
+  } catch (error) {
+    if (error instanceof ZodError) {
+      return handleValidationError(error, res);
+    }
+    console.error('Error updating inventory action:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+};
 
 /**
  * Deletes a inventory movement from the database by its ID.
@@ -522,20 +513,22 @@ export const updateInventoryMovement = async (req: Request, res: Response) => {
  * @throws {404} Inventory movement not found if no product matches the provided ID
  * @throws {500} Internal server error if database query fails
  */
-export const deleteInventoryMovement = async (req: Request, res: Response) =>{
+export const deleteInventoryMovement = async (req: Request, res: Response) => {
   try {
     const { id } = movementIdParamSchema.parse(req.params);
 
-    const result = await pool.query('DELETE FROM "inventory movement" WHERE id = $1 RETURNING *;', [id,]);
+    const result = await pool.query('DELETE FROM "inventory movement" WHERE id = $1 RETURNING *;', [
+      id,
+    ]);
     if (!countRows(result.rows, res)) {
       return;
     }
     res.json({ message: 'Inventory movement deleted successfully', deleted: result.rows[0] });
   } catch (error) {
     if (error instanceof ZodError) {
-          return handleValidationError(error, res);
-        }
-        console.error('Error deleting inventory movement:', error);
-        res.status(500).json({ error: 'Internal server error' });
+      return handleValidationError(error, res);
+    }
+    console.error('Error deleting inventory movement:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
-}
+};
