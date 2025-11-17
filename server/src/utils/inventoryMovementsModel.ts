@@ -29,7 +29,7 @@ export const performedByIdParamSchema = z.object({
 
 export const performedDateParamSchema = z.object({
   date: z.coerce.date(),
-})
+});
 
 // Validates action types for inventory movements
 export const ActionParamSchema = z.enum(['ADD', 'MOVE', 'CHECKOUT', 'DISCARD', 'ADJUSTMENT']);
