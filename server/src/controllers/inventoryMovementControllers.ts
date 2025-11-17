@@ -97,7 +97,7 @@ export const getMovementById = async (req: Request, res: Response) => {
  * Retrieves all inventory movements associated with a specific inventory action.
  *
  * @param {Request} req - Express request object with:
- *   - action: UUID of the inventory action (in params)
+ *   - inventory_action: Type/value of the inventory action (in params). One of: 'ADD', 'MOVE', 'CHECKOUT', 'DISCARD', 'ADJUSTMENT'
  * @param {Response} res - Express response object
  * @returns {Promise<Response>} JSON array of inventory movements matching the action or error message
  * @throws {500} Internal server error if database query fails
@@ -123,12 +123,12 @@ export const getMovementsByAction = async (req: Request, res: Response) => {
 };
 
 /**
- * Retrieves all items associated with a specific item ID.
+ * Retrieves all inventory movements associated with a specific item ID.
  *
  * @param {Request} req - Express request object with:
  *   - item_id: UUID of the item (in params)
  * @param {Response} res - Express response object
- * @returns {Promise<Response>} JSON array of items matching the item ID or error message
+ * @returns {Promise<Response>} JSON array of inventory movements matching the item ID or error message
  * @throws {500} Internal server error if database query fails
  */
 export const getMovementsByItemId = async (req: Request<{ item_id: string }>, res: Response) => {
@@ -151,12 +151,12 @@ export const getMovementsByItemId = async (req: Request<{ item_id: string }>, re
 };
 
 /**
- * Retrieves all items associated with a specific product ID.
+ * Retrieves all inventory movements associated with a specific product ID.
  *
  * @param {Request} req - Express request object with:
  *   - product_id: UUID of the product (in params)
  * @param {Response} res - Express response object
- * @returns {Promise<Response>} JSON array of items matching the product ID or error message
+ * @returns {Promise<Response>} JSON array of inventory movements matching the product ID or error message
  * @throws {500} Internal server error if database query fails
  */
 export const getMovementsByProductId = async (
@@ -182,12 +182,12 @@ export const getMovementsByProductId = async (
 };
 
 /**
- * Retrieves all items associated with a specific start location ID.
+ * Retrieves all inventory movements associated with a specific start location ID.
  *
  * @param {Request} req - Express request object with:
  *   - start_location_id: UUID of the start location (in params)
  * @param {Response} res - Express response object
- * @returns {Promise<Response>} JSON array of items matching the start location ID or error message
+ * @returns {Promise<Response>} JSON array of inventory movements matching the start location ID or error message
  * @throws {500} Internal server error if database query fails
  */
 export const getMovementsByStartLocationId = async (
@@ -214,12 +214,12 @@ export const getMovementsByStartLocationId = async (
 };
 
 /**
- * Retrieves all items associated with a specific start location ID.
+ * Retrieves all inventory movements associated with a specific end location ID.
  *
  * @param {Request} req - Express request object with:
- *   - start_location_id: UUID of the start location (in params)
+ *   - end_location_id: UUID of the end location (in params)
  * @param {Response} res - Express response object
- * @returns {Promise<Response>} JSON array of items matching the start location ID or error message
+ * @returns {Promise<Response>} JSON array of inventory movements matching the end location ID or error message
  * @throws {500} Internal server error if database query fails
  */
 export const getMovementsByEndLocationId = async (
@@ -246,12 +246,12 @@ export const getMovementsByEndLocationId = async (
 };
 
 /**
- * Retrieves all items associated with a specific performer ID.
+ * Retrieves all inventory movements associated with a specific performer ID.
  *
  * @param {Request} req - Express request object with:
  *   - performed_by_id: UUID of the performer (in params)
  * @param {Response} res - Express response object
- * @returns {Promise<Response>} JSON array of items matching the performer ID or error message
+ * @returns {Promise<Response>} JSON array of inventory movements matching the performer ID or error message
  * @throws {500} Internal server error if database query fails
  */
 export const getMovementsByPerformedId = async (
@@ -277,12 +277,12 @@ export const getMovementsByPerformedId = async (
 };
 
 /**
- * Retrieves all items associated with a specific date on and before.
+ * Retrieves all inventory movements associated with a specific date on and before.
  *
  * @param {Request} req - Express request object with:
  *   - date: date requested (in params)
  * @param {Response} res - Express response object
- * @returns {Promise<Response>} JSON array of items matching the date on or before or error message
+ * @returns {Promise<Response>} JSON array of inventory movements matching the date on or before, or error message
  * @throws {500} Internal server error if database query fails
  */
 export const getMovementsOnAndBeforeDate = async (
@@ -309,12 +309,12 @@ export const getMovementsOnAndBeforeDate = async (
 };
 
 /**
- * Retrieves all items associated with a specific date on and after.
+ * Retrieves all inventory movements associated with a specific date on and after.
  *
  * @param {Request} req - Express request object with:
  *   - date: date requested (in params)
  * @param {Response} res - Express response object
- * @returns {Promise<Response>} JSON array of items matching the date on or after or error message
+ * @returns {Promise<Response>} JSON array of inventory movements matching the date on or after, or error message
  * @throws {500} Internal server error if database query fails
  */
 export const getMovementsOnAndAfterDate = async (req: Request<{ date: string }>, res: Response) => {
@@ -342,7 +342,7 @@ export const getMovementsOnAndAfterDate = async (req: Request<{ date: string }>,
  * Validates foreign key constraints for item_id, product_id, from_location_id, to_location_id, performed_by_id.
  *
  * @param {Request} req - Express request object with:
- *   - inventory_action: Type of inventory action ie ('ADD', 'MOVE', 'CLOCKOUT', 'DISCARD', 'ADJUSTMENT') (in body)
+ *   - inventory_action: Type of inventory action ie ('ADD', 'MOVE', 'CHECKOUT', 'DISCARD', 'ADJUSTMENT') (in body)
  *   - item_id: UUID of the item (in body)
  *   - product_id: UUID of the product (in body)
  *   - from_location_id: UUID of the start location (in body)
@@ -430,15 +430,15 @@ export const createInventoryMovement = async (req: Request, res: Response) => {
 };
 
 /**
- * Updates an existing inventory action in the database.
+ * Updates an existing inventory movement in the database.
  * Only updates fields that are provided in the request body.
  * Allowed fields: inventory_action, item_id, product_id, from_location_id, to_location_id, quantity, performed_by, performed_at, note.
  *
  * @param {Request} req - Express request object with:
- *   - id: UUID of the inventory action to update (in params)
+ *   - id: UUID of the inventory movement to update (in params)
  *   - Updatable fields in body (inventory_action, item_id, product_id, from_location_id, to_location_id, quantity, performed_by, performed_at, note)
  * @param {Response} res - Express response object
- * @returns {Promise<Response>} JSON object of the updated inventory action or error message
+ * @returns {Promise<Response>} JSON object of the updated inventory movement or error message
  * @throws {400} Invalid id, item_id, product_id, from_location_id, to_location_id, performed_by (must be valid UUIDs)
  * @throws {400} Invalid product_id if product doesn't exist in database
  * @throws {400} Invalid item_id if item doesn't exist in database
@@ -446,7 +446,7 @@ export const createInventoryMovement = async (req: Request, res: Response) => {
  * @throws {400} Invalid to_location_id if location doesn't exist in database
  * @throws {400} Invalid performed_by if user doesn't exist in database
  * @throws {400} No updatable fields provided if request body is empty or contains no allowed fields
- * @throws {404} Inventory action not found if no inventory action matches the provided ID
+ * @throws {404} Inventory movement not found if no inventory movement matches the provided ID
  * @throws {500} Internal server error if database query fails
  */
 export const updateInventoryMovement = async (req: Request, res: Response) => {
@@ -454,31 +454,13 @@ export const updateInventoryMovement = async (req: Request, res: Response) => {
     const { id } = movementIdParamSchema.parse(req.params);
     const validatedData: UpdateInventoryInput = updateInventoryMovementSchema.parse(req.body);
 
-    const allowedFields = [
-      'inventory_action',
-      'item_id',
-      'product_id',
-      'from_location_id',
-      'to_location_id',
-      'quantity',
-      'performed_by',
-      'performed_at',
-      'note',
-    ];
-
     const setClauses: string[] = [];
     const values: any[] = [];
     let idx = 1;
     for (const [key, value] of Object.entries(validatedData)) {
-      if (allowedFields.includes(key)) {
-        setClauses.push(`${key} = $${idx++}`);
-        values.push(value);
-      }
+      setClauses.push(`${key} = $${idx++}`);
+      values.push(value);
     }
-    if (setClauses.length === 0) {
-      return res.status(400).json({ error: 'No updatable fields provided' });
-    }
-
     const sql = `
       UPDATE "inventory movement"
       SET ${setClauses.join(', ')}
