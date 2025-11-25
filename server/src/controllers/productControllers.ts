@@ -244,7 +244,7 @@ export const updateProduct = async (req: Request, res: Response) => {
       'value',
       'item_limit',
       'category',
-      'total_count'
+      'total_count',
     ];
     const setClauses: string[] = [];
     const values: any[] = [];

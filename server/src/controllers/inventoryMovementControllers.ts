@@ -1,13 +1,53 @@
 import { Request, Response } from 'express';
 import pool from '../db.js';
+import {
+  movementIdParamSchema,
+  createInventoryMovementSchema,
+  updateInventoryMovementSchema,
+  itemIdParamSchema,
+  productIdParamSchema,
+  startLocationIdParamSchema,
+  endLocationIdParamSchema,
+  performedByIdParamSchema,
+  performedDateParamSchema,
+  CreateInventoryInput,
+  UpdateInventoryInput,
+  actionQuerySchema,
+} from '../utils/inventoryMovementsModel.js';
+import { ZodError } from 'zod';
 
-enum InventoryAction {
-  ADD = 'ADD',
-  MOVE = 'MOVE',
-  CLOCKOUT = 'CLOCKOUT',
-  DISCARD = 'DISCARD',
-  ADJUSTMENT = 'ADJUSTMENT',
-}
+/**
+ * Checks if the query returned any rows.
+ * @param rows - The rows returned from the database query.
+ * @param res - The Express response object.
+ * @returns True if rows exist, otherwise sends a 404 response and returns false.
+ */
+const countRows = (rows: any[], res: Response) => {
+  if (rows.length === 0) {
+    res.status(404).json({ error: 'No entries found' });
+    return false;
+  }
+  return true;
+};
+
+/**
+ * Handles Zod validation errors and sends appropriate error response
+ * @param error - The error object
+ * @param res - The Express response object
+ */
+const handleValidationError = (error: unknown, res: Response) => {
+  if (error instanceof ZodError) {
+    return res.status(400).json({
+      error: 'Validation error',
+      details: error.issues.map((err) => ({
+        field: err.path.join('.'),
+        message: err.message,
+      })),
+    });
+  }
+  console.error('Unexpected error:', error);
+  return res.status(500).json({ error: 'Internal server error' });
+};
 
 // Controller functions for inventory movements
 
@@ -22,269 +62,351 @@ export async function getAllInventoryMovements(req: Request, res: Response): Pro
   }
 }
 
+/**
+ * Retrieves a single inventory movement by its unique ID.
+ *
+ * @param {Request} req - Express request object with:
+ *   - id: UUID of the inventory movement (in params)
+ * @param {Response} res - Express response object
+ * @returns {Promise<Response>} JSON object of the requested inventory movement or error message
+ * @throws {404} Inventory movement not found if no inventory movement matches the provided ID
+ * @throws {500} Internal server error if database query fails
+ */
 // GET single row by id
-export async function getMovementById(req: Request<{ id: string }>, res: Response): Promise<void> {
-  const { id } = req.params;
+export const getMovementById = async (req: Request, res: Response) => {
   try {
+    const { id } = movementIdParamSchema.parse(req.params);
+
     const result = await pool.query('SELECT * FROM "inventory movement" WHERE id = $1;', [id]);
-    if (result.rows.length === 0) {
-      res.status(404).json({ error: 'ID not found' });
-    } else {
-      res.json(result.rows[0]);
+
+    if (!countRows(result.rows, res)) {
+      return;
     }
+
+    res.json(result.rows[0]);
   } catch (error) {
-    console.error(error);
+    if (error instanceof ZodError) {
+      return handleValidationError(error, res);
+    }
+    console.error('Error fetching inventory movement by ID:', error);
     res.status(500).json({ error: 'Internal Server Error' });
   }
-}
+};
 
-// GET rows by inventory action
-export async function getMovementsByAction(
-  req: Request<{ action: string }>,
-  res: Response
-): Promise<void> {
-  const { action } = req.params;
-
-  const AllowedActions = Object.values(InventoryAction);
-  if (!AllowedActions.includes(action as InventoryAction)) {
-    res.status(400).json({
-      error: `Invalid inventory action "${action}". 
-        Must be one of: ${AllowedActions.join(', ')}`,
-    });
-    return;
-  }
-  const validAction = action as InventoryAction;
+/**
+ * Retrieves all inventory movements associated with a specific inventory action.
+ *
+ * @param {Request} req - Express request object with:
+ *   - inventory_action: Type/value of the inventory action (in params). One of: 'ADD', 'MOVE', 'CHECKOUT', 'DISCARD', 'ADJUSTMENT'
+ * @param {Response} res - Express response object
+ * @returns {Promise<Response>} JSON array of inventory movements matching the action or error message
+ * @throws {500} Internal server error if database query fails
+ */
+export const getMovementsByAction = async (req: Request, res: Response) => {
   try {
+    const { inventory_action } = actionQuerySchema.parse(req.params);
     const result = await pool.query(
       'SELECT * FROM "inventory movement" WHERE inventory_action = $1;',
-      [validAction]
+      [inventory_action]
     );
-    if (result.rows.length === 0) {
-      res.status(404).json({ error: 'No movement with that action found' });
-    } else {
-      res.json(result.rows);
+    if (!countRows(result.rows, res)) {
+      return;
     }
+    res.json(result.rows);
   } catch (error) {
-    console.error(error);
+    if (error instanceof ZodError) {
+      return handleValidationError(error, res);
+    }
+    console.error('Error fetching inventory movements by action:', error);
     res.status(500).json({ error: 'Internal Server Error' });
   }
-}
+};
 
-// GET rows by item id
-export async function getMovementsByItemId(
-  req: Request<{ item_id: string }>,
-  res: Response
-): Promise<void> {
-  const { item_id } = req.params;
+/**
+ * Retrieves all inventory movements associated with a specific item ID.
+ *
+ * @param {Request} req - Express request object with:
+ *   - item_id: UUID of the item (in params)
+ * @param {Response} res - Express response object
+ * @returns {Promise<Response>} JSON array of inventory movements matching the item ID or error message
+ * @throws {500} Internal server error if database query fails
+ */
+export const getMovementsByItemId = async (req: Request<{ item_id: string }>, res: Response) => {
   try {
+    const { item_id } = itemIdParamSchema.parse(req.params);
     const result = await pool.query('SELECT * FROM "inventory movement" WHERE item_id = $1;', [
       item_id,
     ]);
-    if (result.rows.length === 0) {
-      res.status(404).json({ error: 'No movement with that item Id found' });
-    } else {
-      res.json(result.rows);
+    if (!countRows(result.rows, res)) {
+      return;
     }
+    res.json(result.rows);
   } catch (error) {
-    console.error(error);
+    if (error instanceof ZodError) {
+      return handleValidationError(error, res);
+    }
+    console.error('Error fetching inventory movements by item ID:', error);
     res.status(500).json({ error: 'Internal Server Error' });
   }
-}
+};
 
-// GET rows by product id
-export async function getMovementsByProductId(
+/**
+ * Retrieves all inventory movements associated with a specific product ID.
+ *
+ * @param {Request} req - Express request object with:
+ *   - product_id: UUID of the product (in params)
+ * @param {Response} res - Express response object
+ * @returns {Promise<Response>} JSON array of inventory movements matching the product ID or error message
+ * @throws {500} Internal server error if database query fails
+ */
+export const getMovementsByProductId = async (
   req: Request<{ product_id: string }>,
   res: Response
-): Promise<void> {
-  const { product_id } = req.params;
+) => {
   try {
+    const { product_id } = productIdParamSchema.parse(req.params);
     const result = await pool.query('SELECT * FROM "inventory movement" WHERE product_id = $1;', [
       product_id,
     ]);
-    if (result.rows.length === 0) {
-      res.status(404).json({ error: 'No movement with that product Id found' });
-    } else {
-      res.json(result.rows);
+    if (!countRows(result.rows, res)) {
+      return;
     }
+    res.json(result.rows);
   } catch (error) {
-    console.error(error);
+    if (error instanceof ZodError) {
+      return handleValidationError(error, res);
+    }
+    console.error('Error fetching inventory movements by product ID:', error);
     res.status(500).json({ error: 'Internal Server Error' });
   }
-}
+};
 
-// GET rows by starting location
-export async function getMovementsByStartLocationId(
+/**
+ * Retrieves all inventory movements associated with a specific start location ID.
+ *
+ * @param {Request} req - Express request object with:
+ *   - start_location_id: UUID of the start location (in params)
+ * @param {Response} res - Express response object
+ * @returns {Promise<Response>} JSON array of inventory movements matching the start location ID or error message
+ * @throws {500} Internal server error if database query fails
+ */
+export const getMovementsByStartLocationId = async (
   req: Request<{ start_location_id: string }>,
   res: Response
-): Promise<void> {
-  const { start_location_id } = req.params;
+) => {
   try {
+    const { start_location_id } = startLocationIdParamSchema.parse(req.params);
     const result = await pool.query(
       'SELECT * FROM "inventory movement" WHERE from_location_id = $1;',
       [start_location_id]
     );
-    if (result.rows.length === 0) {
-      res.status(404).json({ error: 'No movements with that start location Id found' });
-    } else {
-      res.json(result.rows);
+    if (!countRows(result.rows, res)) {
+      return;
     }
+    res.json(result.rows);
   } catch (error) {
-    console.error(error);
+    if (error instanceof ZodError) {
+      return handleValidationError(error, res);
+    }
+    console.error('Error fetching inventory movements by start location ID:', error);
     res.status(500).json({ error: 'Internal Server Error' });
   }
-}
+};
 
-// GET rows by ending location
-export async function getMovementsByEndLocationId(
+/**
+ * Retrieves all inventory movements associated with a specific end location ID.
+ *
+ * @param {Request} req - Express request object with:
+ *   - end_location_id: UUID of the end location (in params)
+ * @param {Response} res - Express response object
+ * @returns {Promise<Response>} JSON array of inventory movements matching the end location ID or error message
+ * @throws {500} Internal server error if database query fails
+ */
+export const getMovementsByEndLocationId = async (
   req: Request<{ end_location_id: string }>,
   res: Response
-): Promise<void> {
-  const { end_location_id } = req.params;
+) => {
   try {
+    const { end_location_id } = endLocationIdParamSchema.parse(req.params);
     const result = await pool.query(
       'SELECT * FROM "inventory movement" WHERE to_location_id = $1;',
       [end_location_id]
     );
-    if (result.rows.length === 0) {
-      res.status(404).json({ error: 'No movements with that end location Id found' });
-    } else {
-      res.json(result.rows);
+    if (!countRows(result.rows, res)) {
+      return;
     }
+    res.json(result.rows);
   } catch (error) {
-    console.error(error);
+    if (error instanceof ZodError) {
+      return handleValidationError(error, res);
+    }
+    console.error('Error fetching inventory movements by end location ID:', error);
     res.status(500).json({ error: 'Internal Server Error' });
   }
-}
+};
 
-// GET rows by who moved it
-export async function getMovementsByPerformedId(
+/**
+ * Retrieves all inventory movements associated with a specific performer ID.
+ *
+ * @param {Request} req - Express request object with:
+ *   - performed_by_id: UUID of the performer (in params)
+ * @param {Response} res - Express response object
+ * @returns {Promise<Response>} JSON array of inventory movements matching the performer ID or error message
+ * @throws {500} Internal server error if database query fails
+ */
+export const getMovementsByPerformedId = async (
   req: Request<{ performed_by_id: string }>,
   res: Response
-): Promise<void> {
-  const { performed_by_id } = req.params;
+) => {
   try {
+    const { performed_by_id } = performedByIdParamSchema.parse(req.params);
     const result = await pool.query('SELECT * FROM "inventory movement" WHERE performed_by = $1', [
       performed_by_id,
     ]);
-    if (result.rows.length === 0) {
-      res.status(404).json({ error: 'No movements with that person Id found' });
-    } else {
-      res.json(result.rows);
+    if (!countRows(result.rows, res)) {
+      return;
     }
+    res.json(result.rows);
   } catch (error) {
-    console.error(error);
+    if (error instanceof ZodError) {
+      return handleValidationError(error, res);
+    }
+    console.error('Error fetching inventory movements by performed by ID:', error);
     res.status(500).json({ error: 'Internal Server Error' });
   }
-}
+};
 
-// GET rows by date on and before
-export async function getMovementsOnAndBeforeDate(
+/**
+ * Retrieves all inventory movements associated with a specific date on and before.
+ *
+ * @param {Request} req - Express request object with:
+ *   - date: date requested (in params)
+ * @param {Response} res - Express response object
+ * @returns {Promise<Response>} JSON array of inventory movements matching the date on or before, or error message
+ * @throws {500} Internal server error if database query fails
+ */
+export const getMovementsOnAndBeforeDate = async (
   req: Request<{ date: string }>,
   res: Response
-): Promise<void> {
-  const { date } = req.params;
+) => {
   try {
+    const { date } = performedDateParamSchema.parse(req.params);
     const result = await pool.query(
       'SELECT * FROM "inventory movement" WHERE performed_at <= $1::date ORDER BY performed_at DESC;',
       [date]
     );
-    if (result.rows.length === 0) {
-      res.status(404).json({ error: 'No movements at that date or before found' });
-    } else {
-      res.json(result.rows);
+    if (!countRows(result.rows, res)) {
+      return;
     }
+    res.json(result.rows);
   } catch (error) {
-    console.error(error);
+    if (error instanceof ZodError) {
+      return handleValidationError(error, res);
+    }
+    console.error('Error fetching inventory movements on or before date:', error);
     res.status(500).json({ error: 'Internal Server Error' });
   }
-}
+};
 
-// GET rows by date on and after
-export async function getMovementsOnAndAfterDate(
-  req: Request<{ date: string }>,
-  res: Response
-): Promise<void> {
-  const { date } = req.params;
+/**
+ * Retrieves all inventory movements associated with a specific date on and after.
+ *
+ * @param {Request} req - Express request object with:
+ *   - date: date requested (in params)
+ * @param {Response} res - Express response object
+ * @returns {Promise<Response>} JSON array of inventory movements matching the date on or after, or error message
+ * @throws {500} Internal server error if database query fails
+ */
+export const getMovementsOnAndAfterDate = async (req: Request<{ date: string }>, res: Response) => {
   try {
-    const result = await pool.query('SELECT * FROM "inventory movement" WHERE performed_at >= $1::date ORDER BY performed_at ASC;', [
-      date,
-    ]);
-    if (result.rows.length === 0) {
-      res.status(404).json({ error: 'No movements at that date or later found' });
-    } else {
-      res.json(result.rows);
-    }
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Internal Server Error' });
-  }
-}
-
-// POST (create) a new inventory movement
-export async function createInventoryMovement(
-  req: Request<
-    {},
-    {},
-    {
-      inventory_action: InventoryAction;
-      item_id: string;
-      product_id: string;
-      from_location_id: string;
-      to_location_id: string;
-      quantity: number;
-      performed_by: string;
-      note?: string;
-    }
-  >,
-  res: Response
-): Promise<void> {
-  const {
-    inventory_action,
-    item_id,
-    product_id,
-    from_location_id,
-    to_location_id,
-    quantity,
-    performed_by,
-    note,
-  } = req.body;
-
-  const AllowedActions = Object.values(InventoryAction);
-  if (!AllowedActions.includes(inventory_action)) {
-    res.status(400).json({
-      error: `Invalid inventory action "${inventory_action}". 
-        Must be one of: ${AllowedActions.join(', ')}`,
-    });
-    return;
-  }
-  if (
-    !item_id ||
-    !product_id ||
-    !quantity ||
-    !performed_by ||
-    !from_location_id ||
-    !to_location_id
-  ) {
-    res.status(400).json({ error: 'Missing required fields.' });
-    return;
-  }
-
-  try {
+    const { date } = performedDateParamSchema.parse(req.params);
     const result = await pool.query(
+      'SELECT * FROM "inventory movement" WHERE performed_at >= $1::date ORDER BY performed_at ASC;',
+      [date]
+    );
+    if (!countRows(result.rows, res)) {
+      return;
+    }
+    res.json(result.rows);
+  } catch (error) {
+    if (error instanceof ZodError) {
+      return handleValidationError(error, res);
+    }
+    console.error('Error fetching inventory movements on or after date:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+};
+
+/**
+ * Creates a new inventory movement in the database.
+ * Validates foreign key constraints for item_id, product_id, from_location_id, to_location_id, performed_by_id.
+ *
+ * @param {Request} req - Express request object with:
+ *   - inventory_action: Type of inventory action ie ('ADD', 'MOVE', 'CHECKOUT', 'DISCARD', 'ADJUSTMENT') (in body)
+ *   - item_id: UUID of the item (in body)
+ *   - product_id: UUID of the product (in body)
+ *   - from_location_id: UUID of the start location (in body)
+ *   - to_location_id: UUID of the end location (in body)
+ *   - quantity: Number of items (in body)
+ *   - performed_by: UUID of the user performing the action (in body)
+ *   - note: Optional note about the movement (in body)
+ * @param {Response} res - Express response object
+ * @returns {Promise<Response>} JSON object of the newly created inventory movement or error message
+ * @throws {400} Invalid foreign key if item_id, product_id, from_location_id, to_location_id, performed_by doesn't exist
+ * @throws {500} Internal server error if validation or creation fails
+ */
+export const createInventoryMovement = async (req: Request, res: Response) => {
+  try {
+    const {
+      inventory_action,
+      item_id,
+      product_id,
+      from_location_id,
+      to_location_id,
+      quantity,
+      performed_by,
+      note,
+    }: CreateInventoryInput = createInventoryMovementSchema.parse(req.body);
+
+    // Check if item_id, product_id, from_location_id, to_location_id, performed_by_id exist in tables (in parallel)
+    const [itemCheck, productCheck, fromLocationCheck, toLocationCheck, userCheck] =
+      await Promise.all([
+        pool.query('SELECT id FROM items WHERE id = $1', [item_id]),
+        pool.query('SELECT id FROM products WHERE id = $1', [product_id]),
+        pool.query('SELECT id FROM storage_locations WHERE id = $1', [from_location_id]),
+        pool.query('SELECT id FROM storage_locations WHERE id = $1', [to_location_id]),
+        pool.query('SELECT id FROM users WHERE id = $1', [performed_by]),
+      ]);
+    if (itemCheck.rows.length === 0) {
+      return res.status(400).json({ error: 'Invalid item_id' });
+    }
+    if (productCheck.rows.length === 0) {
+      return res.status(400).json({ error: 'Invalid product_id' });
+    }
+    if (fromLocationCheck.rows.length === 0) {
+      return res.status(400).json({ error: 'Invalid from_location_id' });
+    }
+    if (toLocationCheck.rows.length === 0) {
+      return res.status(400).json({ error: 'Invalid to_location_id' });
+    }
+    if (userCheck.rows.length === 0) {
+      return res.status(400).json({ error: 'Invalid performed_by user id' });
+    }
+    const newInventoryAction = await pool.query(
       `
-            INSERT INTO "inventory movement" (
-            inventory_action, 
-            item_id, 
-            product_id, 
-            from_location_id, 
-            to_location_id, 
-            quantity, 
-            performed_by, 
-            note
-            )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
-            RETURNING *;
-            `,
+      INSERT INTO "inventory movement" (
+      inventory_action, 
+      item_id, 
+      product_id, 
+      from_location_id, 
+      to_location_id, 
+      quantity, 
+      performed_by, 
+      note
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
+      RETURNING *;
+      `,
       [
         inventory_action,
         item_id,
@@ -296,103 +418,99 @@ export async function createInventoryMovement(
         note || null,
       ]
     );
-    res.status(201).json(result.rows[0]);
+
+    res.status(201).json(newInventoryAction.rows[0]);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Internal Server Error' });
-  }
-}
-
-// PATCH (partial update) an inventory movement by id
-export async function updateInventoryMovement(
-  req: Request<
-    { id: string },
-    {},
-    {
-      inventory_action?: string | null;
-      item_id?: string | null;
-      product_id?: string | null;
-      from_location_id?: string | null;
-      to_location_id?: string | null;
-      quantity?: number | null;
-      performed_by?: string | null;
-      performed_at?: string | null;
-      note?: string | null;
+    if (error instanceof ZodError) {
+      return handleValidationError(error, res);
     }
-  >,
-  res: Response
-): Promise<void> {
-  const { id } = req.params;
-  const {
-    inventory_action,
-    item_id,
-    product_id,
-    from_location_id,
-    to_location_id,
-    quantity,
-    performed_by,
-    performed_at,
-    note,
-  } = req.body;
+    console.error('Error creating inventory action:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
 
+/**
+ * Updates an existing inventory movement in the database.
+ * Only updates fields that are provided in the request body.
+ * Allowed fields: inventory_action, item_id, product_id, from_location_id, to_location_id, quantity, performed_by, performed_at, note.
+ *
+ * @param {Request} req - Express request object with:
+ *   - id: UUID of the inventory movement to update (in params)
+ *   - Updatable fields in body (inventory_action, item_id, product_id, from_location_id, to_location_id, quantity, performed_by, performed_at, note)
+ * @param {Response} res - Express response object
+ * @returns {Promise<Response>} JSON object of the updated inventory movement or error message
+ * @throws {400} Invalid id, item_id, product_id, from_location_id, to_location_id, performed_by (must be valid UUIDs)
+ * @throws {400} Invalid product_id if product doesn't exist in database
+ * @throws {400} Invalid item_id if item doesn't exist in database
+ * @throws {400} Invalid from_location_id if location doesn't exist in database
+ * @throws {400} Invalid to_location_id if location doesn't exist in database
+ * @throws {400} Invalid performed_by if user doesn't exist in database
+ * @throws {400} No updatable fields provided if request body is empty or contains no allowed fields
+ * @throws {404} Inventory movement not found if no inventory movement matches the provided ID
+ * @throws {500} Internal server error if database query fails
+ */
+export const updateInventoryMovement = async (req: Request, res: Response) => {
   try {
-    const result = await pool.query(
-      `
-            UPDATE "inventory movement" SET
-            inventory_action = COALESCE($1, inventory_action),
-            item_id = COALESCE($2, item_id),
-            product_id = COALESCE($3, product_id),
-            from_location_id = COALESCE($4, from_location_id),
-            to_location_id = COALESCE($5, to_location_id),
-            quantity = COALESCE($6, quantity),
-            performed_by = COALESCE($7, performed_by),
-            performed_at = COALESCE($8, performed_at),
-            note = COALESCE($9, note)
-            WHERE id = $10
-            RETURNING *;
-            `,
-      [
-        inventory_action ?? null,
-        item_id ?? null,
-        product_id ?? null,
-        from_location_id ?? null,
-        to_location_id ?? null,
-        quantity ?? null,
-        performed_by ?? null,
-        performed_at ?? null,
-        note ?? null,
-        id,
-      ]
-    );
+    const { id } = movementIdParamSchema.parse(req.params);
+    const validatedData: UpdateInventoryInput = updateInventoryMovementSchema.parse(req.body);
 
-    if (result.rows.length === 0) {
-      res.status(404).json({ error: 'ID not found' });
+    const setClauses: string[] = [];
+    const values: any[] = [];
+    let idx = 1;
+    for (const [key, value] of Object.entries(validatedData)) {
+      setClauses.push(`${key} = $${idx++}`);
+      values.push(value);
+    }
+    const sql = `
+      UPDATE "inventory movement"
+      SET ${setClauses.join(', ')}
+      WHERE id = $${idx}
+      RETURNING *;
+    `;
+    values.push(id);
+
+    const { rows } = await pool.query(sql, values);
+
+    if (!countRows(rows, res)) {
       return;
     }
-    res.status(200).json(result.rows[0]);
-  } catch (error) {
-    console.error('PATCH /inventory-movement/:id failed:', error);
-    res.status(500).json({ error: 'Internal Server Error' });
-  }
-}
 
-// DELETE an inventory movement by id
-export async function deleteInventoryMovement(
-  req: Request<{ id: string }>,
-  res: Response
-): Promise<void> {
-  const { id } = req.params;
+    return res.json(rows[0]);
+  } catch (error) {
+    if (error instanceof ZodError) {
+      return handleValidationError(error, res);
+    }
+    console.error('Error updating inventory action:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+/**
+ * Deletes a inventory movement from the database by its ID.
+ *
+ * @param {Request} req - Express request object with:
+ *   - id: UUID of the inventory movement to delete (in params)
+ * @param {Response} res - Express response object
+ * @returns {Promise<Response>} Success message or error message
+ * @throws {404} Inventory movement not found if no product matches the provided ID
+ * @throws {500} Internal server error if database query fails
+ */
+export const deleteInventoryMovement = async (req: Request, res: Response) => {
   try {
+    const { id } = movementIdParamSchema.parse(req.params);
+
     const result = await pool.query('DELETE FROM "inventory movement" WHERE id = $1 RETURNING *;', [
       id,
     ]);
-    if (result.rows.length === 0) {
-      res.status(404).json({ error: 'Inventory movement not found' });
-    } else {
-      res.json({ message: 'Deleted Successfully', deleted: result.rows[0] });
+    if (!countRows(result.rows, res)) {
+      return;
     }
+    res.json({ message: 'Inventory movement deleted successfully', deleted: result.rows[0] });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Internal Server Error' });
+    if (error instanceof ZodError) {
+      return handleValidationError(error, res);
+    }
+    console.error('Error deleting inventory movement:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
-}
+};
