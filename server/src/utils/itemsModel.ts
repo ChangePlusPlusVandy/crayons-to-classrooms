@@ -17,6 +17,10 @@ export const locationIdParamSchema = z.object({
   locationId: uuidSchema,
 });
 
+export const warehouseIdParamSchema = z.object({
+  warehouseId: uuidSchema,
+});
+
 /**
  * Valid status values for items
  */
@@ -24,7 +28,7 @@ export const ItemStatus = z.enum(['active', 'inactive', 'discontinued', 'checked
 
 /**
  * Schema for validating item creation
- * Requires: product_id, quantity, current_location_id, status, created_by
+ * Requires: product_id, quantity, current_location_id, status, created_by, warehouse, value
  */
 export const createItemSchema = z.object({
   product_id: uuidSchema,
@@ -32,6 +36,11 @@ export const createItemSchema = z.object({
   created_by: uuidSchema,
   quantity: z.number().int().positive('Quantity must be a positive integer'),
   status: ItemStatus,
+  warehouse: uuidSchema,
+  category: z.string().optional(),
+  item_limit: z.number().int().nonnegative('Limit cannot be negative').optional(),
+  value: z.number().nonnegative('Value cannot be negative'),
+  limbo: z.boolean().default(false),
 });
 
 /**
@@ -44,6 +53,11 @@ export const updateItemSchema = z
     quantity: z.number().int().nonnegative('Quantity cannot be negative').optional(),
     current_location_id: z.uuid().optional(),
     status: ItemStatus.optional(),
+    warehouse: z.uuid().optional(),
+    category: z.string().optional(),
+    item_limit: z.number().int().nonnegative('Limit cannot be negative').optional(),
+    value: z.number().nonnegative('Value cannot be negative').optional(),
+    limbo: z.boolean().optional(),
   })
   .refine((data) => Object.keys(data).length > 0, {
     message: 'At least one field must be provided for update',

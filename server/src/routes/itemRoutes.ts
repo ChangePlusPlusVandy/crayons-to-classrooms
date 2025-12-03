@@ -6,6 +6,7 @@ import {
   deleteItem,
   getItemsByProductId,
   getItemsByLocationId,
+  getItemsByWarehouseId,
   getItemsByStatus,
 } from '../controllers/itemController.js';
 import express from 'express';
@@ -22,6 +23,8 @@ router.post('/', createItem);
 router.get('/location/:locationId', getItemsByLocationId);
 // get items by product id
 router.get('/product/:productId', getItemsByProductId);
+// get items by warehouse id
+router.get('/warehouse/:warehouseId', getItemsByWarehouseId);
 // get item by ID
 router.get('/:id', getItemById);
 // update an existing item

@@ -7,6 +7,7 @@ import {
   itemIdParamSchema,
   productIdParamSchema,
   locationIdParamSchema,
+  warehouseIdParamSchema,
   CreateItemInput,
   UpdateItemInput,
 } from '../utils/itemsModel.js';
@@ -160,6 +161,30 @@ export const getItemsByLocationId = async (req: Request, res: Response) => {
 };
 
 /**
+ * Retrieves all items associated with a specific warehouse ID.
+ *
+ * @param {Request} req - Express request object with:
+ *   - warehouseId: UUID of the warehouse (in params)
+ * @param {Response} res - Express response object
+ * @returns {Promise<Response>} JSON array of items matching the warehouse ID or error message
+ * @throws {500} Internal server error if database query fails
+ */
+export const getItemsByWarehouseId = async (req: Request, res: Response) => {
+  try {
+    const { warehouseId } = warehouseIdParamSchema.parse(req.params);
+    const items = await pool.query('SELECT * FROM items WHERE warehouse = $1', [warehouseId]);
+    if (!countRows(items.rows, res)) {
+      return;
+    }
+    res.json(items.rows);
+  } catch (error) {
+    if (error instanceof ZodError) {
+      return handleValidationError(error, res);
+    }
+  }
+};
+
+/**
  * Retrieves all items with a specific status.
  *
  * @param {Request} req - Express request object with:
@@ -190,7 +215,7 @@ export const getItemsByStatus = async (req: Request, res: Response) => {
 
 /**
  * Creates a new item in the database.
- * Validates foreign key constraints for product_id, current_location_id, and created_by.
+ * Validates foreign key constraints for product_id, current_location_id, created_by, and warehouse.
  *
  * @param {Request} req - Express request object with:
  *   - product_id: UUID of the product (in body)
@@ -198,21 +223,37 @@ export const getItemsByStatus = async (req: Request, res: Response) => {
  *   - current_location_id: UUID of the current location (in body)
  *   - status: Current status of the item ie ('active', 'inactive', 'discontinued', 'checked out') (in body)
  *   - created_by: UUID of the user creating the item (in body)
+ *   - warehouse: UUID of the warehouse (in body, required)
+ *   - category: Category string (in body, optional)
+ *   - limit: Limit number (in body, optional)
+ *   - value: Value number (in body, required)
+ *   - limbo: Limbo boolean, defaults to false (in body, optional)
  * @param {Response} res - Express response object
  * @returns {Promise<Response>} JSON object of the newly created item or error message
- * @throws {400} Invalid foreign key if product_id, current_location_id, or created_by doesn't exist
+ * @throws {400} Invalid foreign key if product_id, current_location_id, created_by, or warehouse doesn't exist
  * @throws {500} Internal server error if validation or creation fails
  */
 export const createItem = async (req: Request, res: Response) => {
   try {
-    const { product_id, current_location_id, created_by, quantity, status }: CreateItemInput =
-      createItemSchema.parse(req.body);
+    const {
+      product_id,
+      current_location_id,
+      created_by,
+      quantity,
+      status,
+      warehouse,
+      category,
+      item_limit,
+      value,
+      limbo,
+    }: CreateItemInput = createItemSchema.parse(req.body);
 
-    // Check if product_id, current_location_id, created_by exist in tables (in parallel)
-    const [productCheck, locationCheck, userCheck] = await Promise.all([
+    // Check if product_id, current_location_id, created_by, warehouse exist in tables (in parallel)
+    const [productCheck, locationCheck, userCheck, warehouseCheck] = await Promise.all([
       pool.query('SELECT id FROM products WHERE id = $1', [product_id]),
       pool.query('SELECT id FROM storage_locations WHERE id = $1', [current_location_id]),
       pool.query('SELECT id FROM users WHERE id = $1', [created_by]),
+      pool.query('SELECT id FROM warehouse WHERE id = $1', [warehouse]),
     ]);
     if (productCheck.rows.length === 0) {
       return res.status(400).json({ error: 'Invalid product_id' });
@@ -223,9 +264,12 @@ export const createItem = async (req: Request, res: Response) => {
     if (userCheck.rows.length === 0) {
       return res.status(400).json({ error: 'Invalid created_by user id' });
     }
+    if (warehouseCheck.rows.length === 0) {
+      return res.status(400).json({ error: 'Invalid warehouse id' });
+    }
     const newItem = await pool.query(
-      'INSERT INTO items (product_id, quantity, current_location_id, status, created_by, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, NOW(), NOW()) RETURNING *',
-      [product_id, quantity, current_location_id, status, created_by]
+      'INSERT INTO items (product_id, quantity, current_location_id, status, created_by, warehouse, category, item_limit, value, limbo, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), NOW()) RETURNING *',
+      [product_id, quantity, current_location_id, status, created_by, warehouse, category ?? null, item_limit ?? null, value, limbo ?? false]
     );
 
     res.status(201).json(newItem.rows[0]);
@@ -241,15 +285,16 @@ export const createItem = async (req: Request, res: Response) => {
 /**
  * Updates an existing item in the database.
  * Only updates fields that are provided in the request body.
- * Allowed fields: product_id, quantity, current_location_id, status.
+ * Allowed fields: product_id, quantity, current_location_id, status, warehouse, category, limit, value, limbo.
  *
  * @param {Request} req - Express request object with:
  *   - id: UUID of the item to update (in params)
- *   - Updatable fields in body (product_id, quantity, current_location_id, status)
+ *   - Updatable fields in body (product_id, quantity, current_location_id, status, warehouse, category, limit, value, limbo)
  * @param {Response} res - Express response object
  * @returns {Promise<Response>} JSON object of the updated item or error message
  * @throws {400} Invalid id or product_id (must be valid UUIDs)
  * @throws {400} Invalid product_id if product doesn't exist in database
+ * @throws {400} Invalid warehouse if warehouse doesn't exist in database
  * @throws {400} No updatable fields provided if request body is empty or contains no allowed fields
  * @throws {404} Item not found if no item matches the provided ID
  * @throws {500} Internal server error if database query fails
@@ -266,6 +311,16 @@ export const updateItem = async (req: Request, res: Response) => {
       ]);
       if (productCheck.rows.length === 0) {
         return res.status(400).json({ error: 'Invalid product_id' });
+      }
+    }
+
+    // If warehouse is being updated, verify it exists
+    if (validatedData.warehouse) {
+      const warehouseCheck = await pool.query('SELECT id FROM warehouse WHERE id = $1', [
+        validatedData.warehouse,
+      ]);
+      if (warehouseCheck.rows.length === 0) {
+        return res.status(400).json({ error: 'Invalid warehouse id' });
       }
     }
 
