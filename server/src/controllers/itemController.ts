@@ -226,7 +226,7 @@ export const getItemsByStatus = async (req: Request, res: Response) => {
  *   - created_by: UUID of the user creating the item (in body)
  *   - warehouse: UUID of the warehouse (in body, required)
  *   - category: Category string (in body, optional)
- *   - limit: Limit number (in body, optional)
+ *   - item_limit: Limit number (in body, optional)
  *   - value: Value number (in body, required)
  *   - limbo: Limbo boolean, defaults to false (in body, optional)
  * @param {Response} res - Express response object
