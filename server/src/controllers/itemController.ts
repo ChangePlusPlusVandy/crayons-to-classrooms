@@ -181,8 +181,9 @@ export const getItemsByWarehouseId = async (req: Request, res: Response) => {
     if (error instanceof ZodError) {
       return handleValidationError(error, res);
     }
+    console.error('Error fetching items by warehouse ID:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
-};
 
 /**
  * Retrieves all items with a specific status.
