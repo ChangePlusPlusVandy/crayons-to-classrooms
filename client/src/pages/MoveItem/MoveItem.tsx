@@ -9,6 +9,7 @@ import {
   Alert,
   Autocomplete,
 } from '@mui/material';
+import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import {
   getWarehouses,
   getStorageLocations,
@@ -229,9 +230,7 @@ export default function MoveItem() {
         </FormField>
 
         <Box sx={{ display: 'flex', justifyContent: 'center', my: 2 }}>
-          <Typography variant="h6" sx={{ fontSize: '1.5rem' }}>
-            �<br />�
-          </Typography>
+          <ArrowDownwardIcon sx={{ fontSize: '2rem', color: 'text.secondary' }} />
         </Box>
 
         <FormField>
