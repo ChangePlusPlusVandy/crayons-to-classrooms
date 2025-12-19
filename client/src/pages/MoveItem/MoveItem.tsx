@@ -8,6 +8,9 @@ import {
   CircularProgress,
   Alert,
   Autocomplete,
+  Paper,
+  Stack,
+  FormControl,
 } from '@mui/material';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import {
@@ -20,7 +23,7 @@ import {
 import { Warehouse } from '../../types/Warehouse';
 import { StorageLocation } from '../../types/StorageLocation';
 import { Item } from '../../types/Item';
-import { FormContainer, FormField, InfoBox } from './MoveItem.styles';
+import { MoveItemFormLabel } from './MoveItem.styles';
 
 export default function MoveItem() {
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
@@ -126,7 +129,7 @@ export default function MoveItem() {
         from_location_id: selectedItem.current_location_id,
         to_location_id: selectedToSlot.id,
         quantity: selectedItem.quantity,
-        performed_by: '00000000-0000-0000-0000-000000000000', // TODO: Placeholder user ID
+        performed_by: "b4974f63-ee89-42a1-bdb3-ce9df255c682", // TODO: Get user ID
         note: notes || undefined,
       });
 
@@ -161,133 +164,146 @@ export default function MoveItem() {
         Move Item
       </Typography>
 
-      <FormContainer>
-        {error && (
-          <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
-            {error}
-          </Alert>
-        )}
+      <Paper
+        component="form"
+        onSubmit={(e) => {
+          e.preventDefault();
+          handleSubmit();
+        }}
+        sx={{
+          p: { xs: 3, md: 4 },
+          borderRadius: 2,
+          maxWidth: 600,
+          mx: 'auto',
+        }}
+        elevation={2}
+      >
+        <Stack spacing={3}>
+          {error && (
+            <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
+              {error}
+            </Alert>
+          )}
 
-        {success && (
-          <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess('')}>
-            {success}
-          </Alert>
-        )}
+          {success && (
+            <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess('')}>
+              {success}
+            </Alert>
+          )}
 
-        <FormField>
-          <Typography variant="body1" sx={{ mb: 1, fontWeight: 500 }}>
-            Warehouse
-          </Typography>
-          <Autocomplete
-            options={warehouses}
-            getOptionLabel={(option) => option.name || 'Unknown Warehouse'}
-            value={selectedWarehouse}
-            onChange={(_, newValue) => {
-              setSelectedWarehouse(newValue);
-              setSelectedItem(null);
-              setSelectedToSlot(null);
-              setError('');
-            }}
-            renderInput={(params) => <TextField {...params} placeholder="Select warehouse" />}
-          />
-        </FormField>
+          <FormControl fullWidth>
+            <MoveItemFormLabel htmlFor="warehouse-select" sx={{ mb: 1, fontWeight: 500 }}>
+              Warehouse
+            </MoveItemFormLabel>
+            <Autocomplete
+            id="warehouse-select"
+              options={warehouses}
+              getOptionLabel={(option) => option.name || 'Unknown Warehouse'}
+              value={selectedWarehouse}
+              onChange={(_, newValue) => {
+                setSelectedWarehouse(newValue);
+                setSelectedItem(null);
+                setSelectedToSlot(null);
+                setError('');
+              }}
+              renderInput={(params) => <TextField {...params} placeholder="Select warehouse" />}
+            />
+          </FormControl>
 
-        <FormField>
-          <Typography variant="body1" sx={{ mb: 1, fontWeight: 500 }}>
-            Item
-          </Typography>
-          <Autocomplete
-            options={allItems}
-            getOptionLabel={(option) =>
-              `Item ID: ${option.id.substring(0, 8)}... - Product: ${option.product_id.substring(0, 8)}... - Qty: ${option.quantity}`
-            }
-            value={selectedItem}
-            onChange={(_, newValue) => {
-              setSelectedItem(newValue);
-              setSelectedToSlot(null);
-              setError('');
-            }}
-            disabled={!selectedWarehouse || allItems.length === 0}
-            renderInput={(params) => <TextField {...params} placeholder="Enter or select item" />}
-          />
-        </FormField>
+          <FormControl fullWidth disabled={!selectedWarehouse || allItems.length === 0}>
+            {' '}
+            <MoveItemFormLabel htmlFor="item-select">Item</MoveItemFormLabel>
+            <Autocomplete
+              id="item-select"
+              options={allItems}
+              getOptionLabel={(option) =>
+                `Item ID: ${option.id.substring(0, 8)}... - Product: ${option.product_id.substring(0, 8)}... - Qty: ${option.quantity}`
+              }
+              value={selectedItem}
+              onChange={(_, newValue) => {
+                setSelectedItem(newValue);
+                setSelectedToSlot(null);
+                setError('');
+              }}
+              disabled={!selectedWarehouse || allItems.length === 0}
+              renderInput={(params) => <TextField {...params} placeholder="Enter or select item" />}
+            />
+          </FormControl>
 
-        <FormField>
-          <Typography variant="body1" sx={{ mb: 1, fontWeight: 500 }}>
-            From Slot
-          </Typography>
-          <TextField
-            fullWidth
-            value={selectedItem ? fromSlot?.location_code || 'No current location' : ''}
-            placeholder="Select Item to See Slot"
-            slotProps={{
-              input: {
-                readOnly: true,
-              },
-            }}
-            disabled
-          />
-        </FormField>
+          <FormControl fullWidth>
+            <MoveItemFormLabel htmlFor="from-slot-input">From Slot</MoveItemFormLabel>
+            <TextField
+            id="from-slot-input"
+              fullWidth
+              value={selectedItem ? fromSlot?.location_code || 'No current location' : ''}
+              placeholder="Select Item to See Slot"
+              slotProps={{
+                input: {
+                  readOnly: true,
+                },
+              }}
+              disabled
+            />
+          </FormControl>
 
-        <Box sx={{ display: 'flex', justifyContent: 'center', my: 2 }}>
-          <ArrowDownwardIcon sx={{ fontSize: '2rem', color: 'text.secondary' }} />
-        </Box>
+          <Box sx={{ display: 'flex', justifyContent: 'center', my: 2 }}>
+            <ArrowDownwardIcon sx={{ fontSize: '2rem', color: 'text.secondary' }} />
+          </Box>
 
-        <FormField>
-          <Typography variant="body1" sx={{ mb: 1, fontWeight: 500 }}>
-            To Slot
-          </Typography>
-          <Autocomplete
-            options={warehouseLocations}
-            getOptionLabel={(option) => option.location_code ?? 'No location code'}
-            value={selectedToSlot}
-            onChange={(_, newValue) => {
-              setSelectedToSlot(newValue);
-              setError('');
-            }}
-            disabled={!selectedWarehouse}
-            renderInput={(params) => <TextField {...params} placeholder="Enter or select slot" />}
-          />
-        </FormField>
-        <FormField>
-          <Typography variant="body1" sx={{ mb: 1, fontWeight: 500 }}>
-            Notes
-          </Typography>
-          <TextField
-            fullWidth
-            multiline
-            rows={3}
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            placeholder="Enter notes"
-          />
-        </FormField>
+          <FormControl fullWidth>
+            <MoveItemFormLabel htmlFor="to-slot-input">To Slot</MoveItemFormLabel>
+            <Autocomplete
+              id="to-slot-input"
+              options={warehouseLocations}
+              getOptionLabel={(option) => option.location_code ?? 'No location code'}
+              value={selectedToSlot}
+              onChange={(_, newValue) => {
+                setSelectedToSlot(newValue);
+                setError('');
+              }}
+              disabled={!selectedWarehouse}
+              renderInput={(params) => <TextField {...params} placeholder="Enter or select slot" />}
+            />
+          </FormControl>
+          <FormControl fullWidth>
+            <MoveItemFormLabel htmlFor="notes-input">Notes</MoveItemFormLabel>
+            <TextField
+              id="notes-input"
+              fullWidth
+              multiline
+              rows={3}
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Enter notes"
+            />
+          </FormControl>
 
-        <Box sx={{ display: 'flex', gap: 2, mt: 3 }}>
-          <Button
-            variant="outlined"
-            fullWidth
-            onClick={() => {
-              setSelectedWarehouse(null);
-              setSelectedItem(null);
-              setSelectedToSlot(null);
-              setNotes('');
-              setError('');
-              setSuccess('');
-            }}
-          >
-            Cancel
-          </Button>
-          <Button
-            variant="contained"
-            fullWidth
-            onClick={handleSubmit}
-            disabled={submitting || !selectedWarehouse || !selectedItem || !selectedToSlot}
-          >
-            {submitting ? <CircularProgress size={24} /> : 'Confirm Move'}
-          </Button>
-        </Box>
-      </FormContainer>
+          <Box sx={{ display: 'flex', gap: 2, mt: 3 }}>
+            <Button
+              variant="outlined"
+              fullWidth
+              onClick={() => {
+                setSelectedWarehouse(null);
+                setSelectedItem(null);
+                setSelectedToSlot(null);
+                setNotes('');
+                setError('');
+                setSuccess('');
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="contained"
+              fullWidth
+              type="submit"
+              disabled={submitting || !selectedWarehouse || !selectedItem || !selectedToSlot}
+            >
+              {submitting ? <CircularProgress size={24} /> : 'Confirm Move'}
+            </Button>
+          </Box>
+        </Stack>
+      </Paper>
     </Container>
   );
 }
