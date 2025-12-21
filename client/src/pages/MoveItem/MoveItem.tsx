@@ -19,17 +19,22 @@ import {
   getItemsByLocation,
   createInventoryMovement,
   updateItemLocation,
+  getProducts,
 } from '../../api/moveItem';
 import { Warehouse } from '../../types/Warehouse';
 import { StorageLocation } from '../../types/StorageLocation';
 import { Item } from '../../types/Item';
+import { Product } from '../../types/Product';
 import { MoveItemFormLabel } from './MoveItem.styles';
 
 export default function MoveItem() {
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [storageLocations, setStorageLocations] = useState<StorageLocation[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [allItems, setAllItems] = useState<Item[]>([]);
   const [selectedWarehouse, setSelectedWarehouse] = useState<Warehouse | null>(null);
+  const [selectedSourceSlot, setSelectedSourceSlot] = useState<StorageLocation | null>(null);
+  const [itemsInSourceSlot, setItemsInSourceSlot] = useState<Item[]>([]);
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
   const [selectedToSlot, setSelectedToSlot] = useState<StorageLocation | null>(null);
   const [notes, setNotes] = useState('');
@@ -38,18 +43,20 @@ export default function MoveItem() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  // Fetch warehouses and storage locations on mount
+  // Fetch warehouses, storage locations, and products on mount
   useEffect(() => {
     async function fetchInitialData() {
       try {
-        const [warehousesData, locationsData] = await Promise.all([
+        const [warehousesData, locationsData, productsData] = await Promise.all([
           getWarehouses(),
           getStorageLocations(),
+          getProducts(),
         ]);
         setWarehouses(warehousesData);
         setStorageLocations(locationsData);
+        setProducts(productsData);
       } catch (err) {
-        setError('Failed to load initial data.');
+        setError('Failed to load initial data. Please refresh the page.');
       } finally {
         setLoading(false);
       }
@@ -58,9 +65,9 @@ export default function MoveItem() {
     fetchInitialData();
   }, []);
 
-  // Fetch items when warehouse is selected
+  // Fetch all items when warehouse is selected (for product name search)
   useEffect(() => {
-    async function fetchItems() {
+    async function fetchWarehouseItems() {
       if (!selectedWarehouse) {
         setAllItems([]);
         return;
@@ -72,7 +79,7 @@ export default function MoveItem() {
           (loc) => loc.warehouse_id === selectedWarehouse.id
         );
 
-        // TODO: there should be a way to do this with fewer requests
+        // TODO: Kiersten's PR will allow directly fetching items by warehouse id
         const itemsPromises = warehouseLocations.map((loc) =>
           getItemsByLocation(loc.id).catch(() => [])
         );
@@ -84,23 +91,78 @@ export default function MoveItem() {
       }
     }
 
-    fetchItems();
+    fetchWarehouseItems();
   }, [selectedWarehouse, storageLocations]);
 
-  // Get filtered storage locations for selected warehouse
+  // Fetch items when source slot is selected
+  useEffect(() => {
+    async function fetchItemsInSlot() {
+      if (!selectedSourceSlot) {
+        setItemsInSourceSlot([]);
+        return;
+      }
+
+      try {
+        const items = await getItemsByLocation(selectedSourceSlot.id);
+        setItemsInSourceSlot(items);
+      } catch (err) {
+        console.error('Error fetching items:', err);
+        setError('Failed to load items for the selected slot.');
+        setItemsInSourceSlot([]);
+      }
+    }
+
+    fetchItemsInSlot();
+  }, [selectedSourceSlot]);
+
+  // Helper function to get product name
+  const getProductName = (productId: string): string => {
+    const product = products.find((p) => p.id === productId);
+    return product?.name || 'Unknown Product';
+  };
+
+  // Custom filter for Source Slot Autocomplete
+  // Searches by: location_code OR product names of items in that location
+  const filterSourceSlotOptions = (
+    options: StorageLocation[],
+    state: { inputValue: string }
+  ): StorageLocation[] => {
+    const searchTerm = state.inputValue.toLowerCase().trim();
+
+    if (!searchTerm) {
+      return options;
+    }
+
+    // TODO: Optimize if needed
+    return options.filter((location) => {
+      // Match by location code
+      if (location.location_code?.toLowerCase().includes(searchTerm)) {
+        return true;
+      }
+
+      // Match by product name of items at this location
+      const itemsAtLocation = allItems.filter((item) => item.current_location_id === location.id);
+
+      return itemsAtLocation.some((item) => {
+        const product = products.find((p) => p.id === item.product_id);
+        return product?.name?.toLowerCase().includes(searchTerm);
+      });
+    });
+  };
+
+  // Get filtered storage locations for selected warehouse (for source and destination)
   const warehouseLocations = selectedWarehouse
     ? storageLocations.filter((loc) => loc.warehouse_id === selectedWarehouse.id)
     : [];
-
-  // Get from slot location based on selected item
-  const fromSlot = selectedItem
-    ? storageLocations.find((loc) => loc.id === selectedItem.current_location_id)
-    : null;
 
   const handleSubmit = async () => {
     // Validation
     if (!selectedWarehouse) {
       setError('Please select a warehouse.');
+      return;
+    }
+    if (!selectedSourceSlot) {
+      setError('Please select a source slot.');
       return;
     }
     if (!selectedItem) {
@@ -111,8 +173,8 @@ export default function MoveItem() {
       setError('Please select a destination slot.');
       return;
     }
-    if (fromSlot?.id === selectedToSlot.id) {
-      setError('Destination slot must be different from the current slot.');
+    if (selectedSourceSlot.id === selectedToSlot.id) {
+      setError('Destination slot must be different from the source slot.');
       return;
     }
 
@@ -129,7 +191,7 @@ export default function MoveItem() {
         from_location_id: selectedItem.current_location_id,
         to_location_id: selectedToSlot.id,
         quantity: selectedItem.quantity,
-        performed_by: "b4974f63-ee89-42a1-bdb3-ce9df255c682", // TODO: Get user ID
+        performed_by: 'b4974f63-ee89-42a1-bdb3-ce9df255c682', // TODO: Get user ID
         note: notes || undefined,
       });
 
@@ -137,7 +199,9 @@ export default function MoveItem() {
       await updateItemLocation(selectedItem.id, selectedToSlot.id); // TODO: Should this be in a transaction with createInventoryMovement?
 
       setSuccess('Item moved successfully!');
-      // Reset form
+      // Reset form (keep warehouse selected for convenience)
+      setSelectedSourceSlot(null);
+      setItemsInSourceSlot([]);
       setSelectedItem(null);
       setSelectedToSlot(null);
       setNotes('');
@@ -196,12 +260,15 @@ export default function MoveItem() {
               Warehouse
             </MoveItemFormLabel>
             <Autocomplete
-            id="warehouse-select"
+              id="warehouse-select"
               options={warehouses}
               getOptionLabel={(option) => option.name || 'Unknown Warehouse'}
               value={selectedWarehouse}
               onChange={(_, newValue) => {
                 setSelectedWarehouse(newValue);
+                // Cascade reset
+                setSelectedSourceSlot(null);
+                setItemsInSourceSlot([]);
                 setSelectedItem(null);
                 setSelectedToSlot(null);
                 setError('');
@@ -210,39 +277,61 @@ export default function MoveItem() {
             />
           </FormControl>
 
-          <FormControl fullWidth disabled={!selectedWarehouse || allItems.length === 0}>
-            {' '}
-            <MoveItemFormLabel htmlFor="item-select">Item</MoveItemFormLabel>
+          <FormControl fullWidth disabled={!selectedWarehouse}>
+            <MoveItemFormLabel htmlFor="source-slot-select">
+              Source Slot (Search by location code or product name)
+            </MoveItemFormLabel>
             <Autocomplete
-              id="item-select"
-              options={allItems}
-              getOptionLabel={(option) =>
-                `Item ID: ${option.id.substring(0, 8)}... - Product: ${option.product_id.substring(0, 8)}... - Qty: ${option.quantity}`
-              }
-              value={selectedItem}
+              id="source-slot-select"
+              options={warehouseLocations}
+              getOptionLabel={(option) => option.location_code ?? 'No location code'} // TODO: render a nicer tile with more information (eg preview of items in this location)
+              getOptionKey={(option) => option.id} // TODO: should we enforce nonnull unique location codes per warehouse
+              filterOptions={filterSourceSlotOptions}
+              value={selectedSourceSlot}
               onChange={(_, newValue) => {
-                setSelectedItem(newValue);
-                setSelectedToSlot(null);
+                setSelectedSourceSlot(newValue);
+                setItemsInSourceSlot([]);
+                setSelectedItem(null);
                 setError('');
               }}
-              disabled={!selectedWarehouse || allItems.length === 0}
-              renderInput={(params) => <TextField {...params} placeholder="Enter or select item" />}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  placeholder={
+                    !selectedWarehouse
+                      ? 'Select warehouse first'
+                      : 'Search by slot code or product name'
+                  }
+                />
+              )}
+              noOptionsText="No matching slots found"
+              disabled={!selectedWarehouse}
             />
           </FormControl>
 
-          <FormControl fullWidth>
-            <MoveItemFormLabel htmlFor="from-slot-input">From Slot</MoveItemFormLabel>
-            <TextField
-            id="from-slot-input"
-              fullWidth
-              value={selectedItem ? fromSlot?.location_code || 'No current location' : ''}
-              placeholder="Select Item to See Slot"
-              slotProps={{
-                input: {
-                  readOnly: true,
-                },
+          <FormControl fullWidth disabled={!selectedSourceSlot || itemsInSourceSlot.length === 0}>
+            <MoveItemFormLabel htmlFor="item-in-slot-select">Item in Source Slot</MoveItemFormLabel>
+            <Autocomplete
+              id="item-in-slot-select"
+              options={itemsInSourceSlot}
+              getOptionLabel={(option) =>
+                `${getProductName(option.product_id)} - Qty: ${option.quantity}`
+              } // TODO: render a nicer tile with more information
+              value={selectedItem}
+              onChange={(_, newValue) => {
+                setSelectedItem(newValue);
+                setError('');
               }}
-              disabled
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  placeholder={
+                    !selectedSourceSlot ? 'Select source slot first' : 'Select item to move'
+                  }
+                />
+              )}
+              noOptionsText="No matching items found"
+              disabled={!selectedSourceSlot || itemsInSourceSlot.length === 0}
             />
           </FormControl>
 
@@ -250,7 +339,7 @@ export default function MoveItem() {
             <ArrowDownwardIcon sx={{ fontSize: '2rem', color: 'text.secondary' }} />
           </Box>
 
-          <FormControl fullWidth>
+          <FormControl fullWidth disabled={!selectedWarehouse}>
             <MoveItemFormLabel htmlFor="to-slot-input">To Slot</MoveItemFormLabel>
             <Autocomplete
               id="to-slot-input"
@@ -261,8 +350,15 @@ export default function MoveItem() {
                 setSelectedToSlot(newValue);
                 setError('');
               }}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  placeholder={
+                    !selectedWarehouse ? 'Select warehouse first' : 'Select destination slot'
+                  }
+                />
+              )}
               disabled={!selectedWarehouse}
-              renderInput={(params) => <TextField {...params} placeholder="Enter or select slot" />}
             />
           </FormControl>
           <FormControl fullWidth>
@@ -284,6 +380,8 @@ export default function MoveItem() {
               fullWidth
               onClick={() => {
                 setSelectedWarehouse(null);
+                setSelectedSourceSlot(null);
+                setItemsInSourceSlot([]);
                 setSelectedItem(null);
                 setSelectedToSlot(null);
                 setNotes('');
@@ -297,7 +395,13 @@ export default function MoveItem() {
               variant="contained"
               fullWidth
               type="submit"
-              disabled={submitting || !selectedWarehouse || !selectedItem || !selectedToSlot}
+              disabled={
+                submitting ||
+                !selectedWarehouse ||
+                !selectedSourceSlot ||
+                !selectedItem ||
+                !selectedToSlot
+              }
             >
               {submitting ? <CircularProgress size={24} /> : 'Confirm Move'}
             </Button>
