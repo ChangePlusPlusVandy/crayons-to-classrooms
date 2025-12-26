@@ -28,11 +28,12 @@ export const ItemStatus = z.enum(['active', 'inactive', 'discontinued', 'checked
 
 /**
  * Schema for validating item creation
- * Requires: product_id, quantity, current_location_id, status, created_by, warehouse, value
+ * Requires: product_id, quantity, status, created_by, warehouse, value
+ * Optional: current_location_id
  */
 export const createItemSchema = z.object({
   product_id: uuidSchema,
-  current_location_id: uuidSchema,
+  current_location_id: uuidSchema.optional(),
   created_by: uuidSchema,
   quantity: z.number().int().positive('Quantity must be a positive integer'),
   status: ItemStatus,
@@ -41,6 +42,7 @@ export const createItemSchema = z.object({
   item_limit: z.number().int().nonnegative('Limit cannot be negative').optional(),
   value: z.number().nonnegative('Value cannot be negative'),
   limbo: z.boolean().default(false),
+  notes: z.string().optional(),
 });
 
 /**
@@ -58,6 +60,7 @@ export const updateItemSchema = z
     item_limit: z.number().int().nonnegative('Limit cannot be negative').optional(),
     value: z.number().nonnegative('Value cannot be negative').optional(),
     limbo: z.boolean().optional(),
+    notes: z.string().optional(),
   })
   .refine((data) => Object.keys(data).length > 0, {
     message: 'At least one field must be provided for update',
