@@ -4,6 +4,7 @@ import {
   createItemSchema,
   updateItemSchema,
   statusQuerySchema,
+  nameParamSchema,
   itemIdParamSchema,
   productIdParamSchema,
   locationIdParamSchema,
@@ -44,6 +45,31 @@ const handleValidationError = (error: unknown, res: Response) => {
   }
   console.error('Unexpected error:', error);
   return res.status(500).json({ error: 'Internal server error' });
+};
+
+/**
+ * Updates the stock field for all items with the given name.
+ * Stock represents the count of items with the same name.
+ * @param itemName - The name to update stock for
+ */
+const updateStockForName = async (itemName: string) => {
+  try {
+    // Count items with this name
+    const countResult = await pool.query(
+      'SELECT COUNT(*) as count FROM items WHERE name = $1',
+      [itemName]
+    );
+    const stockValue = parseInt(countResult.rows[0].count, 10);
+
+    // Update all items with this name to have the correct stock value
+    await pool.query('UPDATE items SET stock = $1, updated_at = NOW() WHERE name = $2', [
+      stockValue,
+      itemName,
+    ]);
+  } catch (error) {
+    console.error(`Error updating stock for name "${itemName}":`, error);
+    throw error;
+  }
 };
 
 /**
@@ -129,6 +155,31 @@ export const getItemsByProductId = async (req: Request, res: Response) => {
   }
 };
 
+/**
+ * Retrieves all items with a specific name.
+ *
+ * @param {Request} req - Express request object with:
+ *   - name: Name of the items to filter by (in params)
+ * @param {Response} res - Express response object
+ * @returns {Promise<Response>} JSON array of items with the specified name or error message
+ * @throws {500} Internal server error if database query fails
+ */
+export const getItemsByName = async (req: Request, res: Response) => {
+  try {
+    const { name } = nameParamSchema.parse(req.params);
+    const items = await pool.query('SELECT * FROM items WHERE name = $1', [name]);
+    if (!countRows(items.rows, res)) {
+      return;
+    }
+    res.json(items.rows);
+  } catch (error) {
+    if (error instanceof ZodError) {
+      return handleValidationError(error, res);
+    }
+    console.error('Error fetching items by name:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
 /**
  * Retrieves all items currently at a specific location.
  *
@@ -219,6 +270,7 @@ export const getItemsByStatus = async (req: Request, res: Response) => {
  * Validates foreign key constraints for product_id, current_location_id (if provided), created_by, and warehouse.
  *
  * @param {Request} req - Express request object with:
+ *   - name: Item name (in body, required)
  *   - product_id: UUID of the product (in body)
  *   - quantity: Number of items (in body)
  *   - current_location_id: UUID of the current location (in body, optional)
@@ -238,6 +290,7 @@ export const getItemsByStatus = async (req: Request, res: Response) => {
 export const createItem = async (req: Request, res: Response) => {
   try {
     const {
+      name,
       product_id,
       current_location_id,
       created_by,
@@ -281,11 +334,17 @@ export const createItem = async (req: Request, res: Response) => {
     }
 
     const newItem = await pool.query(
-      'INSERT INTO items (product_id, quantity, current_location_id, status, created_by, warehouse, category, item_limit, value, limbo, notes, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), NOW()) RETURNING *',
-      [product_id, quantity, current_location_id ?? null, status, created_by, warehouse, category ?? null, item_limit ?? null, value, limbo ?? false, notes ?? null]
+      'INSERT INTO items (name, product_id, quantity, current_location_id, status, created_by, warehouse, category, item_limit, value, limbo, notes, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW(), NOW()) RETURNING *',
+      [name, product_id, quantity, current_location_id ?? null, status, created_by, warehouse, category ?? null, item_limit ?? null, value, limbo ?? false, notes ?? null]
     );
 
-    res.status(201).json(newItem.rows[0]);
+    // Update stock for all items with this name (including the newly created one)
+    await updateStockForName(name);
+
+    // Fetch the updated item to return the correct stock value
+    const updatedItem = await pool.query('SELECT * FROM items WHERE id = $1', [newItem.rows[0].id]);
+
+    res.status(201).json(updatedItem.rows[0]);
   } catch (error) {
     if (error instanceof ZodError) {
       return handleValidationError(error, res);
@@ -298,11 +357,11 @@ export const createItem = async (req: Request, res: Response) => {
 /**
  * Updates an existing item in the database.
  * Only updates fields that are provided in the request body.
- * Allowed fields: product_id, quantity, current_location_id, status, warehouse, category, limit, value, limbo, notes.
+ * Allowed fields: name, product_id, quantity, current_location_id, status, warehouse, category, limit, value, limbo, notes.
  *
  * @param {Request} req - Express request object with:
  *   - id: UUID of the item to update (in params)
- *   - Updatable fields in body (product_id, quantity, current_location_id, status, warehouse, category, limit, value, limbo, notes)
+ *   - Updatable fields in body (name, product_id, quantity, current_location_id, status, warehouse, category, limit, value, limbo, notes)
  * @param {Response} res - Express response object
  * @returns {Promise<Response>} JSON object of the updated item or error message
  * @throws {400} Invalid id or product_id (must be valid UUIDs)
@@ -316,6 +375,14 @@ export const updateItem = async (req: Request, res: Response) => {
   try {
     const { id } = itemIdParamSchema.parse(req.params);
     const validatedData: UpdateItemInput = updateItemSchema.parse(req.body);
+
+    // Get the current item to check if name is being changed
+    const currentItem = await pool.query('SELECT name FROM items WHERE id = $1', [id]);
+    if (currentItem.rows.length === 0) {
+      return res.status(404).json({ error: 'Item not found' });
+    }
+    const oldName = currentItem.rows[0].name;
+    const newName = validatedData.name;
 
     // If product_id is being updated, verify it exists
     if (validatedData.product_id) {
@@ -372,7 +439,18 @@ export const updateItem = async (req: Request, res: Response) => {
       return;
     }
 
-    return res.json(rows[0]);
+    // Update stock if name was changed
+    if (newName && newName !== oldName) {
+      // Update stock for the old name (item moved away from this name)
+      await updateStockForName(oldName);
+      // Update stock for the new name (item moved to this name)
+      await updateStockForName(newName);
+    }
+
+    // Fetch the updated item to return the correct stock value
+    const updatedItem = await pool.query('SELECT * FROM items WHERE id = $1', [id]);
+
+    return res.json(updatedItem.rows[0]);
   } catch (error) {
     if (error instanceof ZodError) {
       return handleValidationError(error, res);
@@ -396,11 +474,23 @@ export const deleteItem = async (req: Request, res: Response) => {
   try {
     const { id } = itemIdParamSchema.parse(req.params);
 
+    // Get the item's name before deleting so we can update stock
+    const itemToDelete = await pool.query('SELECT name FROM items WHERE id = $1', [id]);
+    
+    if (itemToDelete.rows.length === 0) {
+      return res.status(404).json({ error: 'Item not found' });
+    }
+
+    const itemName = itemToDelete.rows[0].name;
+
     const deletedItem = await pool.query('DELETE FROM items WHERE id = $1 RETURNING *', [id]);
 
     if (!countRows(deletedItem.rows, res)) {
       return;
     }
+
+    // Update stock for all remaining items with this name
+    await updateStockForName(itemName);
 
     res.json({ message: 'Item deleted successfully' });
   } catch (error) {

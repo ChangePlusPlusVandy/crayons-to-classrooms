@@ -4,6 +4,7 @@ import {
   createItem,
   updateItem,
   deleteItem,
+  getItemsByName,
   getItemsByProductId,
   getItemsByLocationId,
   getItemsByWarehouseId,
@@ -19,6 +20,8 @@ router.get('/status', getItemsByStatus);
 router.get('/', getItems);
 // create a new item
 router.post('/', createItem);
+// get items by name
+router.get('/name/:name', getItemsByName);
 // get items by current location
 router.get('/location/:locationId', getItemsByLocationId);
 // get items by product id
