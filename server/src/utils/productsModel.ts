@@ -5,7 +5,7 @@ export const createProductSchema = z.object({
   name: z.string().min(1, 'Name is required').max(255, 'Name must be less than 255 characters'),
   description: z.string().optional(),
   unit_of_measure: z.string().optional(),
-  value: z.number().positive('Value must be a positive number'),
+  value: z.number().nonnegative('Value cannot be negative'),
   item_limit: z.number().int().nonnegative('Item limit must be a non-negative integer').optional(),
   category: z.string().optional(),
   total_count: z
@@ -20,7 +20,7 @@ export const updateProductSchema = z
     name: z.string().min(1).max(255).optional(),
     description: z.string().optional(),
     unit_of_measure: z.string().min(1).optional(),
-    value: z.number().positive().optional(),
+    value: z.number().nonnegative('Value cannot be negative').optional(),
     item_limit: z.number().int().nonnegative().optional(),
     category: z.string().optional(),
     total_count: z.number().int().nonnegative().optional(),
