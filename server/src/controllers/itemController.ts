@@ -489,10 +489,16 @@ export const deleteItem = async (req: Request, res: Response) => {
       return;
     }
 
-    // Update stock for all remaining items with this name
-    await updateStockForName(itemName);
+    // Update stock for all remaining items with this name.
+    // If this fails, the item has already been deleted, so we log the error
+    // but still report the deletion as successful to avoid inconsistency.
+    try {
+      await updateStockForName(itemName);
+    } catch (stockUpdateError) {
+      console.error('Error updating stock after item deletion:', stockUpdateError);
+    }
 
-    res.json({ message: 'Item deleted successfully' });
+    return res.json({ message: 'Item deleted successfully' });
   } catch (error) {
     if (error instanceof ZodError) {
       return handleValidationError(error, res);
