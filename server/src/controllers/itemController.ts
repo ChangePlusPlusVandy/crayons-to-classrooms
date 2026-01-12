@@ -339,12 +339,15 @@ export const createItem = async (req: Request, res: Response) => {
     );
 
     // Update stock for all items with this name (including the newly created one)
-    await updateStockForName(name);
+    const updatedStock = await updateStockForName(name);
 
-    // Fetch the updated item to return the correct stock value
-    const updatedItem = await pool.query('SELECT * FROM items WHERE id = $1', [newItem.rows[0].id]);
+    // Build the created item response, ensuring stock reflects the latest value
+    const createdItem = {
+      ...newItem.rows[0],
+      stock: updatedStock ?? newItem.rows[0].stock,
+    };
 
-    res.status(201).json(updatedItem.rows[0]);
+    res.status(201).json(createdItem);
   } catch (error) {
     if (error instanceof ZodError) {
       return handleValidationError(error, res);
