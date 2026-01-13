@@ -16,10 +16,6 @@ const router = express.Router();
 
 // get items by status
 router.get('/status', getItemsByStatus);
-// get all items
-router.get('/', getItems);
-// create a new item
-router.post('/', createItem);
 // get items by name
 router.get('/name/:name', getItemsByName);
 // get items by current location
@@ -28,6 +24,10 @@ router.get('/location/:locationId', getItemsByLocationId);
 router.get('/product/:productId', getItemsByProductId);
 // get items by warehouse id
 router.get('/warehouse/:warehouseId', getItemsByWarehouseId);
+// get all items
+router.get('/', getItems);
+// create a new item
+router.post('/', createItem);
 // get item by ID
 router.get('/:id', getItemById);
 // update an existing item
