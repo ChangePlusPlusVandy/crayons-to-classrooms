@@ -167,7 +167,10 @@ export async function updateStorageLocation(req: Request, res: Response) {
     }
     const currentSlot = validatedData.slot !== undefined ? validatedData.slot : currentLocation.rows[0].slot;
     const currentFixture = validatedData.fixture !== undefined ? validatedData.fixture : currentLocation.rows[0].fixture;
-    if (validatedData.slot !== undefined || validatedData.fixture !== undefined) {
+    if (
+      (validatedData.slot !== undefined || validatedData.fixture !== undefined) &&
+      validatedData.location_code === undefined
+    ) {
       validatedData.location_code = computeLocationCode(currentSlot, currentFixture);
     }
 
