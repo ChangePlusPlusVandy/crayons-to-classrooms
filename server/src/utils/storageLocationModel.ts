@@ -37,10 +37,10 @@ export const updateStorageLocationSchema = z
     message: 'At least one field must be provided for update',
   });
 
-  // Schema for validating slot parameter
-  export const slotParamSchema = z.object({
-    slot: z.string().min(1, 'Slot cannot be empty'),
-  });
+// Schema for validating slot parameter
+export const slotParamSchema = z.object({
+  slot: z.string().min(1, 'Slot cannot be empty'),
+});
 
 export type CreateStorageLocationInput = z.infer<typeof createStorageLocationSchema>;
 export type UpdateStorageLocationInput = z.infer<typeof updateStorageLocationSchema>;
