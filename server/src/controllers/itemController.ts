@@ -47,30 +47,7 @@ const handleValidationError = (error: unknown, res: Response) => {
   return res.status(500).json({ error: 'Internal server error' });
 };
 
-/**
- * Updates the stock field for all items with the given name.
- * Stock represents the count of items with the same name.
- * @param itemName - The name to update stock for
- */
-const updateStockForName = async (itemName: string) => {
-  try {
-    // Count items with this name
-    const countResult = await pool.query(
-      'SELECT COUNT(*) as count FROM items WHERE name = $1',
-      [itemName]
-    );
-    const stockValue = parseInt(countResult.rows[0].count, 10);
-
-    // Update all items with this name to have the correct stock value
-    await pool.query('UPDATE items SET stock = $1, updated_at = NOW() WHERE name = $2', [
-      stockValue,
-      itemName,
-    ]);
-  } catch (error) {
-    console.error(`Error updating stock for name "${itemName}":`, error);
-    throw error;
-  }
-};
+//TODO: Implement stock updates for items with the same name
 
 /**
  * Retrieves all items from the database.
@@ -338,16 +315,8 @@ export const createItem = async (req: Request, res: Response) => {
       [name, product_id, quantity, current_location_id ?? null, status, created_by, warehouse, category ?? null, item_limit ?? null, value, limbo ?? false, notes ?? null]
     );
 
-    // Update stock for all items with this name (including the newly created one)
-    const updatedStock = await updateStockForName(name);
 
-    // Build the created item response, ensuring stock reflects the latest value
-    const createdItem = {
-      ...newItem.rows[0],
-      stock: updatedStock ?? newItem.rows[0].stock,
-    };
-
-    res.status(201).json(createdItem);
+    res.status(201).json(newItem.rows[0]);
   } catch (error) {
     if (error instanceof ZodError) {
       return handleValidationError(error, res);
@@ -379,13 +348,7 @@ export const updateItem = async (req: Request, res: Response) => {
     const { id } = itemIdParamSchema.parse(req.params);
     const validatedData: UpdateItemInput = updateItemSchema.parse(req.body);
 
-    // Get the current item to check if name is being changed
-    const currentItem = await pool.query('SELECT name FROM items WHERE id = $1', [id]);
-    if (currentItem.rows.length === 0) {
-      return res.status(404).json({ error: 'Item not found' });
-    }
-    const oldName = currentItem.rows[0].name;
-    const newName = validatedData.name;
+
 
     // If product_id is being updated, verify it exists
     if (validatedData.product_id) {
@@ -441,19 +404,9 @@ export const updateItem = async (req: Request, res: Response) => {
     if (!countRows(rows, res)) {
       return;
     }
-
-    // Update stock if name was changed
-    if (newName && newName !== oldName) {
-      // Update stock for the old name (item moved away from this name)
-      await updateStockForName(oldName);
-      // Update stock for the new name (item moved to this name)
-      await updateStockForName(newName);
-    }
-
-    // Fetch the updated item to return the correct stock value
-    const updatedItem = await pool.query('SELECT * FROM items WHERE id = $1', [id]);
-
-    return res.json(updatedItem.rows[0]);
+    
+    //TODO: Implement stock updates for items with the same name
+    return res.json(rows[0]);
   } catch (error) {
     if (error instanceof ZodError) {
       return handleValidationError(error, res);
@@ -492,14 +445,8 @@ export const deleteItem = async (req: Request, res: Response) => {
       return;
     }
 
-    // Update stock for all remaining items with this name.
-    // If this fails, the item has already been deleted, so we log the error
-    // but still report the deletion as successful to avoid inconsistency.
-    try {
-      await updateStockForName(itemName);
-    } catch (stockUpdateError) {
-      console.error('Error updating stock after item deletion:', stockUpdateError);
-    }
+    // TODO: Update stock for all remaining items with this name.
+
 
     return res.json({ message: 'Item deleted successfully' });
   } catch (error) {
