@@ -15,8 +15,7 @@ export const locationCodeParamSchema = z.object({
 export const createStorageLocationSchema = z.object({
   aisle: z.string().min(1, 'Aisle cannot be empty'),
   slot: z.string().min(1, 'Slot cannot be empty'),
-  fixture: z.string().min(1, 'Fixture cannot be empty').optional(),
-  location_code: z.string().min(1, 'Location code cannot be empty').optional(),
+  fixture: z.string().nullable().optional(),
   active: z.boolean(),
   extra_info: z.string().nullable().optional(),
   warehouse_id: uuidSchema,
@@ -27,8 +26,7 @@ export const updateStorageLocationSchema = z
   .object({
     aisle: z.string().min(1, 'Aisle cannot be empty').optional(),
     slot: z.string().min(1, 'Slot cannot be empty').optional(),
-    fixture: z.string().min(1, 'Fixture cannot be empty').optional(),
-    location_code: z.string().min(1, 'Location code cannot be empty').optional(),
+    fixture: z.string().nullable().optional(),
     active: z.boolean().optional(),
     extra_info: z.string().nullable().optional(),
     warehouse_id: uuidSchema.optional(),

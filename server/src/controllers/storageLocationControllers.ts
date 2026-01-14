@@ -88,9 +88,7 @@ export async function getStorageLocationBySlot(req: Request, res: Response) {
   try {
     const { slot } = slotParamSchema.parse(req.params);
 
-    const result = await pool.query('SELECT * FROM storage_locations WHERE slot = $1', [
-      slot,
-    ]);
+    const result = await pool.query('SELECT * FROM storage_locations WHERE slot = $1', [slot]);
 
     if (result.rows.length === 0) {
       res.status(404).json({ error: 'Not found' });
@@ -110,25 +108,18 @@ export async function getStorageLocationBySlot(req: Request, res: Response) {
 // POST storage location
 export async function createStorageLocation(req: Request, res: Response) {
   try {
-    const {
-      aisle,
-      slot,
-      fixture,
-      location_code,
-      active,
-      extra_info,
-      warehouse_id,
-    }: CreateStorageLocationInput = createStorageLocationSchema.parse(req.body);
+    const { aisle, slot, fixture, active, extra_info, warehouse_id }: CreateStorageLocationInput =
+      createStorageLocationSchema.parse(req.body);
 
-    // Check if warehouse_id exists in warehouses table
-    const warehouseCheck = await pool.query('SELECT id FROM warehouses WHERE id = $1', [
+    // Check if warehouse_id exists in warehouse table
+    const warehouseCheck = await pool.query('SELECT id FROM warehouse WHERE id = $1', [
       warehouse_id,
     ]);
     if (warehouseCheck.rows.length === 0) {
       return res.status(400).json({ error: 'Invalid warehouse_id' });
     }
 
-    const computedLocationCode = location_code || computeLocationCode(slot, fixture);
+    const computedLocationCode = computeLocationCode(slot, fixture);
 
     const result = await pool.query(
       'INSERT INTO storage_locations (aisle, slot, fixture, location_code, active, extra_info, warehouse_id) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *;',
@@ -153,7 +144,7 @@ export async function updateStorageLocation(req: Request, res: Response) {
 
     // If warehouse_id is being updated, verify it exists
     if (validatedData.warehouse_id) {
-      const warehouseCheck = await pool.query('SELECT id FROM warehouses WHERE id = $1', [
+      const warehouseCheck = await pool.query('SELECT id FROM warehouse WHERE id = $1', [
         validatedData.warehouse_id,
       ]);
       if (warehouseCheck.rows.length === 0) {
@@ -165,13 +156,20 @@ export async function updateStorageLocation(req: Request, res: Response) {
     if (currentLocation.rows.length === 0) {
       return res.status(404).json({ error: 'Not found' });
     }
-    const currentSlot = validatedData.slot !== undefined ? validatedData.slot : currentLocation.rows[0].slot;
-    const currentFixture = validatedData.fixture !== undefined ? validatedData.fixture : currentLocation.rows[0].fixture;
-    if (
-      (validatedData.slot !== undefined || validatedData.fixture !== undefined) &&
-      validatedData.location_code === undefined
-    ) {
-      validatedData.location_code = computeLocationCode(currentSlot, currentFixture);
+
+    // Prepare data for update, including auto-computed location_code if slot/fixture changed
+    const updateData: UpdateStorageLocationInput & { location_code?: string } = {
+      ...validatedData,
+    };
+
+    if (validatedData.slot !== undefined || validatedData.fixture !== undefined) {
+      const currentSlot =
+        validatedData.slot !== undefined ? validatedData.slot : currentLocation.rows[0].slot;
+      const currentFixture =
+        validatedData.fixture !== undefined
+          ? validatedData.fixture
+          : currentLocation.rows[0].fixture;
+      updateData.location_code = computeLocationCode(currentSlot, currentFixture);
     }
 
     // Build dynamic UPDATE query (like itemController)
@@ -179,7 +177,7 @@ export async function updateStorageLocation(req: Request, res: Response) {
     const values: any[] = [];
     let idx = 1;
 
-    for (const [key, value] of Object.entries(validatedData)) {
+    for (const [key, value] of Object.entries(updateData)) {
       setClauses.push(`${key} = $${idx++}`);
       values.push(value);
     }
