@@ -3,6 +3,7 @@ import {
   getAllStorageLocations,
   getStorageLocationById,
   getStorageLocationByLocationCode,
+  getStorageLocationBySlot,
   createStorageLocation,
   updateStorageLocation,
   deleteStorageLocation,
@@ -12,6 +13,7 @@ const router = express.Router();
 
 router.get('/', getAllStorageLocations); // GET /api/storage-locations
 router.get('/locationCode/:locationCode', getStorageLocationByLocationCode); // GET /api/storage-locations/locationCode/:locationCode
+router.get('/slot/:slot', getStorageLocationBySlot); // GET /api/storage-locations/slot/:slot
 router.get('/:id', getStorageLocationById); // GET /api/storage-locations/:id
 router.post('/', createStorageLocation); // POST /api/storage-locations
 router.patch('/:id', updateStorageLocation); // PATCH /api/storage-locations/:id
