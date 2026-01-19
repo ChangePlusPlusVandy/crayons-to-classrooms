@@ -47,7 +47,43 @@ const handleValidationError = (error: unknown, res: Response) => {
   return res.status(500).json({ error: 'Internal server error' });
 };
 
-//TODO: Implement stock updates for items with the same name
+const DUMMY_FIXTURE = 'DUMMY_FIXTURE';
+const DUMMY_LOCATION_CODE = 'DUMMY_LOCATION';
+
+const syncItemInfoStock = async (
+  itemName: string,
+  stockDelta: number,
+  createIfMissing: boolean
+) => {
+  const existingInfo = await pool.query('SELECT stock FROM item_info WHERE name = $1', [itemName]);
+
+  if (existingInfo.rows.length === 0) {
+    if (!createIfMissing) {
+      return;
+    }
+
+    await pool.query(
+      'INSERT INTO item_info (name, item_limit, stock, last_known_fixture, last_known_location_code, time_last_updated, notes) VALUES ($1, $2, $3, $4, $5, NOW(), $6)',
+      [
+        itemName,
+        0,
+        1,
+        DUMMY_FIXTURE,
+        DUMMY_LOCATION_CODE,
+        null,
+      ]
+    );
+    return;
+  }
+
+  const currentStock = Number.parseInt(existingInfo.rows[0].stock, 10);
+  const nextStock = currentStock + stockDelta;
+
+  await pool.query(
+    'UPDATE item_info SET stock = $1, last_known_fixture = $2, last_known_location_code = $3, time_last_updated = NOW() WHERE name = $4',
+    [nextStock, DUMMY_FIXTURE, DUMMY_LOCATION_CODE, itemName]
+  );
+};
 
 /**
  * Retrieves all items from the database.
@@ -315,6 +351,8 @@ export const createItem = async (req: Request, res: Response) => {
       [name, product_id, quantity, current_location_id ?? null, status, created_by, warehouse, category ?? null, item_limit ?? null, value, limbo ?? false, notes ?? null]
     );
 
+    await syncItemInfoStock(name, 1, true);
+
 
     res.status(201).json(newItem.rows[0]);
   } catch (error) {
@@ -349,6 +387,13 @@ export const updateItem = async (req: Request, res: Response) => {
     const validatedData: UpdateItemInput = updateItemSchema.parse(req.body);
 
 
+
+    const currentItem = await pool.query('SELECT name FROM items WHERE id = $1', [id]);
+    if (currentItem.rows.length === 0) {
+      return res.status(404).json({ error: 'Item not found' });
+    }
+    const oldName = currentItem.rows[0].name as string;
+    const newName = validatedData.name ?? oldName;
 
     // If product_id is being updated, verify it exists
     if (validatedData.product_id) {
@@ -404,8 +449,11 @@ export const updateItem = async (req: Request, res: Response) => {
     if (!countRows(rows, res)) {
       return;
     }
-    
-    //TODO: Implement stock updates for items with the same name
+
+    if (newName !== oldName) {
+      await syncItemInfoStock(oldName, -1, false);
+      await syncItemInfoStock(newName, 1, true);
+    }
     return res.json(rows[0]);
   } catch (error) {
     if (error instanceof ZodError) {
@@ -445,7 +493,7 @@ export const deleteItem = async (req: Request, res: Response) => {
       return;
     }
 
-    // TODO: Update stock for all remaining items with this name.
+    await syncItemInfoStock(itemName, -1, false);
 
 
     return res.json({ message: 'Item deleted successfully' });
