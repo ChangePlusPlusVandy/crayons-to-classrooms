@@ -14,7 +14,6 @@ import {
 } from '@mui/material';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import {
-  getWarehouses,
   getStorageLocations,
   getItemsByLocation,
   createInventoryMovement,
@@ -26,9 +25,9 @@ import { StorageLocation } from '../../types/StorageLocation';
 import { Item } from '../../types/Item';
 import { Product } from '../../types/Product';
 import { MoveItemFormLabel } from './MoveItem.styles';
+import { WarehouseSelector } from '../../components/WarehouseSelector/WarehouseSelector';
 
 export default function MoveItem() {
-  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [storageLocations, setStorageLocations] = useState<StorageLocation[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [allItems, setAllItems] = useState<Item[]>([]);
@@ -43,16 +42,14 @@ export default function MoveItem() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  // Fetch warehouses, storage locations, and products on mount
+  // Fetch storage locations and products on mount
   useEffect(() => {
     async function fetchInitialData() {
       try {
-        const [warehousesData, locationsData, productsData] = await Promise.all([
-          getWarehouses(),
+        const [locationsData, productsData] = await Promise.all([
           getStorageLocations(),
           getProducts(),
         ]);
-        setWarehouses(warehousesData);
         setStorageLocations(locationsData);
         setProducts(productsData);
       } catch (err) {
@@ -255,27 +252,21 @@ export default function MoveItem() {
             </Alert>
           )}
 
-          <FormControl fullWidth>
-            <MoveItemFormLabel htmlFor="warehouse-select" sx={{ mb: 1, fontWeight: 500 }}>
-              Warehouse
-            </MoveItemFormLabel>
-            <Autocomplete
-              id="warehouse-select"
-              options={warehouses}
-              getOptionLabel={(option) => option.name || 'Unknown Warehouse'}
-              value={selectedWarehouse}
-              onChange={(_, newValue) => {
-                setSelectedWarehouse(newValue);
-                // Cascade reset
-                setSelectedSourceSlot(null);
-                setItemsInSourceSlot([]);
-                setSelectedItem(null);
-                setSelectedToSlot(null);
-                setError('');
-              }}
-              renderInput={(params) => <TextField {...params} placeholder="Select warehouse" />}
-            />
-          </FormControl>
+          <WarehouseSelector
+            value={selectedWarehouse}
+            onChange={(newWarehouse) => {
+              setSelectedWarehouse(newWarehouse);
+              // Cascade reset
+              setSelectedSourceSlot(null);
+              setItemsInSourceSlot([]);
+              setSelectedItem(null);
+              setSelectedToSlot(null);
+              setError('');
+            }}
+            label="Warehouse"
+            placeholder="Select warehouse"
+            fullWidth
+          />
 
           <FormControl fullWidth disabled={!selectedWarehouse}>
             <MoveItemFormLabel htmlFor="source-slot-select">
