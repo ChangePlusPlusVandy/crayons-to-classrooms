@@ -13,6 +13,7 @@ import {
   FormControl,
 } from '@mui/material';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
+import AddIcon from '@mui/icons-material/Add';
 import {
   getStorageLocations,
   getItemsByLocation,
@@ -539,6 +540,24 @@ export default function MoveItem() {
               )}
               disabled={!selectedWarehouse}
             />
+            <Button
+              startIcon={<AddIcon />}
+              sx={{
+                mt: 1,
+                justifyContent: 'flex-start',
+                textTransform: 'none',
+                color: 'primary.main',
+                '&:hover': {
+                  backgroundColor: 'transparent',
+                }
+              }}
+              onClick={() => {
+                // Does nothing for now
+              }}
+              disabled={!selectedWarehouse}
+            >
+              New Slot
+            </Button>
           </FormControl>
           <FormControl fullWidth>
             <MoveItemFormLabel htmlFor="notes-input">Notes</MoveItemFormLabel>
