@@ -1,5 +1,4 @@
 import './App.css';
-import TestPage from './pages/TestPage/TestPage';
 import MoveItem from './pages/MoveItem/MoveItem';
 
 function App() {

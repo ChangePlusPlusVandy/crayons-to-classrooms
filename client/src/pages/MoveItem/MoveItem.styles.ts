@@ -1,4 +1,4 @@
-import { styled, Paper, Box, Typography, FormLabel } from '@mui/material';
+import { styled, Box, Typography, FormLabel } from '@mui/material';
 
 export const FormField = styled(Box)(({ theme }) => ({
   marginBottom: theme.spacing(2),
