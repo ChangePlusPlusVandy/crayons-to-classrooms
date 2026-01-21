@@ -7,4 +7,12 @@ export type Item = {
   created_by: string;
   created_at: string;
   updated_at: string;
+  warehouse: string;
+  category: string;
+  item_limit: number;
+  value: number;
+  limbo: boolean;
+  notes: string;
+  name: string;
+  stock: number;
 };

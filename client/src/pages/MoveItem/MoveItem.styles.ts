@@ -26,7 +26,7 @@ export const LocationCodeText = styled(Typography)(({ theme }) => ({
 }));
 
 // Product list text (secondary)
-export const ProductListText = styled(Typography)(({ theme }) => ({
+export const ItemListText = styled(Typography)(({ theme }) => ({
   fontSize: '0.85rem',
   color: theme.palette.text.secondary,
   overflow: 'hidden',

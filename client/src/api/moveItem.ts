@@ -2,7 +2,6 @@ import { Warehouse } from '../types/Warehouse';
 import { StorageLocation } from '../types/StorageLocation';
 import { Item } from '../types/Item';
 import { InventoryMovement } from '../types/InventoryMovement';
-import { Product } from '../types/Product';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
 
@@ -53,11 +52,5 @@ export async function updateItemLocation(itemId: string, locationId: string): Pr
     body: JSON.stringify({ current_location_id: locationId }),
   });
   if (!response.ok) throw new Error('Failed to update item location');
-  return response.json();
-}
-
-export async function getProducts(): Promise<Product[]> {
-  const response = await fetch(`${API_BASE_URL}/products`);
-  if (!response.ok) throw new Error('Failed to fetch products');
   return response.json();
 }

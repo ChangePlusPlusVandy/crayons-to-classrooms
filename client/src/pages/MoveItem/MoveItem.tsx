@@ -18,25 +18,21 @@ import {
   getItemsByLocation,
   createInventoryMovement,
   updateItemLocation,
-  getProducts,
 } from '../../api/moveItem';
 import { Warehouse } from '../../types/Warehouse';
 import { StorageLocation } from '../../types/StorageLocation';
 import { Item } from '../../types/Item';
-import { Product } from '../../types/Product';
 import {
   MoveItemFormLabel,
   SourceSlotOptionContainer,
   LocationCodeText,
-  ProductListText,
+  ItemListText,
   HighlightedText,
 } from './MoveItem.styles';
 import { WarehouseSelector } from '../../components/WarehouseSelector/WarehouseSelector';
 
 export default function MoveItem() {
   const [storageLocations, setStorageLocations] = useState<StorageLocation[]>([]);
-  //TODO: item now has a name, so no longer need to use product name
-  const [products, setProducts] = useState<Product[]>([]);
   const [allItems, setAllItems] = useState<Item[]>([]);
   const [selectedWarehouse, setSelectedWarehouse] = useState<Warehouse | null>(null);
   const [selectedSourceSlot, setSelectedSourceSlot] = useState<StorageLocation | null>(null);
@@ -49,16 +45,12 @@ export default function MoveItem() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  // Fetch storage locations and products on mount
+  // Fetch storage locations on mount
   useEffect(() => {
     async function fetchInitialData() {
       try {
-        const [locationsData, productsData] = await Promise.all([
-          getStorageLocations(),
-          getProducts(),
-        ]);
+        const locationsData = await getStorageLocations();
         setStorageLocations(locationsData);
-        setProducts(productsData);
       } catch (err) {
         setError('Failed to load initial data. Please refresh the page.');
       } finally {
@@ -69,7 +61,7 @@ export default function MoveItem() {
     fetchInitialData();
   }, []);
 
-  // Fetch all items when warehouse is selected (for product name search)
+  // Fetch all items when warehouse is selected (for item name search)
   useEffect(() => {
     async function fetchWarehouseItems() {
       if (!selectedWarehouse) {
@@ -119,12 +111,6 @@ export default function MoveItem() {
     fetchItemsInSlot();
   }, [selectedSourceSlot]);
 
-  // Helper function to get product name
-  const getProductName = (productId: string): string => {
-    const product = products.find((p) => p.id === productId);
-    return product?.name || 'Unknown Product';
-  };
-
   // Custom filter for Source Slot Autocomplete
   // Searches by: location_code OR product names of items in that location
   const filterSourceSlotOptions = (
@@ -144,12 +130,11 @@ export default function MoveItem() {
         return true;
       }
 
-      // Match by product name of items at this location
+      // Match by item name of items at this location
       const itemsAtLocation = allItems.filter((item) => item.current_location_id === location.id);
 
       return itemsAtLocation.some((item) => {
-        const product = products.find((p) => p.id === item.product_id);
-        return product?.name?.toLowerCase().includes(searchTerm);
+        return item.name?.toLowerCase().includes(searchTerm);
       });
     });
   };
@@ -174,22 +159,22 @@ export default function MoveItem() {
     return locationItemsMap.get(locationId) || [];
   };
 
-  // Helper to format product names for display
-  const getProductNamesForLocation = (locationId: string, searchTerm?: string): string => {
+  // Helper to format item names for display
+  const getItemNamesForLocation = (locationId: string, searchTerm?: string): string => {
     const items = getItemsForLocation(locationId);
 
     if (items.length === 0) {
       return 'No items';
     }
 
-    const productNames = items
-      .map((item) => getProductName(item.product_id))
-      .filter((name) => name !== 'Unknown Product');
+    const itemNames = items
+      .map((item) => item.name)
+      .filter((name) => name && name.trim() !== '');
 
     // Remove duplicates
-    const uniqueNames = Array.from(new Set(productNames));
+    const uniqueNames = Array.from(new Set(itemNames));
 
-    // Sort: matched products first, then non-matched
+    // Sort: matched items first, then non-matched
     if (searchTerm?.trim()) {
       const lowerSearch = searchTerm.toLowerCase().trim();
       uniqueNames.sort((a, b) => {
@@ -363,7 +348,7 @@ export default function MoveItem() {
 
           <FormControl fullWidth disabled={!selectedWarehouse}>
             <MoveItemFormLabel htmlFor="source-slot-select">
-              Source Slot (Search by location code or product name)
+              Source Slot (Search by location code or item name)
             </MoveItemFormLabel>
             <Autocomplete
               id="source-slot-select"
@@ -375,7 +360,7 @@ export default function MoveItem() {
                 const { key, ...otherProps } = props;
                 const locationCode = option.location_code ?? 'No location code';
                 const searchTerm = state.inputValue;
-                const productNames = getProductNamesForLocation(option.id, searchTerm);
+                const itemNames = getItemNamesForLocation(option.id, searchTerm);
 
                 return (
                   <li key={key} {...otherProps}>
@@ -383,9 +368,9 @@ export default function MoveItem() {
                       <LocationCodeText>
                         {highlightText(locationCode, searchTerm)}
                       </LocationCodeText>
-                      <ProductListText>
-                        {highlightText(productNames, searchTerm)}
-                      </ProductListText>
+                      <ItemListText>
+                        {highlightText(itemNames, searchTerm)}
+                      </ItemListText>
                     </SourceSlotOptionContainer>
                   </li>
                 );
@@ -403,7 +388,7 @@ export default function MoveItem() {
                   placeholder={
                     !selectedWarehouse
                       ? 'Select warehouse first'
-                      : 'Search by slot code or product name'
+                      : 'Search by slot code or item name'
                   }
                 />
               )}
@@ -418,7 +403,7 @@ export default function MoveItem() {
               id="item-in-slot-select"
               options={itemsInSourceSlot}
               getOptionLabel={(option) =>
-                `${getProductName(option.product_id)} - Qty: ${option.quantity}`
+                `${option.name} - Qty: ${option.quantity}`
               } // TODO: render a nicer tile with more information
               value={selectedItem}
               onChange={(_, newValue) => {
