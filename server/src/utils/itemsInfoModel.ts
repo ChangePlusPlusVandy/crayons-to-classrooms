@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { ItemStatus } from './itemsModel';
 
 /**
  * Valid UUID format
