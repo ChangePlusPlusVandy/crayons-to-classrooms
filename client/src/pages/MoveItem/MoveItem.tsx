@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import {
   Container,
   Typography,
@@ -24,11 +24,18 @@ import { Warehouse } from '../../types/Warehouse';
 import { StorageLocation } from '../../types/StorageLocation';
 import { Item } from '../../types/Item';
 import { Product } from '../../types/Product';
-import { MoveItemFormLabel } from './MoveItem.styles';
+import {
+  MoveItemFormLabel,
+  SourceSlotOptionContainer,
+  LocationCodeText,
+  ProductListText,
+  HighlightedText,
+} from './MoveItem.styles';
 import { WarehouseSelector } from '../../components/WarehouseSelector/WarehouseSelector';
 
 export default function MoveItem() {
   const [storageLocations, setStorageLocations] = useState<StorageLocation[]>([]);
+  //TODO: item now has a name, so no longer need to use product name
   const [products, setProducts] = useState<Product[]>([]);
   const [allItems, setAllItems] = useState<Item[]>([]);
   const [selectedWarehouse, setSelectedWarehouse] = useState<Warehouse | null>(null);
@@ -145,6 +152,92 @@ export default function MoveItem() {
         return product?.name?.toLowerCase().includes(searchTerm);
       });
     });
+  };
+
+  // Create location-to-items map for efficient lookup
+  const locationItemsMap = useMemo(() => {
+    const map = new Map<string, Item[]>();
+
+    allItems.forEach((item) => {
+      const locationId = item.current_location_id;
+      if (!map.has(locationId)) {
+        map.set(locationId, []);
+      }
+      map.get(locationId)!.push(item);
+    });
+
+    return map;
+  }, [allItems]);
+
+  // Helper to get items for a location
+  const getItemsForLocation = (locationId: string): Item[] => {
+    return locationItemsMap.get(locationId) || [];
+  };
+
+  // Helper to format product names for display
+  const getProductNamesForLocation = (locationId: string, searchTerm?: string): string => {
+    const items = getItemsForLocation(locationId);
+
+    if (items.length === 0) {
+      return 'No items';
+    }
+
+    const productNames = items
+      .map((item) => getProductName(item.product_id))
+      .filter((name) => name !== 'Unknown Product');
+
+    // Remove duplicates
+    const uniqueNames = Array.from(new Set(productNames));
+
+    // Sort: matched products first, then non-matched
+    if (searchTerm?.trim()) {
+      const lowerSearch = searchTerm.toLowerCase().trim();
+      uniqueNames.sort((a, b) => {
+        const aMatches = a.toLowerCase().includes(lowerSearch);
+        const bMatches = b.toLowerCase().includes(lowerSearch);
+        if (aMatches && !bMatches) return -1;  // a first
+        if (!aMatches && bMatches) return 1;   // b first
+        return 0;  // maintain original order
+      });
+    }
+
+    // Limit display to prevent overly long lines
+    const MAX_DISPLAY = 5;
+    if (uniqueNames.length > MAX_DISPLAY) {
+      const displayed = uniqueNames.slice(0, MAX_DISPLAY);
+      const remaining = uniqueNames.length - MAX_DISPLAY;
+      return `${displayed.join(', ')} + ${remaining} more`;
+    }
+
+    return uniqueNames.join(', ');
+  };
+
+  // Helper to highlight matching text
+  const highlightText = (text: string, searchTerm: string): React.ReactNode => {
+    if (!searchTerm.trim()) {
+      return text;
+    }
+
+    const lowerText = text.toLowerCase();
+    const lowerSearch = searchTerm.toLowerCase().trim();
+    const index = lowerText.indexOf(lowerSearch);
+
+    if (index === -1) {
+      return text;
+    }
+
+    // Split text into: before match, match, after match
+    const before = text.slice(0, index);
+    const match = text.slice(index, index + lowerSearch.length);
+    const after = text.slice(index + lowerSearch.length);
+
+    return (
+      <>
+        {before}
+        <HighlightedText>{match}</HighlightedText>
+        {after}
+      </>
+    );
   };
 
   // Get filtered storage locations for selected warehouse (for source and destination)
@@ -275,9 +368,28 @@ export default function MoveItem() {
             <Autocomplete
               id="source-slot-select"
               options={warehouseLocations}
-              getOptionLabel={(option) => option.location_code ?? 'No location code'} // TODO: render a nicer tile with more information (eg preview of items in this location)
+              getOptionLabel={(option) => option.location_code ?? 'No location code'}
               getOptionKey={(option) => option.id} // TODO: should we enforce nonnull unique location codes per warehouse
               filterOptions={filterSourceSlotOptions}
+              renderOption={(props, option, state) => {
+                const { key, ...otherProps } = props;
+                const locationCode = option.location_code ?? 'No location code';
+                const searchTerm = state.inputValue;
+                const productNames = getProductNamesForLocation(option.id, searchTerm);
+
+                return (
+                  <li key={key} {...otherProps}>
+                    <SourceSlotOptionContainer>
+                      <LocationCodeText>
+                        {highlightText(locationCode, searchTerm)}
+                      </LocationCodeText>
+                      <ProductListText>
+                        {highlightText(productNames, searchTerm)}
+                      </ProductListText>
+                    </SourceSlotOptionContainer>
+                  </li>
+                );
+              }}
               value={selectedSourceSlot}
               onChange={(_, newValue) => {
                 setSelectedSourceSlot(newValue);
