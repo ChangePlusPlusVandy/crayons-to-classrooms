@@ -307,11 +307,18 @@ export default function MoveItem() {
 
         // Step 1: Create new item at destination with partial quantity
         const newItem = await createItem({
+          name: selectedItem.name,
           product_id: selectedItem.product_id,
           quantity: quantityToMove,
           current_location_id: selectedToSlot.id,
           status: selectedItem.status,
           created_by: 'b4974f63-ee89-42a1-bdb3-ce9df255c682', // TODO: Get user ID
+          warehouse: selectedItem.warehouse,
+          category: selectedItem.category,
+          item_limit: selectedItem.item_limit,
+          value: selectedItem.value,
+          limbo: selectedItem.limbo,
+          notes: selectedItem.notes,
         });
 
         // Step 2: Reduce source item quantity

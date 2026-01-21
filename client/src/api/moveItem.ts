@@ -43,13 +43,19 @@ export async function createInventoryMovement(
   return response.json();
 }
 
-// TODO: need to capture all fields
 export async function createItem(itemData: {
+  name: string;
   product_id: string;
   quantity: number;
-  current_location_id: string;
+  current_location_id?: string;
   status: 'active' | 'inactive' | 'discontinued' | 'checked_out';
   created_by: string;
+  warehouse: string;
+  category?: string;
+  item_limit?: number;
+  value: number;
+  limbo?: boolean;
+  notes?: string;
 }): Promise<Item> {
   const response = await fetch(`${API_BASE_URL}/items`, {
     method: 'POST',
