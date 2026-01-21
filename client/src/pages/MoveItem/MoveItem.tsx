@@ -40,6 +40,7 @@ export default function MoveItem() {
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
   const [selectedToSlot, setSelectedToSlot] = useState<StorageLocation | null>(null);
   const [notes, setNotes] = useState('');
+  const [quantityToMove, setQuantityToMove] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -167,9 +168,7 @@ export default function MoveItem() {
       return 'No items';
     }
 
-    const itemNames = items
-      .map((item) => item.name)
-      .filter((name) => name && name.trim() !== '');
+    const itemNames = items.map((item) => item.name).filter((name) => name && name.trim() !== '');
 
     // Remove duplicates
     const uniqueNames = Array.from(new Set(itemNames));
@@ -180,9 +179,9 @@ export default function MoveItem() {
       uniqueNames.sort((a, b) => {
         const aMatches = a.toLowerCase().includes(lowerSearch);
         const bMatches = b.toLowerCase().includes(lowerSearch);
-        if (aMatches && !bMatches) return -1;  // a first
-        if (!aMatches && bMatches) return 1;   // b first
-        return 0;  // maintain original order
+        if (aMatches && !bMatches) return -1; // a first
+        if (!aMatches && bMatches) return 1; // b first
+        return 0; // maintain original order
       });
     }
 
@@ -230,6 +229,22 @@ export default function MoveItem() {
     ? storageLocations.filter((loc) => loc.warehouse_id === selectedWarehouse.id)
     : [];
 
+  // Helper to check if quantity is valid
+  const isQuantityValid = (): boolean => {
+    if (!selectedItem) return false;
+    return quantityToMove >= 1 && quantityToMove <= selectedItem.quantity;
+  };
+
+  // Helper to get quantity error message
+  const getQuantityError = (): string => {
+    if (!selectedItem) return '';
+    if (quantityToMove < 1) return 'Quantity must be at least 1';
+    if (quantityToMove > selectedItem.quantity) {
+      return `Cannot exceed ${selectedItem.quantity} available`;
+    }
+    return '';
+  };
+
   const handleSubmit = async () => {
     // Validation
     if (!selectedWarehouse) {
@@ -242,6 +257,14 @@ export default function MoveItem() {
     }
     if (!selectedItem) {
       setError('Please select an item.');
+      return;
+    }
+    if (!quantityToMove || quantityToMove < 1) {
+      setError('Please enter a valid quantity (at least 1).');
+      return;
+    }
+    if (quantityToMove > selectedItem.quantity) {
+      setError(`Cannot move more than ${selectedItem.quantity} available.`);
       return;
     }
     if (!selectedToSlot) {
@@ -265,13 +288,13 @@ export default function MoveItem() {
         product_id: selectedItem.product_id,
         from_location_id: selectedItem.current_location_id,
         to_location_id: selectedToSlot.id,
-        quantity: selectedItem.quantity,
+        quantity: quantityToMove,
         performed_by: 'b4974f63-ee89-42a1-bdb3-ce9df255c682', // TODO: Get user ID
         note: notes || undefined,
       });
 
       // Update item location
-      await updateItemLocation(selectedItem.id, selectedToSlot.id); // TODO: Should this be in a transaction with createInventoryMovement?
+      await updateItemLocation(selectedItem.id, selectedToSlot.id); // TODO: This does not handle quantity. These 2 need to be consolidated into 1 backend call anyway so the backend will be able to handle it
 
       setSuccess('Item moved successfully!');
       // Reset form (keep warehouse selected for convenience)
@@ -280,6 +303,7 @@ export default function MoveItem() {
       setSelectedItem(null);
       setSelectedToSlot(null);
       setNotes('');
+      setQuantityToMove(0);
     } catch (err) {
       setError('Failed to move item. Please try again.');
     } finally {
@@ -339,6 +363,7 @@ export default function MoveItem() {
               setItemsInSourceSlot([]);
               setSelectedItem(null);
               setSelectedToSlot(null);
+              setQuantityToMove(0);
               setError('');
             }}
             label="Warehouse"
@@ -365,12 +390,8 @@ export default function MoveItem() {
                 return (
                   <li key={key} {...otherProps}>
                     <SourceSlotOptionContainer>
-                      <LocationCodeText>
-                        {highlightText(locationCode, searchTerm)}
-                      </LocationCodeText>
-                      <ItemListText>
-                        {highlightText(itemNames, searchTerm)}
-                      </ItemListText>
+                      <LocationCodeText>{highlightText(locationCode, searchTerm)}</LocationCodeText>
+                      <ItemListText>{highlightText(itemNames, searchTerm)}</ItemListText>
                     </SourceSlotOptionContainer>
                   </li>
                 );
@@ -380,6 +401,7 @@ export default function MoveItem() {
                 setSelectedSourceSlot(newValue);
                 setItemsInSourceSlot([]);
                 setSelectedItem(null);
+                setQuantityToMove(0);
                 setError('');
               }}
               renderInput={(params) => (
@@ -402,12 +424,12 @@ export default function MoveItem() {
             <Autocomplete
               id="item-in-slot-select"
               options={itemsInSourceSlot}
-              getOptionLabel={(option) =>
-                `${option.name} - Qty: ${option.quantity}`
-              } // TODO: render a nicer tile with more information
+              getOptionLabel={(option) => `${option.name} - Qty: ${option.quantity}`} // TODO: render a nicer tile with more information
               value={selectedItem}
               onChange={(_, newValue) => {
                 setSelectedItem(newValue);
+                // Auto-populate quantity with the full available quantity
+                setQuantityToMove(newValue?.quantity ?? 0);
                 setError('');
               }}
               renderInput={(params) => (
@@ -420,6 +442,37 @@ export default function MoveItem() {
               )}
               noOptionsText="No matching items found"
               disabled={!selectedSourceSlot || itemsInSourceSlot.length === 0}
+            />
+          </FormControl>
+
+          <FormControl
+            fullWidth
+            disabled={!selectedItem}
+            error={selectedItem ? !isQuantityValid() : false}
+          >
+            <MoveItemFormLabel htmlFor="quantity-input">Quantity to Move</MoveItemFormLabel>
+            <TextField
+              id="quantity-input"
+              type="number"
+              fullWidth
+              value={quantityToMove || ''}
+              onChange={(e) => {
+                const value = parseInt(e.target.value, 10);
+                setQuantityToMove(isNaN(value) ? 0 : value);
+              }}
+              placeholder={!selectedItem ? 'Select item first' : 'Enter quantity'}
+              disabled={!selectedItem}
+              error={selectedItem ? !isQuantityValid() : false}
+              helperText={
+                selectedItem ? getQuantityError() || `${selectedItem.quantity} available` : ''
+              }
+              slotProps={{
+                htmlInput: {
+                  min: 1,
+                  max: selectedItem?.quantity ?? 0,
+                  step: 1,
+                },
+              }}
             />
           </FormControl>
 
@@ -473,6 +526,7 @@ export default function MoveItem() {
                 setSelectedItem(null);
                 setSelectedToSlot(null);
                 setNotes('');
+                setQuantityToMove(0);
                 setError('');
                 setSuccess('');
               }}
@@ -488,6 +542,7 @@ export default function MoveItem() {
                 !selectedWarehouse ||
                 !selectedSourceSlot ||
                 !selectedItem ||
+                !isQuantityValid() ||
                 !selectedToSlot
               }
             >
