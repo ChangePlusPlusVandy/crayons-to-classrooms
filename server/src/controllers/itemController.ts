@@ -55,34 +55,47 @@ const syncItemInfoStock = async (
   stockDelta: number,
   createIfMissing: boolean
 ) => {
-  const existingInfo = await pool.query('SELECT stock FROM item_info WHERE name = $1', [itemName]);
+  try {
+    const existingInfo = await pool.query(
+      'SELECT stock FROM item_info WHERE name = $1',
+      [itemName]
+    );
 
-  if (existingInfo.rows.length === 0) {
-    if (!createIfMissing) {
+    if (existingInfo.rows.length === 0) {
+      if (!createIfMissing) {
+        return;
+      }
+
+      await pool.query(
+        'INSERT INTO item_info (name, item_limit, stock, last_known_fixture, last_known_location_code, time_last_updated, notes) VALUES ($1, $2, $3, $4, $5, NOW(), $6)',
+        [
+          itemName,
+          0,
+          1,
+          DUMMY_FIXTURE,
+          DUMMY_LOCATION_CODE,
+          null,
+        ]
+      );
       return;
     }
 
+    const currentStock = Number.parseInt(existingInfo.rows[0].stock, 10);
+    const nextStock = currentStock + stockDelta;
+
     await pool.query(
-      'INSERT INTO item_info (name, item_limit, stock, last_known_fixture, last_known_location_code, time_last_updated, notes) VALUES ($1, $2, $3, $4, $5, NOW(), $6)',
-      [
-        itemName,
-        0,
-        1,
-        DUMMY_FIXTURE,
-        DUMMY_LOCATION_CODE,
-        null,
-      ]
+      'UPDATE item_info SET stock = $1, last_known_fixture = $2, last_known_location_code = $3, time_last_updated = NOW() WHERE name = $4',
+      [nextStock, DUMMY_FIXTURE, DUMMY_LOCATION_CODE, itemName]
     );
-    return;
+  } catch (error) {
+    console.error('Error syncing item info stock:', {
+      itemName,
+      stockDelta,
+      createIfMissing,
+      error,
+    });
+    throw error;
   }
-
-  const currentStock = Number.parseInt(existingInfo.rows[0].stock, 10);
-  const nextStock = currentStock + stockDelta;
-
-  await pool.query(
-    'UPDATE item_info SET stock = $1, last_known_fixture = $2, last_known_location_code = $3, time_last_updated = NOW() WHERE name = $4',
-    [nextStock, DUMMY_FIXTURE, DUMMY_LOCATION_CODE, itemName]
-  );
 };
 
 /**
