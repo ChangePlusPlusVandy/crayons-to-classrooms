@@ -18,6 +18,8 @@ import {
   getItemsByLocation,
   createInventoryMovement,
   updateItemLocation,
+  createItem,
+  updateItemQuantity,
 } from '../../api/moveItem';
 import { Warehouse } from '../../types/Warehouse';
 import { StorageLocation } from '../../types/StorageLocation';
@@ -281,20 +283,52 @@ export default function MoveItem() {
     setSuccess('');
 
     try {
-      // Create inventory movement
-      await createInventoryMovement({
-        inventory_action: 'MOVE',
-        item_id: selectedItem.id,
-        product_id: selectedItem.product_id,
-        from_location_id: selectedItem.current_location_id,
-        to_location_id: selectedToSlot.id,
-        quantity: quantityToMove,
-        performed_by: 'b4974f63-ee89-42a1-bdb3-ce9df255c682', // TODO: Get user ID
-        note: notes || undefined,
-      });
+      const isFullMove = quantityToMove === selectedItem.quantity;
 
-      // Update item location
-      await updateItemLocation(selectedItem.id, selectedToSlot.id); // TODO: This does not handle quantity. These 2 need to be consolidated into 1 backend call anyway so the backend will be able to handle it
+      if (isFullMove) {
+        // Case 1: Moving entire item quantity
+        // Just update location, no need to split
+        await updateItemLocation(selectedItem.id, selectedToSlot.id);
+
+        // Record movement with source item ID
+        await createInventoryMovement({
+          inventory_action: 'MOVE',
+          item_id: selectedItem.id,
+          product_id: selectedItem.product_id,
+          from_location_id: selectedItem.current_location_id,
+          to_location_id: selectedToSlot.id,
+          quantity: quantityToMove,
+          performed_by: 'b4974f63-ee89-42a1-bdb3-ce9df255c682', // TODO: Get user ID
+          note: notes || undefined,
+        });
+      } else {
+        // Case 2: Partial move - need to split item
+
+        // Step 1: Create new item at destination with partial quantity
+        const newItem = await createItem({
+          product_id: selectedItem.product_id,
+          quantity: quantityToMove,
+          current_location_id: selectedToSlot.id,
+          status: selectedItem.status,
+          created_by: 'b4974f63-ee89-42a1-bdb3-ce9df255c682', // TODO: Get user ID
+        });
+
+        // Step 2: Reduce source item quantity
+        const remainingQuantity = selectedItem.quantity - quantityToMove;
+        await updateItemQuantity(selectedItem.id, remainingQuantity);
+
+        // Step 3: Record movement with NEW item's ID (not source item's ID!)
+        await createInventoryMovement({
+          inventory_action: 'MOVE',
+          item_id: newItem.id,
+          product_id: selectedItem.product_id,
+          from_location_id: selectedItem.current_location_id,
+          to_location_id: selectedToSlot.id,
+          quantity: quantityToMove,
+          performed_by: 'b4974f63-ee89-42a1-bdb3-ce9df255c682', // TODO: Get user ID
+          note: notes || undefined,
+        });
+      }
 
       setSuccess('Item moved successfully!');
       // Reset form (keep warehouse selected for convenience)
@@ -305,7 +339,11 @@ export default function MoveItem() {
       setNotes('');
       setQuantityToMove(0);
     } catch (err) {
-      setError('Failed to move item. Please try again.');
+      console.error('Error moving item:', err);
+      setError(
+        'Failed to move item. Please check the inventory and try again. ' +
+          'If the item was partially updated, you may need to verify the inventory manually.'
+      );
     } finally {
       setSubmitting(false);
     }

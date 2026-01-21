@@ -43,6 +43,37 @@ export async function createInventoryMovement(
   return response.json();
 }
 
+// TODO: need to capture all fields
+export async function createItem(itemData: {
+  product_id: string;
+  quantity: number;
+  current_location_id: string;
+  status: 'active' | 'inactive' | 'discontinued' | 'checked_out';
+  created_by: string;
+}): Promise<Item> {
+  const response = await fetch(`${API_BASE_URL}/items`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(itemData),
+  });
+  if (!response.ok) throw new Error('Failed to create item');
+  return response.json();
+}
+
+export async function updateItemQuantity(itemId: string, newQuantity: number): Promise<Item> {
+  const response = await fetch(`${API_BASE_URL}/items/${itemId}`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ quantity: newQuantity }),
+  });
+  if (!response.ok) throw new Error('Failed to update item quantity');
+  return response.json();
+}
+
 export async function updateItemLocation(itemId: string, locationId: string): Promise<Item> {
   const response = await fetch(`${API_BASE_URL}/items/${itemId}`, {
     method: 'PATCH',
