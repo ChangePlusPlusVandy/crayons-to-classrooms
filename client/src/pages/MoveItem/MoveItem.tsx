@@ -362,9 +362,6 @@ export default function MoveItem() {
 
   return (
     <Container maxWidth="md" sx={{ py: 4 }}>
-      <Typography variant="h4" sx={{ mb: 3, textAlign: 'center' }}>
-        Move Item
-      </Typography>
 
       <Paper
         component="form"
@@ -380,6 +377,9 @@ export default function MoveItem() {
         }}
         elevation={2}
       >
+        <Typography variant="h4" sx={{ mb: 3, textAlign: 'left' }}>
+          Move Item
+        </Typography>
         <Stack spacing={3}>
           {error && (
             <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
