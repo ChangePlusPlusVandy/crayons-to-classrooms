@@ -369,7 +369,6 @@ export default function MoveItem() {
 
   return (
     <Container maxWidth="md" sx={{ py: 4 }}>
-
       <Paper
         component="form"
         onSubmit={(e) => {
@@ -556,7 +555,7 @@ export default function MoveItem() {
                 color: 'primary.main',
                 '&:hover': {
                   backgroundColor: 'transparent',
-                }
+                },
               }}
               onClick={() => {
                 // Does nothing for now
