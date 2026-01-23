@@ -9,7 +9,7 @@ export type Item = {
   updated_at: string;
   warehouse: string;
   category: string;
-  item_limit: number;
+  item_limit: number | string; // It is a bigint in db schema so node-postgres currently returns it as a string
   value: number;
   limbo: boolean;
   notes: string;

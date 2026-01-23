@@ -41,7 +41,8 @@ export default function MoveItem() {
   const [selectedSourceSlot, setSelectedSourceSlot] = useState<StorageLocation | null>(null);
   const [itemsInSourceSlot, setItemsInSourceSlot] = useState<Item[]>([]);
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
-  const [selectedToSlot, setSelectedToSlot] = useState<StorageLocation | null>(null);
+  const [selectedAisle, setSelectedAisle] = useState<string | null>(null);
+  const [selectedFixture, setSelectedFixture] = useState<string | null>(null);
   const [notes, setNotes] = useState('');
   const [quantityToMove, setQuantityToMove] = useState<number>(0);
   const [loading, setLoading] = useState(true);
@@ -232,6 +233,47 @@ export default function MoveItem() {
     ? storageLocations.filter((loc) => loc.warehouse_id === selectedWarehouse.id)
     : [];
 
+  // Get deduplicated aisles for selected warehouse
+  const availableAisles = useMemo(() => {
+    if (!selectedWarehouse) return [];
+
+    const aisleSet = new Set<string>();
+    warehouseLocations.forEach((loc) => {
+      if (loc.aisle && loc.aisle.trim() !== '') {
+        aisleSet.add(loc.aisle);
+      }
+    });
+
+    return Array.from(aisleSet).sort();
+  }, [selectedWarehouse, warehouseLocations]);
+
+  // Get fixtures for selected aisle
+  const availableFixtures = useMemo(() => {
+    if (!selectedWarehouse || !selectedAisle) return [];
+
+    const fixtureSet = new Set<string>();
+    let hasNullFixture = false;
+
+    warehouseLocations
+      .filter((loc) => loc.aisle === selectedAisle)
+      .forEach((loc) => {
+        if (loc.fixture && loc.fixture.trim() !== '') {
+          fixtureSet.add(loc.fixture);
+        } else {
+          hasNullFixture = true;
+        }
+      });
+
+    const fixtures = Array.from(fixtureSet).sort();
+
+    // Add "None" option at the beginning if there are locations with null/empty fixtures
+    if (hasNullFixture) {
+      fixtures.unshift('None');
+    }
+
+    return fixtures;
+  }, [selectedWarehouse, selectedAisle, warehouseLocations]);
+
   // Helper to check if quantity is valid
   const isQuantityValid = (): boolean => {
     if (!selectedItem) return false;
@@ -249,6 +291,13 @@ export default function MoveItem() {
   };
 
   const handleSubmit = async () => {
+    const destinationLocation = warehouseLocations.find((loc) => {
+      if (selectedFixture === 'None') {
+        return loc.aisle === selectedAisle && (!loc.fixture || loc.fixture.trim() === '');
+      }
+      return loc.aisle === selectedAisle && loc.fixture === selectedFixture;
+    });
+
     // Validation
     if (!selectedWarehouse) {
       setError('Please select a warehouse.');
@@ -270,11 +319,17 @@ export default function MoveItem() {
       setError(`Cannot move more than ${selectedItem.quantity} available.`);
       return;
     }
-    if (!selectedToSlot) {
-      setError('Please select a destination slot.');
+    if (!selectedAisle || !selectedFixture) {
+      setError('Please select a destination aisle and fixture.');
       return;
     }
-    if (selectedSourceSlot.id === selectedToSlot.id) {
+
+    if (!destinationLocation) {
+      setError('Invalid destination location.');
+      return;
+    }
+
+    if (selectedSourceSlot.id === destinationLocation.id) {
       setError('Destination slot must be different from the source slot.');
       return;
     }
@@ -289,7 +344,7 @@ export default function MoveItem() {
       if (isFullMove) {
         // Case 1: Moving entire item quantity
         // Just update location, no need to split
-        await updateItemLocation(selectedItem.id, selectedToSlot.id);
+        await updateItemLocation(selectedItem.id, destinationLocation.id);
 
         // Record movement with source item ID
         await createInventoryMovement({
@@ -297,7 +352,7 @@ export default function MoveItem() {
           item_id: selectedItem.id,
           product_id: selectedItem.product_id,
           from_location_id: selectedItem.current_location_id,
-          to_location_id: selectedToSlot.id,
+          to_location_id: destinationLocation.id,
           quantity: quantityToMove,
           performed_by: 'b4974f63-ee89-42a1-bdb3-ce9df255c682', // TODO: Get user ID
           note: notes || undefined,
@@ -305,33 +360,36 @@ export default function MoveItem() {
       } else {
         // Case 2: Partial move - need to split item
 
-        // Step 1: Create new item at destination with partial quantity
+        // Create new item at destination with partial quantity
         const newItem = await createItem({
           name: selectedItem.name,
           product_id: selectedItem.product_id,
           quantity: quantityToMove,
-          current_location_id: selectedToSlot.id,
+          current_location_id: destinationLocation.id,
           status: selectedItem.status,
           created_by: 'b4974f63-ee89-42a1-bdb3-ce9df255c682', // TODO: Get user ID
           warehouse: selectedItem.warehouse,
           category: selectedItem.category,
-          item_limit: selectedItem.item_limit,
+          item_limit:
+            selectedItem.item_limit != null
+              ? Number(selectedItem.item_limit)
+              : selectedItem.item_limit,
           value: selectedItem.value,
           limbo: selectedItem.limbo,
           notes: selectedItem.notes,
         });
 
-        // Step 2: Reduce source item quantity
+        // Reduce source item quantity
         const remainingQuantity = selectedItem.quantity - quantityToMove;
         await updateItemQuantity(selectedItem.id, remainingQuantity);
 
-        // Step 3: Record movement with NEW item's ID (not source item's ID!)
+        // Record movement with NEW item's ID (not source item's ID!)
         await createInventoryMovement({
           inventory_action: 'MOVE',
           item_id: newItem.id,
           product_id: selectedItem.product_id,
           from_location_id: selectedItem.current_location_id,
-          to_location_id: selectedToSlot.id,
+          to_location_id: destinationLocation.id,
           quantity: quantityToMove,
           performed_by: 'b4974f63-ee89-42a1-bdb3-ce9df255c682', // TODO: Get user ID
           note: notes || undefined,
@@ -343,7 +401,8 @@ export default function MoveItem() {
       setSelectedSourceSlot(null);
       setItemsInSourceSlot([]);
       setSelectedItem(null);
-      setSelectedToSlot(null);
+      setSelectedAisle(null);
+      setSelectedFixture(null);
       setNotes('');
       setQuantityToMove(0);
     } catch (err) {
@@ -407,7 +466,8 @@ export default function MoveItem() {
               setSelectedSourceSlot(null);
               setItemsInSourceSlot([]);
               setSelectedItem(null);
-              setSelectedToSlot(null);
+              setSelectedAisle(null);
+              setSelectedFixture(null);
               setQuantityToMove(0);
               setError('');
             }}
@@ -526,25 +586,48 @@ export default function MoveItem() {
           </Box>
 
           <FormControl fullWidth disabled={!selectedWarehouse}>
-            <MoveItemFormLabel htmlFor="to-slot-input">To Slot</MoveItemFormLabel>
+            <MoveItemFormLabel htmlFor="aisle-input">To Slot</MoveItemFormLabel>
             <Autocomplete
-              id="to-slot-input"
-              options={warehouseLocations}
-              getOptionLabel={(option) => option.location_code ?? 'No location code'}
-              value={selectedToSlot}
+              id="aisle-input"
+              options={availableAisles}
+              getOptionLabel={(option) => option}
+              value={selectedAisle}
               onChange={(_, newValue) => {
-                setSelectedToSlot(newValue);
+                setSelectedAisle(newValue);
+                // Cascade: clear fixture when aisle changes
+                setSelectedFixture(null);
                 setError('');
               }}
               renderInput={(params) => (
                 <TextField
                   {...params}
-                  placeholder={
-                    !selectedWarehouse ? 'Select warehouse first' : 'Select destination slot'
-                  }
+                  placeholder={!selectedWarehouse ? 'Select warehouse first' : 'Select aisle'}
                 />
               )}
               disabled={!selectedWarehouse}
+              noOptionsText="No aisles available"
+            />
+          </FormControl>
+
+          <FormControl fullWidth disabled={!selectedAisle}>
+            <MoveItemFormLabel htmlFor="fixture-input">Fixture</MoveItemFormLabel>
+            <Autocomplete
+              id="fixture-input"
+              options={availableFixtures}
+              getOptionLabel={(option) => option}
+              value={selectedFixture}
+              onChange={(_, newValue) => {
+                setSelectedFixture(newValue);
+                setError('');
+              }}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  placeholder={!selectedAisle ? 'Select aisle first' : 'Select fixture'}
+                />
+              )}
+              disabled={!selectedAisle}
+              noOptionsText="No fixtures available"
             />
             <Button
               startIcon={<AddIcon />}
@@ -587,7 +670,8 @@ export default function MoveItem() {
                 setSelectedSourceSlot(null);
                 setItemsInSourceSlot([]);
                 setSelectedItem(null);
-                setSelectedToSlot(null);
+                setSelectedAisle(null);
+                setSelectedFixture(null);
                 setNotes('');
                 setQuantityToMove(0);
                 setError('');
@@ -606,7 +690,8 @@ export default function MoveItem() {
                 !selectedSourceSlot ||
                 !selectedItem ||
                 !isQuantityValid() ||
-                !selectedToSlot
+                !selectedAisle ||
+                !selectedFixture
               }
             >
               {submitting ? <CircularProgress size={24} /> : 'Confirm Move'}
