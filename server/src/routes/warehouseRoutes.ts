@@ -11,8 +11,8 @@ import {
 const router = express.Router();
 
 router.get('/', getAllWarehouse); // GET /api/warehouse
-router.get('/:id', getWarehouseById); // GET /api/warehouse/:id
 router.get('/name/:id', getWarehouseByName); // GET /api/warehouse/name/:id
+router.get('/:id', getWarehouseById); // GET /api/warehouse/:id
 router.post('/', createWarehouse); // POST /api/warehouse
 router.patch('/:id', updateWarehouse); // PATCH /api/warehouse/:id
 router.delete('/:id', deleteWarehouse); // DELETE /api/warehouse/:id
