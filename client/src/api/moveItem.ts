@@ -26,7 +26,6 @@ export async function getStorageLocationByCode(locationCode: string): Promise<St
 export async function getItemsByLocation(locationId: string): Promise<Item[]> {
   const response = await fetch(`${API_BASE_URL}/items/location/${locationId}`);
   if (!response.ok) {
-    console.log(response.status);
     if (response.status === 404) {
       return [];
     }
@@ -101,7 +100,7 @@ export async function updateItemLocation(itemId: string, locationId: string): Pr
 export function groupItemsByLocation(items: Item[]): ItemGroup[] {
   const groupMap = new Map<string, ItemGroup>();
 
-  items.forEach(item => {
+  items.forEach((item) => {
     const key = `${item.warehouse}|${item.current_location_id}|${item.name}`;
 
     if (groupMap.has(key)) {
@@ -111,13 +110,11 @@ export function groupItemsByLocation(items: Item[]): ItemGroup[] {
       groupMap.set(key, {
         current_location_id: item.current_location_id,
         warehouse: item.warehouse,
-        name: item.name ?? "Unknown",
+        name: item.name ?? 'Unknown',
         quantity: 1,
       });
     }
   });
 
-  return Array.from(groupMap.values()).sort((a, b) =>
-    a.name.localeCompare(b.name)
-  );
+  return Array.from(groupMap.values()).sort((a, b) => a.name.localeCompare(b.name));
 }

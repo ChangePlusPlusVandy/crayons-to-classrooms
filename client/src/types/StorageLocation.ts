@@ -1,6 +1,7 @@
 export type StorageLocation = {
   id: string;
   aisle: string;
+  slot: string;
   fixture: string;
   location_code: string;
   active: boolean;

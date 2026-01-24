@@ -46,7 +46,8 @@ export function WarehouseSelector({
     }
 
     fetchWarehouses();
-  }, [onError]);
+    // eslint-disable-next-line -- onError is excluded from dependency array bc fetch should only be ran on mount
+  }, []);
 
   return (
     <FormControl fullWidth={fullWidth} error={!!error}>

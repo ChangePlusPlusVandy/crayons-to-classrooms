@@ -41,7 +41,7 @@ export default function MoveItem() {
   const [itemsInSourceSlot, setItemsInSourceSlot] = useState<Item[]>([]);
   const [itemGroupsInSourceSlot, setItemGroupsInSourceSlot] = useState<ItemGroup[]>([]);
   const [selectedItemGroup, setSelectedItemGroup] = useState<ItemGroup | null>(null);
-  const [selectedAisle, setSelectedAisle] = useState<string | null>(null);
+  const [selectedDestinationSlot, setSelectedDestinationSlot] = useState<string | null>(null);
   const [selectedFixture, setSelectedFixture] = useState<string | null>(null);
   const [notes, setNotes] = useState('');
   const [quantityToMove, setQuantityToMove] = useState<number>(0);
@@ -125,7 +125,7 @@ export default function MoveItem() {
   // Create location-to-items map for efficient lookup
   const locationItemsMap = useMemo(() => {
     const map = new Map<string, Item[]>();
-    
+
     allItems.forEach((item) => {
       const locationId = item.current_location_id;
       if (!map.has(locationId)) {
@@ -133,15 +133,15 @@ export default function MoveItem() {
       }
       map.get(locationId)!.push(item);
     });
-    
+
     return map;
   }, [allItems]);
-  
+
   // Helper to get items for a location
   const getItemsForLocation = (locationId: string): Item[] => {
     return locationItemsMap.get(locationId) || [];
   };
-  
+
   // Custom filter for Source Slot Autocomplete
   // Searches by: location_code OR product names of items in that location
   const filterSourceSlotOptions = (
@@ -161,7 +161,7 @@ export default function MoveItem() {
       }
 
       // Match by item name of items at this location
-      const itemsAtLocation = getItemsForLocation(location.id)
+      const itemsAtLocation = getItemsForLocation(location.id);
 
       return itemsAtLocation.some((item) => {
         return item.name?.toLowerCase().includes(searchTerm);
@@ -234,33 +234,37 @@ export default function MoveItem() {
   };
 
   // Get filtered storage locations for selected warehouse (for source and destination)
-  const warehouseLocations = useMemo(() => selectedWarehouse
-    ? storageLocations.filter((loc) => loc.warehouse_id === selectedWarehouse.id)
-    : [], [selectedWarehouse, storageLocations])
+  const warehouseLocations = useMemo(
+    () =>
+      selectedWarehouse
+        ? storageLocations.filter((loc) => loc.warehouse_id === selectedWarehouse.id)
+        : [],
+    [selectedWarehouse, storageLocations]
+  );
 
-  // Get deduplicated aisles for selected warehouse
-  const availableAisles = useMemo(() => {
+  // Get deduplicated slots for selected warehouse
+  const availableDestinationSlots = useMemo(() => {
     if (!selectedWarehouse) return [];
 
-    const aisleSet = new Set<string>();
+    const slotSet = new Set<string>();
     warehouseLocations.forEach((loc) => {
-      if (loc.aisle && loc.aisle.trim() !== '') {
-        aisleSet.add(loc.aisle);
+      if (loc.slot && loc.slot.trim() !== '') {
+        slotSet.add(loc.slot);
       }
     });
 
-    return Array.from(aisleSet).sort();
+    return Array.from(slotSet).sort();
   }, [selectedWarehouse, warehouseLocations]);
 
-  // Get fixtures for selected aisle
+  // Get fixtures for selected destination slot
   const availableFixtures = useMemo(() => {
-    if (!selectedWarehouse || !selectedAisle) return [];
+    if (!selectedWarehouse || !selectedDestinationSlot) return [];
 
     const fixtureSet = new Set<string>();
     let hasNullFixture = false;
 
     warehouseLocations
-      .filter((loc) => loc.aisle === selectedAisle)
+      .filter((loc) => loc.slot === selectedDestinationSlot)
       .forEach((loc) => {
         if (loc.fixture && loc.fixture.trim() !== '') {
           fixtureSet.add(loc.fixture);
@@ -271,13 +275,21 @@ export default function MoveItem() {
 
     const fixtures = Array.from(fixtureSet).sort();
 
-    // Add "None" option at the beginning if there are locations with null/empty fixtures
+    // Add "N/A" option at the beginning if there are locations with null/empty fixtures
     if (hasNullFixture) {
-      fixtures.unshift('None');
+      fixtures.unshift('N/A');
     }
 
     return fixtures;
-  }, [selectedWarehouse, selectedAisle, warehouseLocations]);
+  }, [selectedWarehouse, selectedDestinationSlot, warehouseLocations]);
+
+  useEffect(() => {
+    if (availableFixtures.includes('N/A')) {
+      setSelectedFixture('N/A');
+    } else {
+      setSelectedFixture(null);
+    }
+  }, [availableFixtures]);
 
   // Helper to check if quantity is valid
   const isQuantityValid = (): boolean => {
@@ -297,10 +309,10 @@ export default function MoveItem() {
 
   const handleSubmit = async () => {
     const destinationLocation = warehouseLocations.find((loc) => {
-      if (selectedFixture === 'None') {
-        return loc.aisle === selectedAisle && (!loc.fixture || loc.fixture.trim() === '');
+      if (selectedFixture === 'N/A') {
+        return loc.slot === selectedDestinationSlot && (!loc.fixture || loc.fixture.trim() === '');
       }
-      return loc.aisle === selectedAisle && loc.fixture === selectedFixture;
+      return loc.slot === selectedDestinationSlot && loc.fixture === selectedFixture;
     });
 
     // Validation
@@ -324,8 +336,8 @@ export default function MoveItem() {
       setError(`Cannot move more than ${selectedItemGroup.quantity} available.`);
       return;
     }
-    if (!selectedAisle || !selectedFixture) {
-      setError('Please select a destination aisle and fixture.');
+    if (!selectedDestinationSlot || !selectedFixture) {
+      setError('Please select a destination slot and fixture.');
       return;
     }
 
@@ -352,7 +364,7 @@ export default function MoveItem() {
       );
 
       const itemsToMove = itemsInGroup
-        .sort((a, b) => a.id.localeCompare(b.id))
+        .sort((a, b) => b.created_at.localeCompare(a.created_at)) // descending by date
         .slice(0, quantityToMove);
 
       if (itemsToMove.length !== quantityToMove) {
@@ -379,18 +391,23 @@ export default function MoveItem() {
       });
 
       setSuccess('Item moved successfully!');
-      // Reset form (keep warehouse selected for convenience)
+      // Reset form (resetting warehouse triggers refetch)
+      setSelectedWarehouse(null);
       setSelectedSourceSlot(null);
       setItemsInSourceSlot([]);
       setItemGroupsInSourceSlot([]);
       setSelectedItemGroup(null);
-      setSelectedAisle(null);
+      setSelectedDestinationSlot(null);
       setSelectedFixture(null);
       setNotes('');
       setQuantityToMove(0);
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('Error moving item:', err);
-      setError('Failed to move item. Please check the inventory and try again.');
+      const errorMessage =
+        err instanceof Error && err.message
+          ? `Failed to move item. ${err.message}`
+          : 'Failed to move item. Please check the inventory and try again.';
+      setError(errorMessage);
     } finally {
       setSubmitting(false);
     }
@@ -447,7 +464,7 @@ export default function MoveItem() {
               setItemsInSourceSlot([]);
               setItemGroupsInSourceSlot([]);
               setSelectedItemGroup(null);
-              setSelectedAisle(null);
+              setSelectedDestinationSlot(null);
               setSelectedFixture(null);
               setQuantityToMove(0);
               setError('');
@@ -465,7 +482,7 @@ export default function MoveItem() {
               id="source-slot-select"
               options={warehouseLocations}
               getOptionLabel={(option) => option.location_code ?? 'No location code'}
-              getOptionKey={(option) => option.id} // TODO: should we enforce nonnull unique location codes per warehouse
+              getOptionKey={(option) => option.id}
               filterOptions={filterSourceSlotOptions}
               renderOption={(props, option, state) => {
                 const { key, ...otherProps } = props;
@@ -506,10 +523,7 @@ export default function MoveItem() {
             />
           </FormControl>
 
-          <FormControl
-            fullWidth
-            disabled={!selectedSourceSlot}
-          >
+          <FormControl fullWidth disabled={!selectedSourceSlot}>
             <MoveItemFormLabel htmlFor="item-in-slot-select">Item in Source Slot</MoveItemFormLabel>
             <Autocomplete
               id="item-in-slot-select"
@@ -569,30 +583,35 @@ export default function MoveItem() {
           </FormControl>
 
           <Box sx={{ display: 'flex', justifyContent: 'center', my: 2 }}>
-            <ArrowDownwardIcon sx={{ fontSize: '2rem', color: 'text.secondary' }} />
+            <ArrowDownwardIcon
+              aria-hidden="true"
+              sx={{ fontSize: '2rem', color: 'text.secondary' }}
+            />
           </Box>
           <Stack spacing={0}>
             <FormControl fullWidth disabled={!selectedWarehouse}>
-              <MoveItemFormLabel htmlFor="aisle-input">To Slot</MoveItemFormLabel>
+              <MoveItemFormLabel htmlFor="toslot-input">Destination Slot</MoveItemFormLabel>
               <Autocomplete
-                id="aisle-input"
-                options={availableAisles}
+                id="toslot-input"
+                options={availableDestinationSlots}
                 getOptionLabel={(option) => option}
-                value={selectedAisle}
+                value={selectedDestinationSlot}
                 onChange={(_, newValue) => {
-                  setSelectedAisle(newValue);
-                  // Cascade: clear fixture when aisle changes
+                  setSelectedDestinationSlot(newValue);
+                  // Cascade: clear fixture when destination slot changes
                   setSelectedFixture(null);
                   setError('');
                 }}
                 renderInput={(params) => (
                   <TextField
                     {...params}
-                    placeholder={!selectedWarehouse ? 'Select warehouse first' : 'Select aisle'}
+                    placeholder={
+                      !selectedWarehouse ? 'Select warehouse first' : 'Select destination slot'
+                    }
                   />
                 )}
                 disabled={!selectedWarehouse}
-                noOptionsText="No aisles available"
+                noOptionsText="No slots available"
               />
               <Button
                 startIcon={<AddIcon />}
@@ -616,7 +635,7 @@ export default function MoveItem() {
 
             <FormControl
               fullWidth
-              disabled={!selectedAisle}
+              disabled={!selectedDestinationSlot}
               sx={{
                 marginTop: 0,
               }}
@@ -634,10 +653,12 @@ export default function MoveItem() {
                 renderInput={(params) => (
                   <TextField
                     {...params}
-                    placeholder={!selectedAisle ? 'Select aisle first' : 'Select fixture'}
+                    placeholder={
+                      !selectedDestinationSlot ? 'Select destination slot first' : 'Select fixture'
+                    }
                   />
                 )}
-                disabled={!selectedAisle}
+                disabled={!selectedDestinationSlot}
                 noOptionsText="No fixtures available"
               />
             </FormControl>
@@ -665,7 +686,7 @@ export default function MoveItem() {
                 setItemsInSourceSlot([]);
                 setItemGroupsInSourceSlot([]);
                 setSelectedItemGroup(null);
-                setSelectedAisle(null);
+                setSelectedDestinationSlot(null);
                 setSelectedFixture(null);
                 setNotes('');
                 setQuantityToMove(0);
@@ -685,7 +706,7 @@ export default function MoveItem() {
                 !selectedSourceSlot ||
                 !selectedItemGroup ||
                 !isQuantityValid() ||
-                !selectedAisle ||
+                !selectedDestinationSlot ||
                 !selectedFixture
               }
             >
