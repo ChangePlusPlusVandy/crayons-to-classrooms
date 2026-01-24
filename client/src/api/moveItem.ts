@@ -25,7 +25,13 @@ export async function getStorageLocationByCode(locationCode: string): Promise<St
 
 export async function getItemsByLocation(locationId: string): Promise<Item[]> {
   const response = await fetch(`${API_BASE_URL}/items/location/${locationId}`);
-  if (!response.ok) throw new Error('Failed to fetch items at location');
+  if (!response.ok) {
+    console.log(response.status);
+    if (response.status === 404) {
+      return [];
+    }
+    throw new Error('Failed to fetch items at location');
+  }
   return response.json();
 }
 

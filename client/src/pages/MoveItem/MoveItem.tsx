@@ -509,7 +509,7 @@ export default function MoveItem() {
 
           <FormControl
             fullWidth
-            disabled={!selectedSourceSlot || itemGroupsInSourceSlot.length === 0}
+            disabled={!selectedSourceSlot}
           >
             <MoveItemFormLabel htmlFor="item-in-slot-select">Item in Source Slot</MoveItemFormLabel>
             <Autocomplete
@@ -532,7 +532,7 @@ export default function MoveItem() {
                 />
               )}
               noOptionsText="No matching items found"
-              disabled={!selectedSourceSlot || itemGroupsInSourceSlot.length === 0}
+              disabled={!selectedSourceSlot}
             />
           </FormControl>
 
