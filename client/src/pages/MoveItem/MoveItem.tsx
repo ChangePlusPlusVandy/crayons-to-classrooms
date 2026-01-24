@@ -122,6 +122,26 @@ export default function MoveItem() {
     fetchItemsInSlot();
   }, [selectedSourceSlot]);
 
+  // Create location-to-items map for efficient lookup
+  const locationItemsMap = useMemo(() => {
+    const map = new Map<string, Item[]>();
+    
+    allItems.forEach((item) => {
+      const locationId = item.current_location_id;
+      if (!map.has(locationId)) {
+        map.set(locationId, []);
+      }
+      map.get(locationId)!.push(item);
+    });
+    
+    return map;
+  }, [allItems]);
+  
+  // Helper to get items for a location
+  const getItemsForLocation = (locationId: string): Item[] => {
+    return locationItemsMap.get(locationId) || [];
+  };
+  
   // Custom filter for Source Slot Autocomplete
   // Searches by: location_code OR product names of items in that location
   const filterSourceSlotOptions = (
@@ -134,7 +154,6 @@ export default function MoveItem() {
       return options;
     }
 
-    // TODO: Optimize if needed
     return options.filter((location) => {
       // Match by location code
       if (location.location_code?.toLowerCase().includes(searchTerm)) {
@@ -142,32 +161,12 @@ export default function MoveItem() {
       }
 
       // Match by item name of items at this location
-      const itemsAtLocation = allItems.filter((item) => item.current_location_id === location.id);
+      const itemsAtLocation = getItemsForLocation(location.id)
 
       return itemsAtLocation.some((item) => {
         return item.name?.toLowerCase().includes(searchTerm);
       });
     });
-  };
-
-  // Create location-to-items map for efficient lookup
-  const locationItemsMap = useMemo(() => {
-    const map = new Map<string, Item[]>();
-
-    allItems.forEach((item) => {
-      const locationId = item.current_location_id;
-      if (!map.has(locationId)) {
-        map.set(locationId, []);
-      }
-      map.get(locationId)!.push(item);
-    });
-
-    return map;
-  }, [allItems]);
-
-  // Helper to get items for a location
-  const getItemsForLocation = (locationId: string): Item[] => {
-    return locationItemsMap.get(locationId) || [];
   };
 
   // Helper to format item names for display
