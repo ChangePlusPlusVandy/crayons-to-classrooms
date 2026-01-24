@@ -235,9 +235,9 @@ export default function MoveItem() {
   };
 
   // Get filtered storage locations for selected warehouse (for source and destination)
-  const warehouseLocations = selectedWarehouse
+  const warehouseLocations = useMemo(() => selectedWarehouse
     ? storageLocations.filter((loc) => loc.warehouse_id === selectedWarehouse.id)
-    : [];
+    : [], [selectedWarehouse, storageLocations])
 
   // Get deduplicated aisles for selected warehouse
   const availableAisles = useMemo(() => {
