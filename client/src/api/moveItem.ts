@@ -1,6 +1,6 @@
 import { Warehouse } from '../types/Warehouse';
 import { StorageLocation } from '../types/StorageLocation';
-import { Item } from '../types/Item';
+import { Item, ItemGroup } from '../types/Item';
 import { InventoryMovement } from '../types/InventoryMovement';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
@@ -90,4 +90,28 @@ export async function updateItemLocation(itemId: string, locationId: string): Pr
   });
   if (!response.ok) throw new Error('Failed to update item location');
   return response.json();
+}
+
+export function groupItemsByLocation(items: Item[]): ItemGroup[] {
+  const groupMap = new Map<string, ItemGroup>();
+
+  items.forEach(item => {
+    const key = `${item.warehouse}|${item.current_location_id}|${item.name}`;
+
+    if (groupMap.has(key)) {
+      const group = groupMap.get(key)!;
+      group.quantity += 1;
+    } else {
+      groupMap.set(key, {
+        current_location_id: item.current_location_id,
+        warehouse: item.warehouse,
+        name: item.name ?? "Unknown",
+        quantity: 1,
+      });
+    }
+  });
+
+  return Array.from(groupMap.values()).sort((a, b) =>
+    a.name.localeCompare(b.name)
+  );
 }

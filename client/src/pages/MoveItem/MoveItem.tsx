@@ -19,12 +19,11 @@ import {
   getItemsByLocation,
   createInventoryMovement,
   updateItemLocation,
-  createItem,
-  updateItemQuantity,
+  groupItemsByLocation,
 } from '../../api/moveItem';
 import { Warehouse } from '../../types/Warehouse';
 import { StorageLocation } from '../../types/StorageLocation';
-import { Item } from '../../types/Item';
+import { Item, ItemGroup } from '../../types/Item';
 import {
   MoveItemFormLabel,
   SourceSlotOptionContainer,
@@ -40,7 +39,8 @@ export default function MoveItem() {
   const [selectedWarehouse, setSelectedWarehouse] = useState<Warehouse | null>(null);
   const [selectedSourceSlot, setSelectedSourceSlot] = useState<StorageLocation | null>(null);
   const [itemsInSourceSlot, setItemsInSourceSlot] = useState<Item[]>([]);
-  const [selectedItem, setSelectedItem] = useState<Item | null>(null);
+  const [itemGroupsInSourceSlot, setItemGroupsInSourceSlot] = useState<ItemGroup[]>([]);
+  const [selectedItemGroup, setSelectedItemGroup] = useState<ItemGroup | null>(null);
   const [selectedAisle, setSelectedAisle] = useState<string | null>(null);
   const [selectedFixture, setSelectedFixture] = useState<string | null>(null);
   const [notes, setNotes] = useState('');
@@ -100,16 +100,22 @@ export default function MoveItem() {
     async function fetchItemsInSlot() {
       if (!selectedSourceSlot) {
         setItemsInSourceSlot([]);
+        setItemGroupsInSourceSlot([]);
         return;
       }
 
       try {
         const items = await getItemsByLocation(selectedSourceSlot.id);
         setItemsInSourceSlot(items);
+
+        // Generate groups for display
+        const groups = groupItemsByLocation(items);
+        setItemGroupsInSourceSlot(groups);
       } catch (err) {
         console.error('Error fetching items:', err);
         setError('Failed to load items for the selected slot.');
         setItemsInSourceSlot([]);
+        setItemGroupsInSourceSlot([]);
       }
     }
 
@@ -276,16 +282,16 @@ export default function MoveItem() {
 
   // Helper to check if quantity is valid
   const isQuantityValid = (): boolean => {
-    if (!selectedItem) return false;
-    return quantityToMove >= 1 && quantityToMove <= selectedItem.quantity;
+    if (!selectedItemGroup) return false;
+    return quantityToMove >= 1 && quantityToMove <= selectedItemGroup.quantity;
   };
 
   // Helper to get quantity error message
   const getQuantityError = (): string => {
-    if (!selectedItem) return '';
+    if (!selectedItemGroup) return '';
     if (quantityToMove < 1) return 'Quantity must be at least 1';
-    if (quantityToMove > selectedItem.quantity) {
-      return `Cannot exceed ${selectedItem.quantity} available`;
+    if (quantityToMove > selectedItemGroup.quantity) {
+      return `Cannot exceed ${selectedItemGroup.quantity} available`;
     }
     return '';
   };
@@ -307,7 +313,7 @@ export default function MoveItem() {
       setError('Please select a source slot.');
       return;
     }
-    if (!selectedItem) {
+    if (!selectedItemGroup) {
       setError('Please select an item.');
       return;
     }
@@ -315,8 +321,8 @@ export default function MoveItem() {
       setError('Please enter a valid quantity (at least 1).');
       return;
     }
-    if (quantityToMove > selectedItem.quantity) {
-      setError(`Cannot move more than ${selectedItem.quantity} available.`);
+    if (quantityToMove > selectedItemGroup.quantity) {
+      setError(`Cannot move more than ${selectedItemGroup.quantity} available.`);
       return;
     }
     if (!selectedAisle || !selectedFixture) {
@@ -339,68 +345,48 @@ export default function MoveItem() {
     setSuccess('');
 
     try {
-      const isFullMove = quantityToMove === selectedItem.quantity;
+      const itemsInGroup = itemsInSourceSlot.filter(
+        item =>
+          item.warehouse === selectedItemGroup.warehouse &&
+          item.current_location_id === selectedItemGroup.current_location_id &&
+          item.name === selectedItemGroup.name
+      );
 
-      if (isFullMove) {
-        // Case 1: Moving entire item quantity
-        // Just update location, no need to split
-        await updateItemLocation(selectedItem.id, destinationLocation.id);
+      const itemsToMove = itemsInGroup
+        .sort((a, b) => a.id.localeCompare(b.id))
+        .slice(0, quantityToMove);
 
-        // Record movement with source item ID
-        await createInventoryMovement({
-          inventory_action: 'MOVE',
-          item_id: selectedItem.id,
-          product_id: selectedItem.product_id,
-          from_location_id: selectedItem.current_location_id,
-          to_location_id: destinationLocation.id,
-          quantity: quantityToMove,
-          performed_by: 'b4974f63-ee89-42a1-bdb3-ce9df255c682', // TODO: Get user ID
-          note: notes || undefined,
-        });
-      } else {
-        // Case 2: Partial move - need to split item
-
-        // Create new item at destination with partial quantity
-        const newItem = await createItem({
-          name: selectedItem.name,
-          product_id: selectedItem.product_id,
-          quantity: quantityToMove,
-          current_location_id: destinationLocation.id,
-          status: selectedItem.status,
-          created_by: 'b4974f63-ee89-42a1-bdb3-ce9df255c682', // TODO: Get user ID
-          warehouse: selectedItem.warehouse,
-          category: selectedItem.category,
-          item_limit:
-            selectedItem.item_limit != null
-              ? Number(selectedItem.item_limit)
-              : selectedItem.item_limit,
-          value: selectedItem.value,
-          limbo: selectedItem.limbo,
-          notes: selectedItem.notes,
-        });
-
-        // Reduce source item quantity
-        const remainingQuantity = selectedItem.quantity - quantityToMove;
-        await updateItemQuantity(selectedItem.id, remainingQuantity);
-
-        // Record movement with NEW item's ID (not source item's ID!)
-        await createInventoryMovement({
-          inventory_action: 'MOVE',
-          item_id: newItem.id,
-          product_id: selectedItem.product_id,
-          from_location_id: selectedItem.current_location_id,
-          to_location_id: destinationLocation.id,
-          quantity: quantityToMove,
-          performed_by: 'b4974f63-ee89-42a1-bdb3-ce9df255c682', // TODO: Get user ID
-          note: notes || undefined,
-        });
+      if (itemsToMove.length !== quantityToMove) {
+        throw new Error('Insufficient items in group to move');
       }
+
+      // TODO: Replace with batch update API endpoint when available
+      await Promise.all(
+        itemsToMove.map(item =>
+          updateItemLocation(item.id, destinationLocation.id)
+        )
+      );
+
+      // Record one inventory movement for the entire operation
+      // Use the first item's ID and product_id as representative
+      const representativeItem = itemsToMove[0];
+      await createInventoryMovement({
+        inventory_action: 'MOVE',
+        item_id: representativeItem.id,
+        product_id: representativeItem.product_id,
+        from_location_id: selectedSourceSlot.id,
+        to_location_id: destinationLocation.id,
+        quantity: quantityToMove,
+        performed_by: 'b4974f63-ee89-42a1-bdb3-ce9df255c682', // TODO: Get user ID
+        note: notes || undefined,
+      });
 
       setSuccess('Item moved successfully!');
       // Reset form (keep warehouse selected for convenience)
       setSelectedSourceSlot(null);
       setItemsInSourceSlot([]);
-      setSelectedItem(null);
+      setItemGroupsInSourceSlot([]);
+      setSelectedItemGroup(null);
       setSelectedAisle(null);
       setSelectedFixture(null);
       setNotes('');
@@ -408,8 +394,7 @@ export default function MoveItem() {
     } catch (err) {
       console.error('Error moving item:', err);
       setError(
-        'Failed to move item. Please check the inventory and try again. ' +
-          'If the item was partially updated, you may need to verify the inventory manually.'
+        'Failed to move item. Please check the inventory and try again.'
       );
     } finally {
       setSubmitting(false);
@@ -465,7 +450,8 @@ export default function MoveItem() {
               // Cascade reset
               setSelectedSourceSlot(null);
               setItemsInSourceSlot([]);
-              setSelectedItem(null);
+              setItemGroupsInSourceSlot([]);
+              setSelectedItemGroup(null);
               setSelectedAisle(null);
               setSelectedFixture(null);
               setQuantityToMove(0);
@@ -505,7 +491,8 @@ export default function MoveItem() {
               onChange={(_, newValue) => {
                 setSelectedSourceSlot(newValue);
                 setItemsInSourceSlot([]);
-                setSelectedItem(null);
+                setItemGroupsInSourceSlot([]);
+                setSelectedItemGroup(null);
                 setQuantityToMove(0);
                 setError('');
               }}
@@ -524,15 +511,15 @@ export default function MoveItem() {
             />
           </FormControl>
 
-          <FormControl fullWidth disabled={!selectedSourceSlot || itemsInSourceSlot.length === 0}>
+          <FormControl fullWidth disabled={!selectedSourceSlot || itemGroupsInSourceSlot.length === 0}>
             <MoveItemFormLabel htmlFor="item-in-slot-select">Item in Source Slot</MoveItemFormLabel>
             <Autocomplete
               id="item-in-slot-select"
-              options={itemsInSourceSlot}
-              getOptionLabel={(option) => `${option.name} - Qty: ${option.quantity}`} // TODO: render a nicer tile with more information
-              value={selectedItem}
+              options={itemGroupsInSourceSlot}
+              getOptionLabel={(option) => `${option.name} - Qty: ${option.quantity} items`}
+              value={selectedItemGroup}
               onChange={(_, newValue) => {
-                setSelectedItem(newValue);
+                setSelectedItemGroup(newValue);
                 // Auto-populate quantity with the full available quantity
                 setQuantityToMove(newValue?.quantity ?? 0);
                 setError('');
@@ -546,14 +533,14 @@ export default function MoveItem() {
                 />
               )}
               noOptionsText="No matching items found"
-              disabled={!selectedSourceSlot || itemsInSourceSlot.length === 0}
+              disabled={!selectedSourceSlot || itemGroupsInSourceSlot.length === 0}
             />
           </FormControl>
 
           <FormControl
             fullWidth
-            disabled={!selectedItem}
-            error={selectedItem ? !isQuantityValid() : false}
+            disabled={!selectedItemGroup}
+            error={selectedItemGroup ? !isQuantityValid() : false}
           >
             <MoveItemFormLabel htmlFor="quantity-input">Quantity to Move</MoveItemFormLabel>
             <TextField
@@ -565,16 +552,16 @@ export default function MoveItem() {
                 const value = parseInt(e.target.value, 10);
                 setQuantityToMove(isNaN(value) ? 0 : value);
               }}
-              placeholder={!selectedItem ? 'Select item first' : 'Enter quantity'}
-              disabled={!selectedItem}
-              error={selectedItem ? !isQuantityValid() : false}
+              placeholder={!selectedItemGroup ? 'Select item first' : 'Enter quantity'}
+              disabled={!selectedItemGroup}
+              error={selectedItemGroup ? !isQuantityValid() : false}
               helperText={
-                selectedItem ? getQuantityError() || `${selectedItem.quantity} available` : ''
+                selectedItemGroup ? getQuantityError() || `${selectedItemGroup.quantity} items available` : ''
               }
               slotProps={{
                 htmlInput: {
                   min: 1,
-                  max: selectedItem?.quantity ?? 0,
+                  max: selectedItemGroup?.quantity ?? 0,
                   step: 1,
                 },
               }}
@@ -669,7 +656,8 @@ export default function MoveItem() {
                 setSelectedWarehouse(null);
                 setSelectedSourceSlot(null);
                 setItemsInSourceSlot([]);
-                setSelectedItem(null);
+                setItemGroupsInSourceSlot([]);
+                setSelectedItemGroup(null);
                 setSelectedAisle(null);
                 setSelectedFixture(null);
                 setNotes('');
@@ -688,7 +676,7 @@ export default function MoveItem() {
                 submitting ||
                 !selectedWarehouse ||
                 !selectedSourceSlot ||
-                !selectedItem ||
+                !selectedItemGroup ||
                 !isQuantityValid() ||
                 !selectedAisle ||
                 !selectedFixture
