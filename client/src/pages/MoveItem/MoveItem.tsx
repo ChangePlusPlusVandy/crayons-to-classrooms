@@ -346,7 +346,7 @@ export default function MoveItem() {
 
     try {
       const itemsInGroup = itemsInSourceSlot.filter(
-        item =>
+        (item) =>
           item.warehouse === selectedItemGroup.warehouse &&
           item.current_location_id === selectedItemGroup.current_location_id &&
           item.name === selectedItemGroup.name
@@ -362,9 +362,7 @@ export default function MoveItem() {
 
       // TODO: Replace with batch update API endpoint when available
       await Promise.all(
-        itemsToMove.map(item =>
-          updateItemLocation(item.id, destinationLocation.id)
-        )
+        itemsToMove.map((item) => updateItemLocation(item.id, destinationLocation.id))
       );
 
       // Record one inventory movement for the entire operation
@@ -393,9 +391,7 @@ export default function MoveItem() {
       setQuantityToMove(0);
     } catch (err) {
       console.error('Error moving item:', err);
-      setError(
-        'Failed to move item. Please check the inventory and try again.'
-      );
+      setError('Failed to move item. Please check the inventory and try again.');
     } finally {
       setSubmitting(false);
     }
@@ -511,7 +507,10 @@ export default function MoveItem() {
             />
           </FormControl>
 
-          <FormControl fullWidth disabled={!selectedSourceSlot || itemGroupsInSourceSlot.length === 0}>
+          <FormControl
+            fullWidth
+            disabled={!selectedSourceSlot || itemGroupsInSourceSlot.length === 0}
+          >
             <MoveItemFormLabel htmlFor="item-in-slot-select">Item in Source Slot</MoveItemFormLabel>
             <Autocomplete
               id="item-in-slot-select"
@@ -556,7 +555,9 @@ export default function MoveItem() {
               disabled={!selectedItemGroup}
               error={selectedItemGroup ? !isQuantityValid() : false}
               helperText={
-                selectedItemGroup ? getQuantityError() || `${selectedItemGroup.quantity} items available` : ''
+                selectedItemGroup
+                  ? getQuantityError() || `${selectedItemGroup.quantity} items available`
+                  : ''
               }
               slotProps={{
                 htmlInput: {
@@ -571,70 +572,77 @@ export default function MoveItem() {
           <Box sx={{ display: 'flex', justifyContent: 'center', my: 2 }}>
             <ArrowDownwardIcon sx={{ fontSize: '2rem', color: 'text.secondary' }} />
           </Box>
+          <Stack spacing={0}>
+            <FormControl fullWidth disabled={!selectedWarehouse}>
+              <MoveItemFormLabel htmlFor="aisle-input">To Slot</MoveItemFormLabel>
+              <Autocomplete
+                id="aisle-input"
+                options={availableAisles}
+                getOptionLabel={(option) => option}
+                value={selectedAisle}
+                onChange={(_, newValue) => {
+                  setSelectedAisle(newValue);
+                  // Cascade: clear fixture when aisle changes
+                  setSelectedFixture(null);
+                  setError('');
+                }}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    placeholder={!selectedWarehouse ? 'Select warehouse first' : 'Select aisle'}
+                  />
+                )}
+                disabled={!selectedWarehouse}
+                noOptionsText="No aisles available"
+              />
+              <Button
+                startIcon={<AddIcon />}
+                sx={{
+                  justifyContent: 'flex-start',
+                  textTransform: 'none',
+                  color: 'primary.main',
+                  marginTop: 0,
+                  '&:hover': {
+                    backgroundColor: 'transparent',
+                  },
+                }}
+                onClick={() => {
+                  // Does nothing for now
+                }}
+                disabled={!selectedWarehouse}
+              >
+                New Slot
+              </Button>
+            </FormControl>
 
-          <FormControl fullWidth disabled={!selectedWarehouse}>
-            <MoveItemFormLabel htmlFor="aisle-input">To Slot</MoveItemFormLabel>
-            <Autocomplete
-              id="aisle-input"
-              options={availableAisles}
-              getOptionLabel={(option) => option}
-              value={selectedAisle}
-              onChange={(_, newValue) => {
-                setSelectedAisle(newValue);
-                // Cascade: clear fixture when aisle changes
-                setSelectedFixture(null);
-                setError('');
-              }}
-              renderInput={(params) => (
-                <TextField
-                  {...params}
-                  placeholder={!selectedWarehouse ? 'Select warehouse first' : 'Select aisle'}
-                />
-              )}
-              disabled={!selectedWarehouse}
-              noOptionsText="No aisles available"
-            />
-          </FormControl>
-
-          <FormControl fullWidth disabled={!selectedAisle}>
-            <MoveItemFormLabel htmlFor="fixture-input">Fixture</MoveItemFormLabel>
-            <Autocomplete
-              id="fixture-input"
-              options={availableFixtures}
-              getOptionLabel={(option) => option}
-              value={selectedFixture}
-              onChange={(_, newValue) => {
-                setSelectedFixture(newValue);
-                setError('');
-              }}
-              renderInput={(params) => (
-                <TextField
-                  {...params}
-                  placeholder={!selectedAisle ? 'Select aisle first' : 'Select fixture'}
-                />
-              )}
+            <FormControl
+              fullWidth
               disabled={!selectedAisle}
-              noOptionsText="No fixtures available"
-            />
-            <Button
-              startIcon={<AddIcon />}
               sx={{
-                mt: 1,
-                justifyContent: 'flex-start',
-                textTransform: 'none',
-                color: 'primary.main',
-                '&:hover': {
-                  backgroundColor: 'transparent',
-                },
+                marginTop: 0,
               }}
-              onClick={() => {
-                // Does nothing for now
-              }}
-              disabled={!selectedWarehouse}
             >
-              New Slot
-            </Button>
-          </FormControl>
+              <MoveItemFormLabel htmlFor="fixture-input">Fixture</MoveItemFormLabel>
+              <Autocomplete
+                id="fixture-input"
+                options={availableFixtures}
+                getOptionLabel={(option) => option}
+                value={selectedFixture}
+                onChange={(_, newValue) => {
+                  setSelectedFixture(newValue);
+                  setError('');
+                }}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    placeholder={!selectedAisle ? 'Select aisle first' : 'Select fixture'}
+                  />
+                )}
+                disabled={!selectedAisle}
+                noOptionsText="No fixtures available"
+              />
+            </FormControl>
+          </Stack>
           <FormControl fullWidth>
             <MoveItemFormLabel htmlFor="notes-input">Notes</MoveItemFormLabel>
             <TextField
