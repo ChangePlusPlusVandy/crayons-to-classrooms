@@ -43,8 +43,6 @@ const handleValidationError = (error: unknown, res: Response) => {
   return res.status(500).json({ error: 'Internal server error' });
 };
 
-//TODO: Implement stock updates for items with the same name
-
 /**
  * Retrieves all items from the database.
  *
@@ -100,7 +98,7 @@ export const getItemInfoById = async (req: Request, res: Response) => {
 
 
 /**
- * Retrieves item with a specific name.
+ * Retrieves item info with a specific name.
  *
  * @param {Request} req - Express request object with:
  *   - name: Name of the items to filter by (in params)
@@ -215,7 +213,6 @@ export const updateItemInfo = async (req: Request, res: Response) => {
       return;
     }
     
-    //TODO: Implement stock updates for items with the same name
     return res.json(rows[0]);
   } catch (error) {
     if (error instanceof ZodError) {
@@ -247,15 +244,13 @@ export const deleteItemInfo = async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Item not found' });
     }
 
-    const itemName = itemToDelete.rows[0].name;
-
     const deletedItem = await pool.query('DELETE FROM item_info WHERE id = $1 RETURNING *', [id]);
 
     if (!countRows(deletedItem.rows, res)) {
       return;
     }
 
-    // TODO: Update stock for all remaining items with this name.
+    
 
 
     return res.json({ message: 'Item info deleted successfully' });

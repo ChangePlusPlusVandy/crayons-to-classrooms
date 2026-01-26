@@ -16,7 +16,8 @@ export const nameParamSchema = z.object({
 
 /**
  * Schema for validating item creation
- * Requires: name, item_limit, stock, last_known_fixture, last_known_location_code, time_last_updated, notes
+ * Requires: name, item_limit, stock, last_known_location_code, time_last_updated
+ * Optional: last_known_fixture, notes
  */
 export const createItemInfoSchema = z.object({
   name: z.string().min(1, 'Name is required').max(255, 'Name must be less than 255 characters'),

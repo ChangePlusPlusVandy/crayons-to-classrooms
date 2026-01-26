@@ -47,16 +47,42 @@ const handleValidationError = (error: unknown, res: Response) => {
   return res.status(500).json({ error: 'Internal server error' });
 };
 
-const DUMMY_FIXTURE = 'DUMMY_FIXTURE';
-const DUMMY_LOCATION_CODE = 'DUMMY_LOCATION';
+
+type DbClient = {
+  query: (text: string, params?: any[]) => Promise<any>;
+};
+
+const getLocationInfo = async (locationId?: string | null) => {
+  if (!locationId) {
+    return { fixture: null, locationCode: null };
+  }
+
+  const locationResult = await pool.query(
+    'SELECT fixture, location_code FROM storage_locations WHERE id = $1',
+    [locationId]
+  );
+
+  if (locationResult.rows.length === 0) {
+    return { fixture: null, locationCode: null };
+  }
+
+  return {
+    fixture: locationResult.rows[0].fixture ?? null,
+    locationCode: locationResult.rows[0].location_code ?? null,
+  };
+};
 
 const syncItemInfoStock = async (
   itemName: string,
+  itemLimit: number | undefined,
+  lastKnownFixture: string | null | undefined,
+  lastKnownLocationCode: string | null | undefined,
   stockDelta: number,
-  createIfMissing: boolean
+  createIfMissing: boolean,
+  db: DbClient = pool
 ) => {
   try {
-    const existingInfo = await pool.query(
+    const existingInfo = await db.query(
       'SELECT stock FROM item_info WHERE name = $1',
       [itemName]
     );
@@ -66,14 +92,14 @@ const syncItemInfoStock = async (
         return;
       }
 
-      await pool.query(
+      await db.query(
         'INSERT INTO item_info (name, item_limit, stock, last_known_fixture, last_known_location_code, time_last_updated, notes) VALUES ($1, $2, $3, $4, $5, NOW(), $6)',
         [
           itemName,
-          0,
+          itemLimit ?? 0,
           1,
-          DUMMY_FIXTURE,
-          DUMMY_LOCATION_CODE,
+          lastKnownFixture ?? null,
+          lastKnownLocationCode ?? null,
           null,
         ]
       );
@@ -83,14 +109,17 @@ const syncItemInfoStock = async (
     const currentStock = Number.parseInt(existingInfo.rows[0].stock, 10);
     const nextStock = currentStock + stockDelta;
 
-    await pool.query(
-      'UPDATE item_info SET stock = $1, last_known_fixture = $2, last_known_location_code = $3, time_last_updated = NOW() WHERE name = $4',
-      [nextStock, DUMMY_FIXTURE, DUMMY_LOCATION_CODE, itemName]
+    await db.query(
+      'UPDATE item_info SET stock = $1, last_known_fixture = COALESCE($2, last_known_fixture), last_known_location_code = COALESCE($3, last_known_location_code), time_last_updated = NOW() WHERE name = $4',
+      [nextStock, lastKnownFixture ?? null, lastKnownLocationCode ?? null, itemName]
     );
   } catch (error) {
     console.error('Error syncing item info stock:', {
       itemName,
       stockDelta,
+      itemLimit,
+      lastKnownFixture,
+      lastKnownLocationCode,
       createIfMissing,
       error,
     });
@@ -364,7 +393,15 @@ export const createItem = async (req: Request, res: Response) => {
       [name, product_id, quantity, current_location_id ?? null, status, created_by, warehouse, category ?? null, item_limit ?? null, value, limbo ?? false, notes ?? null]
     );
 
-    await syncItemInfoStock(name, 1, true);
+    const { fixture, locationCode } = await getLocationInfo(current_location_id ?? null);
+    await syncItemInfoStock(
+      name,
+      item_limit ?? 0,
+      fixture,
+      locationCode,
+      1,
+      true
+    );
 
 
     res.status(201).json(newItem.rows[0]);
@@ -401,12 +438,14 @@ export const updateItem = async (req: Request, res: Response) => {
 
 
 
-    const currentItem = await pool.query('SELECT name FROM items WHERE id = $1', [id]);
+    const currentItem = await pool.query('SELECT name, current_location_id FROM items WHERE id = $1', [id]);
     if (currentItem.rows.length === 0) {
       return res.status(404).json({ error: 'Item not found' });
     }
     const oldName = currentItem.rows[0].name as string;
     const newName = validatedData.name ?? oldName;
+    const oldLocationId = currentItem.rows[0].current_location_id as string | null;
+    const newLocationId = validatedData.current_location_id ?? oldLocationId;
 
     // If product_id is being updated, verify it exists
     if (validatedData.product_id) {
@@ -429,9 +468,9 @@ export const updateItem = async (req: Request, res: Response) => {
     }
 
     // If current_location_id is being updated, verify it exists
-    if (validatedData.current_location_id) {
+    if (newLocationId) {
       const locationCheck = await pool.query('SELECT id FROM storage_locations WHERE id = $1', [
-        validatedData.current_location_id,
+        newLocationId,
       ]);
       if (locationCheck.rows.length === 0) {
         return res.status(400).json({ error: 'Invalid current_location_id' });
@@ -463,9 +502,10 @@ export const updateItem = async (req: Request, res: Response) => {
       return;
     }
 
+    const { fixture, locationCode } = await getLocationInfo(newLocationId ?? null);
     if (newName !== oldName) {
-      await syncItemInfoStock(oldName, -1, false);
-      await syncItemInfoStock(newName, 1, true);
+      await syncItemInfoStock(oldName, 0, undefined, undefined, -1, false);
+      await syncItemInfoStock(newName, 0, fixture, locationCode, 1, true);
     }
     return res.json(rows[0]);
   } catch (error) {
@@ -490,26 +530,37 @@ export const updateItem = async (req: Request, res: Response) => {
 export const deleteItem = async (req: Request, res: Response) => {
   try {
     const { id } = itemIdParamSchema.parse(req.params);
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
 
-    // Get the item's name before deleting so we can update stock
-    const itemToDelete = await pool.query('SELECT name FROM items WHERE id = $1', [id]);
-    
-    if (itemToDelete.rows.length === 0) {
-      return res.status(404).json({ error: 'Item not found' });
+      // Get the item's name before deleting so we can update stock
+      const itemToDelete = await client.query('SELECT name FROM items WHERE id = $1', [id]);
+
+      if (itemToDelete.rows.length === 0) {
+        await client.query('ROLLBACK');
+        return res.status(404).json({ error: 'Item not found' });
+      }
+
+      const itemName = itemToDelete.rows[0].name;
+
+      const deletedItem = await client.query('DELETE FROM items WHERE id = $1 RETURNING *', [id]);
+
+      if (!countRows(deletedItem.rows, res)) {
+        await client.query('ROLLBACK');
+        return;
+      }
+
+      await syncItemInfoStock(itemName, 0, undefined, undefined, -1, false, client);
+
+      await client.query('COMMIT');
+      return res.json({ message: 'Item deleted successfully' });
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
     }
-
-    const itemName = itemToDelete.rows[0].name;
-
-    const deletedItem = await pool.query('DELETE FROM items WHERE id = $1 RETURNING *', [id]);
-
-    if (!countRows(deletedItem.rows, res)) {
-      return;
-    }
-
-    await syncItemInfoStock(itemName, -1, false);
-
-
-    return res.json({ message: 'Item deleted successfully' });
   } catch (error) {
     if (error instanceof ZodError) {
       return handleValidationError(error, res);
