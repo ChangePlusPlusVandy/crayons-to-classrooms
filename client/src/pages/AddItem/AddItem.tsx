@@ -194,40 +194,53 @@ export default function AddItem() {
     setSuccess('');
 
     try {
-      // Create the new item using product values
+      // Create the new items using product values
+      // Each item has stock: 1, and we create as many items as quantityToAdd
       const itemLimit = typeof selectedProduct.item_limit === 'string'
         ? parseInt(selectedProduct.item_limit, 10)
         : selectedProduct.item_limit;
 
-      const newItem = await createItem({
-        name: selectedProduct.name,
-        product_id: selectedProduct.id,
-        quantity: 1, // Default pack size
-        stock: quantityToAdd as number,
-        current_location_id: destinationLocation.id,
-        status: 'active',
-        created_by: 'b4974f63-ee89-42a1-bdb3-ce9df255c682', // TODO: Get user ID from auth context
-        warehouse: selectedWarehouse.id,
-        category: selectedProduct.category || undefined,
-        item_limit: itemLimit || undefined,
-        value: selectedProduct.value,
-        limbo: false,
-        notes: notes || undefined,
-      });
+      const quantity = quantityToAdd as number;
+      const itemPromises = [];
 
-      // Create the inventory movement
+      // Create individual item entries (one per quantity)
+      for (let i = 0; i < quantity; i++) {
+        itemPromises.push(
+          createItem({
+            name: selectedProduct.name,
+            product_id: selectedProduct.id,
+            quantity: 1,
+            stock: 1,
+            current_location_id: destinationLocation.id,
+            status: 'active',
+            created_by: 'b4974f63-ee89-42a1-bdb3-ce9df255c682', // TODO: Get user ID from auth context
+            warehouse: selectedWarehouse.id,
+            category: selectedProduct.category || undefined,
+            item_limit: itemLimit || undefined,
+            value: selectedProduct.value,
+            limbo: false,
+            notes: notes || undefined,
+          })
+        );
+      }
+
+      // Create all items
+      const newItems = await Promise.all(itemPromises);
+
+      // Create a single inventory movement with the total quantity
+      // Use the first item's ID for the movement record
       await createInventoryMovement({
         inventory_action: 'ADD',
-        item_id: newItem.id,
+        item_id: newItems[0].id,
         product_id: selectedProduct.id,
         from_location_id: null,
         to_location_id: destinationLocation.id,
-        quantity: quantityToAdd as number,
+        quantity: quantity,
         performed_by: 'b4974f63-ee89-42a1-bdb3-ce9df255c682', // TODO: Get user ID from auth context
         note: notes || undefined,
       });
 
-      setSuccess('Item added successfully!');
+      setSuccess(`${quantity} item${quantity > 1 ? 's' : ''} added successfully!`);
 
       // Reset form (keep warehouse selected for convenience)
       setSelectedProduct(null);
