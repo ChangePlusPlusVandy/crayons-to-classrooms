@@ -535,12 +535,12 @@ export const deleteItem = async (req: Request, res: Response) => {
       await client.query('BEGIN');
 
       const deletedItem = await client.query('DELETE FROM items WHERE id = $1 RETURNING *', [id]);
-      const itemName = deletedItem.rows[0].name;
       if (!countRows(deletedItem.rows, res)) {
         await client.query('ROLLBACK');
         return;
       }
 
+      const itemName = deletedItem.rows[0].name;
       await syncItemInfoStock(itemName, 0, undefined, undefined, -1, false, client);
 
       await client.query('COMMIT');
