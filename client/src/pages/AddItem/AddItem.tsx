@@ -12,6 +12,7 @@ import {
   Stack,
   FormControl,
 } from '@mui/material';
+import AddIcon from '@mui/icons-material/Add';
 import {
   getProducts,
   getStorageLocations,
@@ -375,6 +376,23 @@ export default function AddItem() {
               )}
               noOptionsText="No matching products found"
             />
+            <Button
+              startIcon={<AddIcon />}
+              sx={{
+                justifyContent: 'flex-start',
+                textTransform: 'none',
+                color: 'primary.main',
+                marginTop: 0,
+                '&:hover': {
+                  backgroundColor: 'transparent',
+                },
+              }}
+              onClick={() => {
+                // TODO: Add new item name functionality
+              }}
+            >
+              New Item Name
+            </Button>
           </FormControl>
 
           {/* Category */}
@@ -387,6 +405,23 @@ export default function AddItem() {
               onChange={(e) => setCategory(e.target.value)}
               placeholder="Enter category"
             />
+            <Button
+              startIcon={<AddIcon />}
+              sx={{
+                justifyContent: 'flex-start',
+                textTransform: 'none',
+                color: 'primary.main',
+                marginTop: 0,
+                '&:hover': {
+                  backgroundColor: 'transparent',
+                },
+              }}
+              onClick={() => {
+                // TODO: Add new category functionality
+              }}
+            >
+              New Category
+            </Button>
           </FormControl>
 
           {/* Limit */}
