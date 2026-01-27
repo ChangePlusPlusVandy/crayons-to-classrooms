@@ -39,10 +39,6 @@ export default function AddItem() {
   // Form states
   const [selectedWarehouse, setSelectedWarehouse] = useState<Warehouse | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [category, setCategory] = useState('');
-  const [itemLimit, setItemLimit] = useState<number | ''>('');
-  const [value, setValue] = useState<number | ''>('');
-  const [packSize, setPackSize] = useState<number | ''>('');
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   const [selectedFixture, setSelectedFixture] = useState<string | null>(null);
   const [quantityToAdd, setQuantityToAdd] = useState<number | ''>('');
@@ -73,21 +69,6 @@ export default function AddItem() {
 
     fetchInitialData();
   }, []);
-
-  // Autopopulate fields when product is selected
-  useEffect(() => {
-    if (selectedProduct) {
-      setCategory(selectedProduct.category || '');
-      setItemLimit(
-        typeof selectedProduct.item_limit === 'string'
-          ? parseInt(selectedProduct.item_limit, 10) || ''
-          : selectedProduct.item_limit || ''
-      );
-      setValue(selectedProduct.value || '');
-      // Pack size comes from product's unit quantity - using a default of 1 if not specified
-      setPackSize(1);
-    }
-  }, [selectedProduct]);
 
   // Get filtered storage locations for selected warehouse
   const warehouseLocations = selectedWarehouse
@@ -167,20 +148,13 @@ export default function AddItem() {
     return typeof quantityToAdd === 'number' && quantityToAdd >= 1;
   };
 
-  const isPackSizeValid = (): boolean => {
-    return typeof packSize === 'number' && packSize >= 1;
-  };
-
   const isFormValid = (): boolean => {
     return (
       !!selectedWarehouse &&
       !!selectedProduct &&
       !!selectedSlot &&
       !!selectedFixture &&
-      isQuantityValid() &&
-      isPackSizeValid() &&
-      typeof value === 'number' &&
-      value >= 0
+      isQuantityValid()
     );
   };
 
@@ -210,16 +184,8 @@ export default function AddItem() {
       setError('Invalid destination location.');
       return;
     }
-    if (!isPackSizeValid()) {
-      setError('Please enter a valid pack size (at least 1).');
-      return;
-    }
     if (!isQuantityValid()) {
       setError('Please enter a valid quantity to add (at least 1).');
-      return;
-    }
-    if (typeof value !== 'number' || value < 0) {
-      setError('Please enter a valid value.');
       return;
     }
 
@@ -228,19 +194,23 @@ export default function AddItem() {
     setSuccess('');
 
     try {
-      // Create the new item
+      // Create the new item using product values
+      const itemLimit = typeof selectedProduct.item_limit === 'string'
+        ? parseInt(selectedProduct.item_limit, 10)
+        : selectedProduct.item_limit;
+
       const newItem = await createItem({
         name: selectedProduct.name,
         product_id: selectedProduct.id,
-        quantity: packSize as number,
+        quantity: 1, // Default pack size
         stock: quantityToAdd as number,
         current_location_id: destinationLocation.id,
         status: 'active',
         created_by: 'b4974f63-ee89-42a1-bdb3-ce9df255c682', // TODO: Get user ID from auth context
         warehouse: selectedWarehouse.id,
-        category: category || undefined,
-        item_limit: typeof itemLimit === 'number' ? itemLimit : undefined,
-        value: value as number,
+        category: selectedProduct.category || undefined,
+        item_limit: itemLimit || undefined,
+        value: selectedProduct.value,
         limbo: false,
         notes: notes || undefined,
       });
@@ -261,10 +231,6 @@ export default function AddItem() {
 
       // Reset form (keep warehouse selected for convenience)
       setSelectedProduct(null);
-      setCategory('');
-      setItemLimit('');
-      setValue('');
-      setPackSize('');
       setSelectedSlot(null);
       setSelectedFixture(null);
       setQuantityToAdd('');
@@ -395,105 +361,6 @@ export default function AddItem() {
             </Button>
           </FormControl>
 
-          {/* Category */}
-          <FormControl fullWidth>
-            <AddItemFormLabel htmlFor="category-input">Category</AddItemFormLabel>
-            <TextField
-              id="category-input"
-              fullWidth
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              placeholder="Enter category"
-            />
-            <Button
-              startIcon={<AddIcon />}
-              sx={{
-                justifyContent: 'flex-start',
-                textTransform: 'none',
-                color: 'primary.main',
-                marginTop: 0,
-                '&:hover': {
-                  backgroundColor: 'transparent',
-                },
-              }}
-              onClick={() => {
-                // TODO: Add new category functionality
-              }}
-            >
-              New Category
-            </Button>
-          </FormControl>
-
-          {/* Limit */}
-          <FormControl fullWidth>
-            <AddItemFormLabel htmlFor="limit-input">Limit</AddItemFormLabel>
-            <TextField
-              id="limit-input"
-              type="number"
-              fullWidth
-              value={itemLimit}
-              onChange={(e) => {
-                const val = parseInt(e.target.value, 10);
-                setItemLimit(isNaN(val) ? '' : val);
-              }}
-              placeholder="Enter item limit"
-              slotProps={{
-                htmlInput: {
-                  min: 0,
-                  step: 1,
-                },
-              }}
-            />
-          </FormControl>
-
-          {/* Value */}
-          <FormControl fullWidth>
-            <AddItemFormLabel htmlFor="value-input">Value</AddItemFormLabel>
-            <TextField
-              id="value-input"
-              type="number"
-              fullWidth
-              value={value}
-              onChange={(e) => {
-                const val = parseFloat(e.target.value);
-                setValue(isNaN(val) ? '' : val);
-              }}
-              placeholder="Enter value"
-              slotProps={{
-                htmlInput: {
-                  min: 0,
-                  step: 0.01,
-                },
-              }}
-            />
-          </FormControl>
-
-          {/* Pack Size */}
-          <FormControl fullWidth>
-            <AddItemFormLabel htmlFor="pack-size-input">Pack Size</AddItemFormLabel>
-            <TextField
-              id="pack-size-input"
-              type="number"
-              fullWidth
-              value={packSize}
-              onChange={(e) => {
-                const val = parseInt(e.target.value, 10);
-                setPackSize(isNaN(val) ? '' : val);
-              }}
-              placeholder="Enter pack size"
-              error={packSize !== '' && !isPackSizeValid()}
-              helperText={
-                packSize !== '' && !isPackSizeValid() ? 'Pack size must be at least 1' : ''
-              }
-              slotProps={{
-                htmlInput: {
-                  min: 1,
-                  step: 1,
-                },
-              }}
-            />
-          </FormControl>
-
           {/* Slot Selection */}
           <FormControl fullWidth disabled={!selectedWarehouse}>
             <AddItemFormLabel htmlFor="slot-input">Slot</AddItemFormLabel>
@@ -590,10 +457,6 @@ export default function AddItem() {
               onClick={() => {
                 setSelectedWarehouse(null);
                 setSelectedProduct(null);
-                setCategory('');
-                setItemLimit('');
-                setValue('');
-                setPackSize('');
                 setSelectedSlot(null);
                 setSelectedFixture(null);
                 setQuantityToAdd('');
