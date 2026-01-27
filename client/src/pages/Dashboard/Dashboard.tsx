@@ -1,4 +1,4 @@
-import { Container, Box, Typography, MenuItem, Select } from '@mui/material';
+import { Container, Box, MenuItem, Select } from '@mui/material';
 import AlertsSection from '../../components/AlertsSection/AlertsSection';
 import QuickActions from '../../components/QuickActions/QuickActions';
 import InventoryHealthOverview from '../../components/InventoryHealthOverview/InventoryHealthOverview';
@@ -20,6 +20,7 @@ export default function Dashboard() {
       >
         <Select
           value="woodman"
+          aria-label="Select warehouse"
           sx={{
             minWidth: 200,
             bgcolor: 'background.paper',

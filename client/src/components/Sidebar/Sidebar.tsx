@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Drawer,
   Box,
@@ -38,7 +38,16 @@ const menuItems = [
 
 export default function Sidebar({ mobileOpen, onDrawerToggle }: SidebarProps) {
   const navigate = useNavigate();
+  const location = useLocation();
   const [selectedIndex, setSelectedIndex] = useState(0);
+  
+  // Sync selectedIndex with current route
+  useEffect(() => {
+    const currentIndex = menuItems.findIndex(item => item.path === location.pathname);
+    if (currentIndex !== -1) {
+      setSelectedIndex(currentIndex);
+    }
+  }, [location.pathname]);
 
   const handleListItemClick = (index: number, path: string) => {
     setSelectedIndex(index);

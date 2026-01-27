@@ -1,4 +1,4 @@
-import { Card, CardContent, Typography, Box, IconButton } from '@mui/material';
+import { Card, CardContent, Typography, Box, IconButton, Button } from '@mui/material';
 import UndoIcon from '@mui/icons-material/Undo';
 import EditIcon from '@mui/icons-material/Edit';
 import { activityLogStyles } from './ActivityLog.styles';
@@ -81,21 +81,30 @@ export default function ActivityLog() {
               </Box>
 
               <Box sx={{ display: 'flex', gap: 0.5, flexDirection: 'row', ml: 2, flexShrink: 0 }}>
-                <IconButton size="small">
-                  <UndoIcon fontSize="small" />
-                </IconButton>
-                <IconButton size="small">
-                  <EditIcon fontSize="small" />
-                </IconButton>
+              <IconButton size="small" aria-label={`Undo ${activity.action.toLowerCase()} for ${activity.item}`}>
+                <UndoIcon fontSize="small" />
+              </IconButton>
+              <IconButton size="small" aria-label={`Edit ${activity.action.toLowerCase()} for ${activity.item}`}>
+                <EditIcon fontSize="small" />
+              </IconButton>
               </Box>
             </Box>
           ))}
         </Box>
 
         <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end' }}>
-          <Typography variant="body2" sx={{ cursor: 'pointer', color: 'black', fontWeight: 500 }}>
-            View All Activities →
-          </Typography>
+        <Button 
+          variant="text"
+          sx={{ 
+            color: 'black', 
+            fontWeight: 500,
+            textTransform: 'none',
+            '&:hover': { bgcolor: 'transparent', textDecoration: 'underline' }
+          }}
+          aria-label="View all activities"
+        >
+          View All Activities →
+        </Button>
         </Box>
       </CardContent>
     </Card>

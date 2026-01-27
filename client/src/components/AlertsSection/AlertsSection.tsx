@@ -33,6 +33,7 @@ export default function AlertsSection() {
           </Typography>
           <IconButton
             size="small"
+            aria-label={expanded ? "Collapse low-stock items" : "Expand low-stock items"}
             sx={{
               transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)',
               transition: 'transform 0.3s',
