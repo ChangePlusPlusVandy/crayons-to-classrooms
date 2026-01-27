@@ -29,12 +29,12 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         }}
       >
         <Toolbar>
-          <IconButton 
-          color="inherit" 
-          edge="start"
-          onClick={handleDrawerToggle} 
-          sx={{ mr: 2 }}
-            aria-label="Toggle navigation menu" 
+          <IconButton
+            color="inherit"
+            edge="start"
+            onClick={handleDrawerToggle}
+            sx={{ mr: 2 }}
+            aria-label="Open navigation menu"
           >
             <MenuIcon />
           </IconButton>
