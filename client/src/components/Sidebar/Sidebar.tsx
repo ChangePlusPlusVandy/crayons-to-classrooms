@@ -40,10 +40,10 @@ export default function Sidebar({ mobileOpen, onDrawerToggle }: SidebarProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const [selectedIndex, setSelectedIndex] = useState(0);
-  
+
   // Sync selectedIndex with current route
   useEffect(() => {
-    const currentIndex = menuItems.findIndex(item => item.path === location.pathname);
+    const currentIndex = menuItems.findIndex((item) => item.path === location.pathname);
     if (currentIndex !== -1) {
       setSelectedIndex(currentIndex);
     }
