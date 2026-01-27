@@ -368,29 +368,36 @@ export const createInventoryMovement = async (req: Request, res: Response) => {
       note,
     }: CreateInventoryInput = createInventoryMovementSchema.parse(req.body);
 
-    // Check if item_id, product_id, from_location_id, to_location_id, performed_by_id exist in tables (in parallel)
-    const [itemCheck, productCheck, fromLocationCheck, toLocationCheck, userCheck] =
-      await Promise.all([
-        pool.query('SELECT id FROM items WHERE id = $1', [item_id]),
-        pool.query('SELECT id FROM products WHERE id = $1', [product_id]),
-        pool.query('SELECT id FROM storage_locations WHERE id = $1', [from_location_id]),
-        pool.query('SELECT id FROM storage_locations WHERE id = $1', [to_location_id]),
-        pool.query('SELECT id FROM users WHERE id = $1', [performed_by]),
-      ]);
+    // Check if item_id, product_id, from_location_id (if provided), to_location_id, performed_by_id exist in tables (in parallel)
+    const checks = [
+      pool.query('SELECT id FROM items WHERE id = $1', [item_id]),
+      pool.query('SELECT id FROM products WHERE id = $1', [product_id]),
+      pool.query('SELECT id FROM storage_locations WHERE id = $1', [to_location_id]),
+      pool.query('SELECT id FROM users WHERE id = $1', [performed_by]),
+    ];
+
+    // Only check from_location_id if it's provided (it's optional for ADD actions)
+    if (from_location_id) {
+      checks.push(pool.query('SELECT id FROM storage_locations WHERE id = $1', [from_location_id]));
+    }
+
+    const [itemCheck, productCheck, toLocationCheck, userCheck, fromLocationCheck] =
+      await Promise.all(checks);
+
     if (itemCheck.rows.length === 0) {
       return res.status(400).json({ error: 'Invalid item_id' });
     }
     if (productCheck.rows.length === 0) {
       return res.status(400).json({ error: 'Invalid product_id' });
     }
-    if (fromLocationCheck.rows.length === 0) {
-      return res.status(400).json({ error: 'Invalid from_location_id' });
-    }
     if (toLocationCheck.rows.length === 0) {
       return res.status(400).json({ error: 'Invalid to_location_id' });
     }
     if (userCheck.rows.length === 0) {
       return res.status(400).json({ error: 'Invalid performed_by user id' });
+    }
+    if (from_location_id && fromLocationCheck && fromLocationCheck.rows.length === 0) {
+      return res.status(400).json({ error: 'Invalid from_location_id' });
     }
     const newInventoryAction = await pool.query(
       `

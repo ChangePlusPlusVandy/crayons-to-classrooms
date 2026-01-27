@@ -272,6 +272,7 @@ export const createItem = async (req: Request, res: Response) => {
       current_location_id,
       created_by,
       quantity,
+      stock,
       status,
       warehouse,
       category,
@@ -311,8 +312,8 @@ export const createItem = async (req: Request, res: Response) => {
     }
 
     const newItem = await pool.query(
-      'INSERT INTO items (name, product_id, quantity, current_location_id, status, created_by, warehouse, category, item_limit, value, limbo, notes, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW(), NOW()) RETURNING *',
-      [name, product_id, quantity, current_location_id ?? null, status, created_by, warehouse, category ?? null, item_limit ?? null, value, limbo ?? false, notes ?? null]
+      'INSERT INTO items (name, product_id, quantity, stock, current_location_id, status, created_by, warehouse, category, item_limit, value, limbo, notes, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW(), NOW()) RETURNING *',
+      [name, product_id, quantity, stock ?? null, current_location_id ?? null, status, created_by, warehouse, category ?? null, item_limit ?? null, value, limbo ?? false, notes ?? null]
     );
 
 
