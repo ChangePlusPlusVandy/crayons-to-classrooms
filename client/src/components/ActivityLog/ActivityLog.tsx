@@ -81,10 +81,16 @@ export default function ActivityLog() {
               </Box>
 
               <Box sx={{ display: 'flex', gap: 0.5, flexDirection: 'row', ml: 2, flexShrink: 0 }}>
-                <IconButton size="small">
+                <IconButton
+                  size="small"
+                  aria-label={`Undo ${activity.action.toLowerCase()} for ${activity.item}`}
+                >
                   <UndoIcon fontSize="small" />
                 </IconButton>
-                <IconButton size="small">
+                <IconButton
+                  size="small"
+                  aria-label={`Edit ${activity.action.toLowerCase()} for ${activity.item}`}
+                >
                   <EditIcon fontSize="small" />
                 </IconButton>
               </Box>
