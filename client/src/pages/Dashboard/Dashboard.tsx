@@ -1,4 +1,4 @@
-import { Container, Box, Typography, MenuItem, Select } from '@mui/material';
+import { Container, Box, MenuItem, Select } from '@mui/material';
 import AlertsSection from '../../components/AlertsSection/AlertsSection';
 import QuickActions from '../../components/QuickActions/QuickActions';
 import InventoryHealthOverview from '../../components/InventoryHealthOverview/InventoryHealthOverview';
