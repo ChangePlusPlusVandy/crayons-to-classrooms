@@ -96,7 +96,6 @@ export const getItemInfoById = async (req: Request, res: Response) => {
   }
 };
 
-
 /**
  * Retrieves item info with a specific name.
  *
@@ -128,7 +127,7 @@ export const getItemsInfoByName = async (req: Request, res: Response) => {
  *
  * @param {Request} req - Express request object with:
  *   - name: Item name (in body, required)
- *   - item_limit: Limit number (in body, optional)
+ *   - item_limit: Limit number (in body, required)
  *   - stock: total stock of the item (in body, required)
  *   - last_known_fixture: last known fixture of the item (in body, optional)
  *   - last_known_location_code: last known location code of the item (in body, required)
@@ -150,13 +149,18 @@ export const createItemInfo = async (req: Request, res: Response) => {
       notes,
     }: CreateItemInfoInput = createItemInfoSchema.parse(req.body);
 
-
-
     const newItemInfo = await pool.query(
       'INSERT INTO item_info (name, item_limit, stock, last_known_fixture, last_known_location_code, time_last_updated, notes) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
-      [name, item_limit, stock, last_known_fixture, last_known_location_code, time_last_updated, notes]
+      [
+        name,
+        item_limit,
+        stock,
+        last_known_fixture,
+        last_known_location_code,
+        time_last_updated,
+        notes,
+      ]
     );
-
 
     res.status(201).json(newItemInfo.rows[0]);
   } catch (error) {
@@ -187,7 +191,6 @@ export const updateItemInfo = async (req: Request, res: Response) => {
     const { id } = itemInfoIdParamSchema.parse(req.params);
     const validatedData: UpdateItemInfoInput = updateItemInfoSchema.parse(req.body);
 
-
     const setClauses: string[] = [];
     const values: any[] = [];
     let idx = 1;
@@ -212,7 +215,7 @@ export const updateItemInfo = async (req: Request, res: Response) => {
     if (!countRows(rows, res)) {
       return;
     }
-    
+
     return res.json(rows[0]);
   } catch (error) {
     if (error instanceof ZodError) {
@@ -239,7 +242,7 @@ export const deleteItemInfo = async (req: Request, res: Response) => {
 
     // Get the item's name before deleting so we can update stock
     const itemToDelete = await pool.query('SELECT name FROM item_info WHERE id = $1', [id]);
-    
+
     if (itemToDelete.rows.length === 0) {
       return res.status(404).json({ error: 'Item not found' });
     }
@@ -249,9 +252,6 @@ export const deleteItemInfo = async (req: Request, res: Response) => {
     if (!countRows(deletedItem.rows, res)) {
       return;
     }
-
-    
-
 
     return res.json({ message: 'Item info deleted successfully' });
   } catch (error) {
