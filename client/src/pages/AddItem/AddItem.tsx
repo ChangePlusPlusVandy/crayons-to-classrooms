@@ -30,6 +30,8 @@ import {
   HighlightedText,
 } from './AddItem.styles';
 import { WarehouseSelector } from '../../components/WarehouseSelector/WarehouseSelector';
+import { SlotSelector } from '../../components/SlotSelector/SlotSelector';
+import { FixtureSelector } from '../../components/FixtureSelector/FixtureSelector';
 
 export default function AddItem() {
   // Data states
@@ -70,53 +72,12 @@ export default function AddItem() {
     fetchInitialData();
   }, []);
 
-  // Get filtered storage locations for selected warehouse
+  // Compute warehouseLocations for form submission
   const warehouseLocations = useMemo(() => {
     return selectedWarehouse
       ? storageLocations.filter((loc) => loc.warehouse_id === selectedWarehouse.id)
       : [];
   }, [selectedWarehouse, storageLocations]);
-
-  // Get deduplicated slots for selected warehouse
-  const availableSlots = useMemo(() => {
-    if (!selectedWarehouse) return [];
-
-    const slotSet = new Set<string>();
-    warehouseLocations.forEach((loc) => {
-      if (loc.slot && loc.slot.trim() !== '') {
-        slotSet.add(loc.slot);
-      }
-    });
-
-    return Array.from(slotSet).sort();
-  }, [selectedWarehouse, warehouseLocations]);
-
-  // Get fixtures for selected slot
-  const availableFixtures = useMemo(() => {
-    if (!selectedWarehouse || !selectedSlot) return [];
-
-    const fixtureSet = new Set<string>();
-    let hasNullFixture = false;
-
-    warehouseLocations
-      .filter((loc) => loc.slot === selectedSlot)
-      .forEach((loc) => {
-        if (loc.fixture && loc.fixture.trim() !== '') {
-          fixtureSet.add(loc.fixture);
-        } else {
-          hasNullFixture = true;
-        }
-      });
-
-    const fixtures = Array.from(fixtureSet).sort();
-
-    // Add "None" option at the beginning if there are locations with null/empty fixtures
-    if (hasNullFixture) {
-      fixtures.unshift('None');
-    }
-
-    return fixtures;
-  }, [selectedWarehouse, selectedSlot, warehouseLocations]);
 
   // Helper to highlight matching text in search results
   const highlightText = (text: string, searchTerm: string): React.ReactNode => {
@@ -377,52 +338,30 @@ export default function AddItem() {
           </FormControl>
 
           {/* Slot Selection */}
-          <FormControl fullWidth disabled={!selectedWarehouse}>
-            <AddItemFormLabel htmlFor="slot-input">Slot</AddItemFormLabel>
-            <Autocomplete
-              id="slot-input"
-              options={availableSlots}
-              getOptionLabel={(option) => option}
-              value={selectedSlot}
-              onChange={(_, newValue) => {
-                setSelectedSlot(newValue);
-                // Cascade: clear fixture when slot changes
-                setSelectedFixture(null);
-                setError('');
-              }}
-              renderInput={(params) => (
-                <TextField
-                  {...params}
-                  placeholder={!selectedWarehouse ? 'Select warehouse first' : 'Select slot'}
-                />
-              )}
-              disabled={!selectedWarehouse}
-              noOptionsText="No slots available"
-            />
-          </FormControl>
+          <SlotSelector
+            value={selectedSlot}
+            onChange={(newSlot) => {
+              setSelectedSlot(newSlot);
+              // Cascade: clear fixture when slot changes
+              setSelectedFixture(null);
+              setError('');
+            }}
+            warehouse={selectedWarehouse}
+            storageLocations={storageLocations}
+          />
 
           {/* Fixture Selection */}
-          <FormControl fullWidth disabled={!selectedSlot}>
-            <AddItemFormLabel htmlFor="fixture-input">Fixture</AddItemFormLabel>
-            <Autocomplete
-              id="fixture-input"
-              options={availableFixtures}
-              getOptionLabel={(option) => option}
-              value={selectedFixture}
-              onChange={(_, newValue) => {
-                setSelectedFixture(newValue);
-                setError('');
-              }}
-              renderInput={(params) => (
-                <TextField
-                  {...params}
-                  placeholder={!selectedSlot ? 'Select slot first' : 'Select fixture'}
-                />
-              )}
-              disabled={!selectedSlot}
-              noOptionsText="No fixtures available"
-            />
-          </FormControl>
+          <FixtureSelector
+            value={selectedFixture}
+            onChange={(newFixture) => {
+              setSelectedFixture(newFixture);
+              setError('');
+            }}
+            slot={selectedSlot}
+            warehouse={selectedWarehouse}
+            storageLocations={storageLocations}
+            nullFixtureLabel="None"
+          />
 
           {/* Quantity to Add */}
           <FormControl fullWidth>
