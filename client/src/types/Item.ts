@@ -14,7 +14,7 @@ export type Item = {
   limbo: boolean;
   notes: string;
   name: string;
-  stock: number;
+  stock?: number;
 };
 
 // Group of the same item in the same location
