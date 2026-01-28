@@ -3,7 +3,7 @@ export type Product = {
   created_at: string;
   name: string;
   description: string | null;
-  unit_of_measure: string;
+  unit_of_measure: string | null;
   value: number;
   item_limit: string | number;
   category: string;
