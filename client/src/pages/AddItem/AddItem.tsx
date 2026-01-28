@@ -71,9 +71,11 @@ export default function AddItem() {
   }, []);
 
   // Get filtered storage locations for selected warehouse
-  const warehouseLocations = selectedWarehouse
-    ? storageLocations.filter((loc) => loc.warehouse_id === selectedWarehouse.id)
-    : [];
+  const warehouseLocations = useMemo(() => {
+    return selectedWarehouse
+      ? storageLocations.filter((loc) => loc.warehouse_id === selectedWarehouse.id)
+      : [];
+  }, [selectedWarehouse, storageLocations]);
 
   // Get deduplicated slots for selected warehouse
   const availableSlots = useMemo(() => {
