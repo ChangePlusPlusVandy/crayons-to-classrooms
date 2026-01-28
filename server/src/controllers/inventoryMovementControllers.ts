@@ -370,6 +370,9 @@ export const createInventoryMovement = async (req: Request, res: Response) => {
       note,
     }: CreateInventoryInput = createInventoryMovementSchema.parse(req.body);
 
+    // Normalize from_location_id: undefined → null to avoid node-postgres invalid parameter errors
+    const normalizedFromLocationId = from_location_id ?? null;
+
     // Check if item_id, product_id, from_location_id (if provided), to_location_id, performed_by_id exist in tables (in parallel)
     const checks = [
       pool.query('SELECT id FROM items WHERE id = $1', [item_id]),
@@ -379,8 +382,8 @@ export const createInventoryMovement = async (req: Request, res: Response) => {
     ];
 
     // Only check from_location_id if it's provided (it's optional for ADD actions)
-    if (from_location_id) {
-      checks.push(pool.query('SELECT id FROM storage_locations WHERE id = $1', [from_location_id]));
+    if (normalizedFromLocationId) {
+      checks.push(pool.query('SELECT id FROM storage_locations WHERE id = $1', [normalizedFromLocationId]));
     }
 
     const [itemCheck, productCheck, toLocationCheck, userCheck, fromLocationCheck] =
@@ -398,7 +401,7 @@ export const createInventoryMovement = async (req: Request, res: Response) => {
     if (userCheck.rows.length === 0) {
       return res.status(400).json({ error: 'Invalid performed_by user id' });
     }
-    if (from_location_id && fromLocationCheck && fromLocationCheck.rows.length === 0) {
+    if (normalizedFromLocationId && fromLocationCheck && fromLocationCheck.rows.length === 0) {
       return res.status(400).json({ error: 'Invalid from_location_id' });
     }
     const newInventoryAction = await pool.query(
@@ -420,7 +423,7 @@ export const createInventoryMovement = async (req: Request, res: Response) => {
         inventory_action,
         item_id,
         product_id,
-        from_location_id,
+        normalizedFromLocationId,
         to_location_id,
         quantity,
         performed_by,
