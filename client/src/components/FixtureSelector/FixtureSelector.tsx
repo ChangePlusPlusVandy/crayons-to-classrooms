@@ -74,7 +74,7 @@ export function FixtureSelector({
     if (value == null && autoSelectNull && availableFixtures.includes(nullFixtureLabel)) {
       onChange(nullFixtureLabel);
     }
-  }, [autoSelectNull, availableFixtures, nullFixtureLabel, onChange]);
+  }, [autoSelectNull, availableFixtures, nullFixtureLabel, onChange, value]);
 
   const isDisabled = disabled || !slot;
 
