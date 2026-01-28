@@ -57,7 +57,11 @@ export const createItemSchema = z.object({
  */
 export const updateItemSchema = z
   .object({
-    name: z.string().min(1, 'Name is required').max(255, 'Name must be less than 255 characters').optional(),
+    name: z
+      .string()
+      .min(1, 'Name is required')
+      .max(255, 'Name must be less than 255 characters')
+      .optional(),
     product_id: uuidSchema.optional(),
     quantity: z.number().int().nonnegative('Quantity cannot be negative').optional(),
     stock: z.number().int().nonnegative('Stock cannot be negative').optional(),
