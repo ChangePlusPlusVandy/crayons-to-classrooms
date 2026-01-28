@@ -20,6 +20,7 @@ import {
   createInventoryMovement,
 } from '../../api/addItem';
 import { Warehouse } from '../../types/Warehouse';
+import { InventoryMovement } from '../../types/InventoryMovement';
 import { StorageLocation } from '../../types/StorageLocation';
 import { Product } from '../../types/Product';
 import {
@@ -192,7 +193,7 @@ export default function AddItem() {
 
       // Create a single inventory movement with the total quantity
       // Use the first item's ID for the movement record
-      await createInventoryMovement({
+      const movementPayload: Omit<InventoryMovement, 'id' | 'performed_at'> = {
         inventory_action: 'ADD',
         item_id: newItems[0].id,
         product_id: selectedProduct.id,
@@ -201,7 +202,10 @@ export default function AddItem() {
         quantity: quantity,
         performed_by: 'b4974f63-ee89-42a1-bdb3-ce9df255c682', // TODO: Get user ID from auth context
         note: notes || undefined,
-      });
+      };
+      console.log('DEBUG: Movement payload:', JSON.stringify(movementPayload, null, 2));
+      const movementResult = await createInventoryMovement(movementPayload);
+      console.log('DEBUG: Movement result:', JSON.stringify(movementResult, null, 2));
 
       setSuccess(`${quantity} item${quantity > 1 ? 's' : ''} added successfully!`);
 
