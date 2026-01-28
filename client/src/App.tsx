@@ -1,6 +1,8 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import DashboardLayout from './components/DashboardLayout/DashboardLayout';
 import Dashboard from './pages/Dashboard/Dashboard';
+import MoveItem from './pages/MoveItem/MoveItem';
+import AddItem from './pages/AddItem/AddItem';
 import './App.css';
 
 function App() {
@@ -10,6 +12,8 @@ function App() {
         <Routes>
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/add-item" element={<AddItem />} />
+          <Route path="/move-item" element={<MoveItem />} />
           {/* Placeholder routes - these don't have to work yet */}
           <Route
             path="/inventory"

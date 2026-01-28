@@ -33,7 +33,7 @@ export const ItemStatus = z.enum(['active', 'inactive', 'discontinued', 'checked
 /**
  * Schema for validating item creation
  * Requires: name, product_id, quantity, status, created_by, warehouse, value
- * Optional: current_location_id
+ * Optional: current_location_id, stock
  */
 export const createItemSchema = z.object({
   name: z.string().min(1, 'Name is required').max(255, 'Name must be less than 255 characters'),
@@ -41,6 +41,7 @@ export const createItemSchema = z.object({
   current_location_id: uuidSchema.optional(),
   created_by: uuidSchema,
   quantity: z.number().int().nonnegative('Quantity cannot be negative'),
+  stock: z.number().int().nonnegative('Stock cannot be negative').optional(),
   status: ItemStatus,
   warehouse: uuidSchema,
   category: z.string().optional(),
@@ -63,6 +64,7 @@ export const updateItemSchema = z
       .optional(),
     product_id: uuidSchema.optional(),
     quantity: z.number().int().nonnegative('Quantity cannot be negative').optional(),
+    stock: z.number().int().nonnegative('Stock cannot be negative').optional(),
     current_location_id: uuidSchema.optional(),
     status: ItemStatus.optional(),
     warehouse: uuidSchema.optional(),

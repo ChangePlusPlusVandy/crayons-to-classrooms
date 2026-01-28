@@ -32,6 +32,8 @@ import {
   HighlightedText,
 } from './MoveItem.styles';
 import { WarehouseSelector } from '../../components/WarehouseSelector/WarehouseSelector';
+import { SlotSelector } from '../../components/SlotSelector/SlotSelector';
+import { FixtureSelector } from '../../components/FixtureSelector/FixtureSelector';
 
 export default function MoveItem() {
   const [storageLocations, setStorageLocations] = useState<StorageLocation[]>([]);
@@ -233,63 +235,12 @@ export default function MoveItem() {
     );
   };
 
-  // Get filtered storage locations for selected warehouse (for source and destination)
-  const warehouseLocations = useMemo(
-    () =>
-      selectedWarehouse
-        ? storageLocations.filter((loc) => loc.warehouse_id === selectedWarehouse.id)
-        : [],
-    [selectedWarehouse, storageLocations]
-  );
-
-  // Get deduplicated slots for selected warehouse
-  const availableDestinationSlots = useMemo(() => {
-    if (!selectedWarehouse) return [];
-
-    const slotSet = new Set<string>();
-    warehouseLocations.forEach((loc) => {
-      if (loc.slot && loc.slot.trim() !== '') {
-        slotSet.add(loc.slot);
-      }
-    });
-
-    return Array.from(slotSet).sort();
-  }, [selectedWarehouse, warehouseLocations]);
-
-  // Get fixtures for selected destination slot
-  const availableFixtures = useMemo(() => {
-    if (!selectedWarehouse || !selectedDestinationSlot) return [];
-
-    const fixtureSet = new Set<string>();
-    let hasNullFixture = false;
-
-    warehouseLocations
-      .filter((loc) => loc.slot === selectedDestinationSlot)
-      .forEach((loc) => {
-        if (loc.fixture && loc.fixture.trim() !== '') {
-          fixtureSet.add(loc.fixture);
-        } else {
-          hasNullFixture = true;
-        }
-      });
-
-    const fixtures = Array.from(fixtureSet).sort();
-
-    // Add "N/A" option at the beginning if there are locations with null/empty fixtures
-    if (hasNullFixture) {
-      fixtures.unshift('N/A');
-    }
-
-    return fixtures;
-  }, [selectedWarehouse, selectedDestinationSlot, warehouseLocations]);
-
-  useEffect(() => {
-    if (availableFixtures.includes('N/A')) {
-      setSelectedFixture('N/A');
-    } else {
-      setSelectedFixture(null);
-    }
-  }, [availableFixtures]);
+  // Compute warehouseLocations for form submission and source slot filtering
+  const warehouseLocations = useMemo(() => {
+    return selectedWarehouse
+      ? storageLocations.filter((loc) => loc.warehouse_id === selectedWarehouse.id)
+      : [];
+  }, [selectedWarehouse, storageLocations]);
 
   // Helper to check if quantity is valid
   const isQuantityValid = (): boolean => {
@@ -589,30 +540,19 @@ export default function MoveItem() {
             />
           </Box>
           <Stack spacing={0}>
-            <FormControl fullWidth disabled={!selectedWarehouse}>
-              <MoveItemFormLabel htmlFor="toslot-input">Destination Slot</MoveItemFormLabel>
-              <Autocomplete
-                id="toslot-input"
-                options={availableDestinationSlots}
-                getOptionLabel={(option) => option}
-                value={selectedDestinationSlot}
-                onChange={(_, newValue) => {
-                  setSelectedDestinationSlot(newValue);
-                  // Cascade: clear fixture when destination slot changes
-                  setSelectedFixture(null);
-                  setError('');
-                }}
-                renderInput={(params) => (
-                  <TextField
-                    {...params}
-                    placeholder={
-                      !selectedWarehouse ? 'Select warehouse first' : 'Select destination slot'
-                    }
-                  />
-                )}
-                disabled={!selectedWarehouse}
-                noOptionsText="No slots available"
-              />
+            <SlotSelector
+              value={selectedDestinationSlot}
+              onChange={(newSlot) => {
+                setSelectedDestinationSlot(newSlot);
+                // Cascade: clear fixture when destination slot changes
+                setSelectedFixture(null);
+                setError('');
+              }}
+              warehouse={selectedWarehouse}
+              storageLocations={storageLocations}
+              label="Destination Slot"
+              placeholder="Select destination slot"
+            >
               <Button
                 startIcon={<AddIcon />}
                 sx={{
@@ -631,37 +571,20 @@ export default function MoveItem() {
               >
                 New Slot
               </Button>
-            </FormControl>
+            </SlotSelector>
 
-            <FormControl
-              fullWidth
-              disabled={!selectedDestinationSlot}
-              sx={{
-                marginTop: 0,
+            <FixtureSelector
+              value={selectedFixture}
+              onChange={(newFixture) => {
+                setSelectedFixture(newFixture);
+                setError('');
               }}
-            >
-              <MoveItemFormLabel htmlFor="fixture-input">Fixture</MoveItemFormLabel>
-              <Autocomplete
-                id="fixture-input"
-                options={availableFixtures}
-                getOptionLabel={(option) => option}
-                value={selectedFixture}
-                onChange={(_, newValue) => {
-                  setSelectedFixture(newValue);
-                  setError('');
-                }}
-                renderInput={(params) => (
-                  <TextField
-                    {...params}
-                    placeholder={
-                      !selectedDestinationSlot ? 'Select destination slot first' : 'Select fixture'
-                    }
-                  />
-                )}
-                disabled={!selectedDestinationSlot}
-                noOptionsText="No fixtures available"
-              />
-            </FormControl>
+              slot={selectedDestinationSlot}
+              warehouse={selectedWarehouse}
+              storageLocations={storageLocations}
+              nullFixtureLabel="N/A"
+              autoSelectNull
+            />
           </Stack>
           <FormControl fullWidth>
             <MoveItemFormLabel htmlFor="notes-input">Notes</MoveItemFormLabel>
