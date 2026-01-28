@@ -283,7 +283,6 @@ export default function AddItem() {
               id="item-name-select"
               options={products}
               getOptionLabel={(option) => option.name || 'Unknown Product'}
-              getOptionKey={(option) => option.id}
               filterOptions={(options, state) => {
                 const searchTerm = state.inputValue.toLowerCase().trim();
                 if (!searchTerm) return options;
