@@ -339,20 +339,22 @@ export const getMovementsOnAndAfterDate = async (req: Request<{ date: string }>,
 
 /**
  * Creates a new inventory movement in the database.
- * Validates foreign key constraints for item_id, product_id, from_location_id, to_location_id, performed_by_id.
+ * Validates foreign key constraints for item_id, product_id, to_location_id, performed_by_id,
+ * and from_location_id when provided.
  *
  * @param {Request} req - Express request object with:
  *   - inventory_action: Type of inventory action ie ('ADD', 'MOVE', 'CHECKOUT', 'DISCARD', 'ADJUSTMENT') (in body)
  *   - item_id: UUID of the item (in body)
  *   - product_id: UUID of the product (in body)
- *   - from_location_id: UUID of the start location (in body)
+ *   - from_location_id: Optional UUID of the start location, may be null for ADD actions (in body)
  *   - to_location_id: UUID of the end location (in body)
  *   - quantity: Number of items (in body)
  *   - performed_by: UUID of the user performing the action (in body)
  *   - note: Optional note about the movement (in body)
  * @param {Response} res - Express response object
  * @returns {Promise<Response>} JSON object of the newly created inventory movement or error message
- * @throws {400} Invalid foreign key if item_id, product_id, from_location_id, to_location_id, performed_by doesn't exist
+ * @throws {400} Invalid foreign key if item_id, product_id, to_location_id, performed_by doesn't exist
+ * @throws {400} Invalid from_location_id if provided and doesn't exist
  * @throws {500} Internal server error if validation or creation fails
  */
 export const createInventoryMovement = async (req: Request, res: Response) => {

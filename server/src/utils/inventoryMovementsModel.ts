@@ -55,7 +55,7 @@ export const updateInventoryMovementSchema = z
     inventory_action: ActionParamSchema.optional(),
     item_id: uuidSchema.optional(),
     product_id: uuidSchema.optional(),
-    from_location_id: uuidSchema.optional(),
+    from_location_id: uuidSchema.nullable().optional(),
     to_location_id: uuidSchema.optional(),
     quantity: z.number().int().nonnegative('Quantity must be a nonnegative integer').optional(),
     performed_by: uuidSchema.optional(),
