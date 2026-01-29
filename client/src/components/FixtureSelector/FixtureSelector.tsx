@@ -71,12 +71,10 @@ export function FixtureSelector({
 
   // Auto-select null fixture option when available
   useEffect(() => {
-    if (autoSelectNull && availableFixtures.includes(nullFixtureLabel)) {
+    if (value == null && autoSelectNull && availableFixtures.includes(nullFixtureLabel)) {
       onChange(nullFixtureLabel);
-    } else if (autoSelectNull && availableFixtures.length > 0 && !availableFixtures.includes(nullFixtureLabel)) {
-      onChange(null);
     }
-  }, [autoSelectNull, availableFixtures, nullFixtureLabel, onChange]);
+  }, [autoSelectNull, availableFixtures, nullFixtureLabel, onChange, value]);
 
   const isDisabled = disabled || !slot;
 
