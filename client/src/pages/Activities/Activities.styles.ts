@@ -1,6 +1,5 @@
 export const activitiesStyles = {
   container: {
-    maxWidth: 'lg',
     py: 4,
   },
   header: {
