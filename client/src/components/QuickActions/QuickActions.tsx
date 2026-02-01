@@ -1,10 +1,13 @@
 import { Card, CardContent, Typography, Box, Button, Avatar } from '@mui/material';
+import { useNavigate } from 'react-router-dom';
 import AddIcon from '@mui/icons-material/Add';
 import RemoveIcon from '@mui/icons-material/Remove';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import { quickActionsStyles } from './QuickActions.styles';
 
 export default function QuickActions() {
+  const navigate = useNavigate();
+
   const actions = [
     {
       icon: <AddIcon />,
@@ -12,6 +15,7 @@ export default function QuickActions() {
       borderColor: '#28a745',
       bgColor: '#d4edda',
       iconColor: '#1e7e34',
+      route: '/add-item',
     },
     {
       icon: <RemoveIcon />,
@@ -19,6 +23,7 @@ export default function QuickActions() {
       borderColor: '#dc3545',
       bgColor: '#f8d7da',
       iconColor: '#a71d2a',
+      route: null, // Not implemented yet
     },
     {
       icon: <ArrowForwardIcon />,
@@ -26,6 +31,7 @@ export default function QuickActions() {
       borderColor: '#17a2b8',
       bgColor: '#d1ecf1',
       iconColor: '#117a8b',
+      route: '/move-item',
     },
   ];
 
@@ -40,6 +46,7 @@ export default function QuickActions() {
             <Button
               key={index}
               variant="outlined"
+              onClick={() => action.route && navigate(action.route)}
               sx={{
                 ...quickActionsStyles.actionButton,
                 bgcolor: 'white',

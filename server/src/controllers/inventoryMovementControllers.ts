@@ -339,20 +339,22 @@ export const getMovementsOnAndAfterDate = async (req: Request<{ date: string }>,
 
 /**
  * Creates a new inventory movement in the database.
- * Validates foreign key constraints for item_id, product_id, from_location_id, to_location_id, performed_by_id.
+ * Validates foreign key constraints for item_id, product_id, to_location_id, performed_by_id,
+ * and from_location_id when provided.
  *
  * @param {Request} req - Express request object with:
  *   - inventory_action: Type of inventory action ie ('ADD', 'MOVE', 'CHECKOUT', 'DISCARD', 'ADJUSTMENT') (in body)
  *   - item_id: UUID of the item (in body)
  *   - product_id: UUID of the product (in body)
- *   - from_location_id: UUID of the start location (in body)
+ *   - from_location_id: Optional UUID of the start location, may be null for ADD actions (in body)
  *   - to_location_id: UUID of the end location (in body)
  *   - quantity: Number of items (in body)
  *   - performed_by: UUID of the user performing the action (in body)
  *   - note: Optional note about the movement (in body)
  * @param {Response} res - Express response object
  * @returns {Promise<Response>} JSON object of the newly created inventory movement or error message
- * @throws {400} Invalid foreign key if item_id, product_id, from_location_id, to_location_id, performed_by doesn't exist
+ * @throws {400} Invalid foreign key if item_id, product_id, to_location_id, performed_by doesn't exist
+ * @throws {400} Invalid from_location_id if provided and doesn't exist
  * @throws {500} Internal server error if validation or creation fails
  */
 export const createInventoryMovement = async (req: Request, res: Response) => {
@@ -368,29 +370,39 @@ export const createInventoryMovement = async (req: Request, res: Response) => {
       note,
     }: CreateInventoryInput = createInventoryMovementSchema.parse(req.body);
 
-    // Check if item_id, product_id, from_location_id, to_location_id, performed_by_id exist in tables (in parallel)
-    const [itemCheck, productCheck, fromLocationCheck, toLocationCheck, userCheck] =
-      await Promise.all([
-        pool.query('SELECT id FROM items WHERE id = $1', [item_id]),
-        pool.query('SELECT id FROM products WHERE id = $1', [product_id]),
-        pool.query('SELECT id FROM storage_locations WHERE id = $1', [from_location_id]),
-        pool.query('SELECT id FROM storage_locations WHERE id = $1', [to_location_id]),
-        pool.query('SELECT id FROM users WHERE id = $1', [performed_by]),
-      ]);
+    // Normalize from_location_id: undefined → null to avoid node-postgres invalid parameter errors
+    const normalizedFromLocationId = from_location_id ?? null;
+
+    // Check if item_id, product_id, from_location_id (if provided), to_location_id, performed_by_id exist in tables (in parallel)
+    const checks = [
+      pool.query('SELECT id FROM items WHERE id = $1', [item_id]),
+      pool.query('SELECT id FROM products WHERE id = $1', [product_id]),
+      pool.query('SELECT id FROM storage_locations WHERE id = $1', [to_location_id]),
+      pool.query('SELECT id FROM users WHERE id = $1', [performed_by]),
+    ];
+
+    // Only check from_location_id if it's provided (it's optional for ADD actions)
+    if (normalizedFromLocationId) {
+      checks.push(pool.query('SELECT id FROM storage_locations WHERE id = $1', [normalizedFromLocationId]));
+    }
+
+    const [itemCheck, productCheck, toLocationCheck, userCheck, fromLocationCheck] =
+      await Promise.all(checks);
+
     if (itemCheck.rows.length === 0) {
       return res.status(400).json({ error: 'Invalid item_id' });
     }
     if (productCheck.rows.length === 0) {
       return res.status(400).json({ error: 'Invalid product_id' });
     }
-    if (fromLocationCheck.rows.length === 0) {
-      return res.status(400).json({ error: 'Invalid from_location_id' });
-    }
     if (toLocationCheck.rows.length === 0) {
       return res.status(400).json({ error: 'Invalid to_location_id' });
     }
     if (userCheck.rows.length === 0) {
       return res.status(400).json({ error: 'Invalid performed_by user id' });
+    }
+    if (normalizedFromLocationId && fromLocationCheck && fromLocationCheck.rows.length === 0) {
+      return res.status(400).json({ error: 'Invalid from_location_id' });
     }
     const newInventoryAction = await pool.query(
       `
@@ -411,7 +423,7 @@ export const createInventoryMovement = async (req: Request, res: Response) => {
         inventory_action,
         item_id,
         product_id,
-        from_location_id,
+        normalizedFromLocationId,
         to_location_id,
         quantity,
         performed_by,
@@ -424,7 +436,7 @@ export const createInventoryMovement = async (req: Request, res: Response) => {
     if (error instanceof ZodError) {
       return handleValidationError(error, res);
     }
-    console.error('Error creating inventory action:', error);
+    console.error('Error creating inventory movement:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -480,7 +492,7 @@ export const updateInventoryMovement = async (req: Request, res: Response) => {
     if (error instanceof ZodError) {
       return handleValidationError(error, res);
     }
-    console.error('Error updating inventory action:', error);
+    console.error('Error updating inventory movement:', error);
     return res.status(500).json({ error: 'Internal server error' });
   }
 };

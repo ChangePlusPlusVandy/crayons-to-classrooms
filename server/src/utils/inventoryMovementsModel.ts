@@ -36,13 +36,14 @@ export const ActionParamSchema = z.enum(['ADD', 'MOVE', 'CHECKOUT', 'DISCARD', '
 
 /**
  * Schema for inventory creation
- * Requires: inventory_action, item_id, product_id, from_location_id, to_location_id, quantity, performed_by
+ * Requires: inventory_action, item_id, product_id, to_location_id, quantity, performed_by
+ * from_location_id is optional (null for ADD actions)
  */
 export const createInventoryMovementSchema = z.object({
   inventory_action: ActionParamSchema,
   item_id: uuidSchema,
   product_id: uuidSchema,
-  from_location_id: uuidSchema,
+  from_location_id: uuidSchema.nullable().optional(),
   to_location_id: uuidSchema,
   quantity: z.number().int().nonnegative('Quantity must be a nonnegative integer'),
   performed_by: uuidSchema,
@@ -54,7 +55,7 @@ export const updateInventoryMovementSchema = z
     inventory_action: ActionParamSchema.optional(),
     item_id: uuidSchema.optional(),
     product_id: uuidSchema.optional(),
-    from_location_id: uuidSchema.optional(),
+    from_location_id: uuidSchema.nullable().optional(),
     to_location_id: uuidSchema.optional(),
     quantity: z.number().int().nonnegative('Quantity must be a nonnegative integer').optional(),
     performed_by: uuidSchema.optional(),
