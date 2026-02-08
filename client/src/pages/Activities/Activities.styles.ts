@@ -13,6 +13,7 @@ export const activitiesStyles = {
     boxShadow: 1,
     overflowX: 'auto',
     width: '100%',
+    minHeight: 580,
   },
   table: {
     minWidth: { xs: 600, sm: 650 },
@@ -61,5 +62,25 @@ export const activitiesStyles = {
     textTransform: 'none',
     fontWeight: 500,
     px: 3,
+  },
+  paginationContainer: {
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: { xs: 0.5, sm: 1 },
+    py: 3,
+  },
+  paginationButton: {
+    textTransform: 'none',
+    fontWeight: 500,
+    minWidth: { xs: 32, sm: 36 },
+    px: { xs: 0.75, sm: 1.5 },
+    fontSize: { xs: '0.75rem', sm: '0.875rem' },
+  },
+  paginationEllipsis: {
+    px: 1,
+    color: '#666',
+    userSelect: 'none',
   },
 } as const;

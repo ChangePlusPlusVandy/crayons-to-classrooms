@@ -1,6 +1,6 @@
 export type InventoryMovement = {
   id?: string;
-  inventory_action: 'MOVE' | 'ADD' | 'CHECKOUT' | 'DISCARD' | 'ADJUSTMENT' | 'CLOCKOUT';
+  inventory_action: 'ADD' | 'MOVE' | 'CHECKOUT' | 'DISCARD' | 'ADJUSTMENT';
   item_id: string;
   product_id: string;
   from_location_id: string | null;

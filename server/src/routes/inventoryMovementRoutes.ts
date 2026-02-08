@@ -1,6 +1,7 @@
 import express from 'express';
 import {
   getAllInventoryMovements,
+  getAllMovementsDetailed,
   getMovementById,
   getMovementsByAction,
   getMovementsByItemId,
@@ -17,6 +18,7 @@ import {
 
 const router = express.Router();
 router.get('/', getAllInventoryMovements); // GET /api/inventory-movement
+router.get('/detailed', getAllMovementsDetailed); // GET /api/inventory-movement/detailed?page=1&limit=10
 router.get('/:id', getMovementById); // GET /api/inventory-movement/:id
 router.get('/action/:inventory_action', getMovementsByAction); // GET /api/inventory-movement/action/:inventory_action
 router.get('/item/:item_id', getMovementsByItemId); // GET /api/inventory-movement/item/:item_id

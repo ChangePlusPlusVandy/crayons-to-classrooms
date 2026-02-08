@@ -62,6 +62,56 @@ export async function getAllInventoryMovements(req: Request, res: Response): Pro
   }
 }
 
+// GET all rows with JOINed details and server-side pagination
+export async function getAllMovementsDetailed(req: Request, res: Response): Promise<void> {
+  try {
+    const page = Math.max(1, parseInt(req.query.page as string) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 10));
+    const offset = (page - 1) * limit;
+
+    const [dataResult, countResult] = await Promise.all([
+      pool.query(
+        `SELECT
+          im.id,
+          im.item_id,
+          im.product_id,
+          im.from_location_id,
+          im.to_location_id,
+          im.quantity,
+          im.performed_by,
+          im.note,
+          im.performed_at,
+          im.inventory_action,
+          p.name AS product_name,
+          from_loc.location_code AS from_location_name,
+          to_loc.location_code AS to_location_name,
+          u.name AS user_name
+        FROM "inventory movement" im
+        LEFT JOIN products p ON im.product_id = p.id
+        LEFT JOIN storage_locations from_loc ON im.from_location_id = from_loc.id
+        LEFT JOIN storage_locations to_loc ON im.to_location_id = to_loc.id
+        LEFT JOIN users u ON im.performed_by = u.id
+        ORDER BY im.performed_at DESC NULLS LAST
+        LIMIT $1 OFFSET $2`,
+        [limit, offset]
+      ),
+      pool.query('SELECT COUNT(*) FROM "inventory movement"'),
+    ]);
+
+    const total = parseInt(countResult.rows[0].count, 10);
+
+    res.json({
+      data: dataResult.rows,
+      total,
+      page,
+      limit,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+}
+
 /**
  * Retrieves a single inventory movement by its unique ID.
  *
@@ -383,7 +433,9 @@ export const createInventoryMovement = async (req: Request, res: Response) => {
 
     // Only check from_location_id if it's provided (it's optional for ADD actions)
     if (normalizedFromLocationId) {
-      checks.push(pool.query('SELECT id FROM storage_locations WHERE id = $1', [normalizedFromLocationId]));
+      checks.push(
+        pool.query('SELECT id FROM storage_locations WHERE id = $1', [normalizedFromLocationId])
+      );
     }
 
     const [itemCheck, productCheck, toLocationCheck, userCheck, fromLocationCheck] =
