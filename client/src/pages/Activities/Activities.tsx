@@ -38,10 +38,10 @@ export default function Activities() {
 
   const formatTimestamp = (timestamp: string) => {
     if (!timestamp) return 'Unknown time';
-    
+
     const date = new Date(timestamp);
     if (isNaN(date.getTime())) return 'Unknown time';
-    
+
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
     const diffMins = Math.floor(diffMs / 60000);
@@ -115,14 +115,24 @@ export default function Activities() {
                     onClick={() => handleUndo(activity)}
                     aria-label={`Undo ${activity.inventory_action} for ${activity.item_name}`}
                   >
-                    <img src={undoArrow} alt="Undo" style={activitiesStyles.actionIcon} />
+                    <Box
+                      component="img"
+                      src={undoArrow}
+                      alt="Undo"
+                      sx={activitiesStyles.actionIcon}
+                    />
                   </IconButton>
                   <IconButton
                     sx={activitiesStyles.actionButton}
                     onClick={() => handleEdit(activity)}
                     aria-label={`Edit ${activity.inventory_action} for ${activity.item_name}`}
                   >
-                    <img src={modifyPen} alt="Edit" style={activitiesStyles.actionIcon} />
+                    <Box
+                      component="img"
+                      src={modifyPen}
+                      alt="Edit"
+                      sx={activitiesStyles.actionIcon}
+                    />
                   </IconButton>
                 </TableCell>
               </TableRow>
