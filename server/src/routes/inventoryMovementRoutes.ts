@@ -13,6 +13,7 @@ import {
   createInventoryMovement,
   updateInventoryMovement,
   deleteInventoryMovement,
+  undoInventoryMovement,
 } from '../controllers/inventoryMovementControllers.js';
 
 const router = express.Router();
@@ -29,5 +30,6 @@ router.get('/after/:date', getMovementsOnAndAfterDate); // GET /api/inventory-mo
 router.post('/', createInventoryMovement); // POST /api/inventory-movement
 router.patch('/:id', updateInventoryMovement); // PATCH /api/inventory-movement/:id
 router.delete('/:id', deleteInventoryMovement); // DELETE /api/inventory-movement/:id
+router.post('/:id/undo', undoInventoryMovement); // POST /api/inventory-movement/:id/undo
 
 export default router;
