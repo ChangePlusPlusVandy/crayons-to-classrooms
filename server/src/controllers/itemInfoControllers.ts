@@ -127,6 +127,10 @@ export const getItemsInfoByName = async (req: Request, res: Response) => {
  *
  * @param {Request} req - Express request object with:
  *   - name: Item name (in body, required)
+ *   - product_id: UUID of the product (in body, required)
+ *   - category: Category string (in body, required)
+ *   - quantity: Quantity number (in body, required)
+ *   - value: Value number (in body, required)
  *   - item_limit: Limit number (in body, required)
  *   - stock: total stock of the item (in body, required)
  *   - last_known_fixture: last known fixture of the item (in body, optional)
@@ -141,6 +145,10 @@ export const createItemInfo = async (req: Request, res: Response) => {
   try {
     const {
       name,
+      product_id,
+      category,
+      quantity,
+      value,
       item_limit,
       stock,
       last_known_fixture,
@@ -149,10 +157,19 @@ export const createItemInfo = async (req: Request, res: Response) => {
       notes,
     }: CreateItemInfoInput = createItemInfoSchema.parse(req.body);
 
+    const productCheck = await pool.query('SELECT id FROM products WHERE id = $1', [product_id]);
+    if (productCheck.rows.length === 0) {
+      return res.status(400).json({ error: 'Invalid product_id' });
+    }
+
     const newItemInfo = await pool.query(
-      'INSERT INTO item_info (name, item_limit, stock, last_known_fixture, last_known_location_code, time_last_updated, notes) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
+      'INSERT INTO item_info (name, product_id, category, quantity, value, item_limit, stock, last_known_fixture, last_known_location_code, time_last_updated, notes) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *',
       [
         name,
+        product_id,
+        category,
+        quantity,
+        value,
         item_limit,
         stock,
         last_known_fixture,
@@ -175,11 +192,11 @@ export const createItemInfo = async (req: Request, res: Response) => {
 /**
  * Updates an existing item in the database.
  * Only updates fields that are provided in the request body.
- * Allowed fields: name, item_limit, stock, last_known_fixture, last_known_location_code, time_last_updated, notes.
+ * Allowed fields: name, product_id, category, quantity, value, item_limit, stock, last_known_fixture, last_known_location_code, time_last_updated, notes.
  *
  * @param {Request} req - Express request object with:
  *   - id: UUID of the item to update (in params)
- *   - Updatable fields in body (name, item_limit, stock, last_known_fixture, last_known_location_code, time_last_updated, notes)
+ *   - Updatable fields in body (name, product_id, category, quantity, value, item_limit, stock, last_known_fixture, last_known_location_code, time_last_updated, notes)
  * @param {Response} res - Express response object
  * @returns {Promise<Response>} JSON object of the updated item or error message
  * @throws {400} No updatable fields provided if request body is empty or contains no allowed fields
@@ -190,6 +207,15 @@ export const updateItemInfo = async (req: Request, res: Response) => {
   try {
     const { id } = itemInfoIdParamSchema.parse(req.params);
     const validatedData: UpdateItemInfoInput = updateItemInfoSchema.parse(req.body);
+
+    if (validatedData.product_id) {
+      const productCheck = await pool.query('SELECT id FROM products WHERE id = $1', [
+        validatedData.product_id,
+      ]);
+      if (productCheck.rows.length === 0) {
+        return res.status(400).json({ error: 'Invalid product_id' });
+      }
+    }
 
     const setClauses: string[] = [];
     const values: any[] = [];

@@ -383,7 +383,9 @@ export const createInventoryMovement = async (req: Request, res: Response) => {
 
     // Only check from_location_id if it's provided (it's optional for ADD actions)
     if (normalizedFromLocationId) {
-      checks.push(pool.query('SELECT id FROM storage_locations WHERE id = $1', [normalizedFromLocationId]));
+      checks.push(
+        pool.query('SELECT id FROM storage_locations WHERE id = $1', [normalizedFromLocationId])
+      );
     }
 
     const [itemCheck, productCheck, toLocationCheck, userCheck, fromLocationCheck] =

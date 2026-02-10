@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import pool from '../db.js';
 import {
   createItemSchema,
+  createItemsBulkSchema,
   updateItemSchema,
   statusQuerySchema,
   nameParamSchema,
@@ -10,6 +11,7 @@ import {
   locationIdParamSchema,
   warehouseIdParamSchema,
   CreateItemInput,
+  CreateItemsBulkInput,
   UpdateItemInput,
 } from '../utils/itemsModel.js';
 import { ZodError } from 'zod';
@@ -73,6 +75,10 @@ const getLocationInfo = async (locationId?: string | null) => {
 
 const syncItemInfoStock = async (
   itemName: string,
+  productId: string | undefined,
+  category: string | undefined,
+  quantity: number | undefined,
+  value: number | undefined,
   itemLimit: number | undefined,
   lastKnownFixture: string | null | undefined,
   lastKnownLocationCode: string | null | undefined,
@@ -90,16 +96,24 @@ const syncItemInfoStock = async (
     }
 
     await db.query(
-      `INSERT INTO item_info (name, item_limit, stock, last_known_fixture, last_known_location_code, time_last_updated, notes)
-       VALUES ($1, $2, $3, $4, $5, NOW(), $6)
+      `INSERT INTO item_info (name, product_id, category, quantity, value, item_limit, stock, last_known_fixture, last_known_location_code, time_last_updated, notes)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), $10)
        ON CONFLICT (name) DO UPDATE
        SET stock = item_info.stock + EXCLUDED.stock,
+           product_id = COALESCE(EXCLUDED.product_id, item_info.product_id),
+           category = COALESCE(EXCLUDED.category, item_info.category),
+           quantity = COALESCE(EXCLUDED.quantity, item_info.quantity),
+           value = COALESCE(EXCLUDED.value, item_info.value),
            item_limit = COALESCE(EXCLUDED.item_limit, item_info.item_limit),
            last_known_fixture = COALESCE(EXCLUDED.last_known_fixture, item_info.last_known_fixture),
            last_known_location_code = COALESCE(EXCLUDED.last_known_location_code, item_info.last_known_location_code),
            time_last_updated = NOW()`,
       [
         itemName,
+        productId ?? null,
+        category ?? null,
+        quantity ?? null,
+        value ?? null,
         itemLimit ?? Number.MAX_SAFE_INTEGER,
         stockDelta,
         lastKnownFixture ?? null,
@@ -110,6 +124,10 @@ const syncItemInfoStock = async (
   } catch (error) {
     console.error('Error syncing item info stock:', {
       itemName,
+      productId,
+      category,
+      quantity,
+      value,
       stockDelta,
       itemLimit,
       lastKnownFixture,
@@ -403,7 +421,18 @@ export const createItem = async (req: Request, res: Response) => {
     );
 
     const { fixture, locationCode } = await getLocationInfo(current_location_id ?? null);
-    await syncItemInfoStock(name, item_limit ?? 0, fixture, locationCode, 1, true);
+    await syncItemInfoStock(
+      name,
+      product_id,
+      category ?? 'UNKNOWN',
+      quantity,
+      value,
+      item_limit ?? 0,
+      fixture,
+      locationCode,
+      1,
+      true
+    );
 
     res.status(201).json(newItem.rows[0]);
   } catch (error) {
@@ -411,6 +440,141 @@ export const createItem = async (req: Request, res: Response) => {
       return handleValidationError(error, res);
     }
     console.error('Error creating item:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+/**
+ * Creates multiple items in the database with the same data.
+ *
+ * @param {Request} req - Express request object with:
+ *   - count: Number of items to create (in body, required)
+ *   - All fields required by createItemSchema
+ * @param {Response} res - Express response object
+ * @returns {Promise<Response>} JSON array of created items or error message
+ * @throws {400} Invalid foreign key if product_id, current_location_id (if provided), created_by, or warehouse doesn't exist
+ * @throws {500} Internal server error if validation or creation fails
+ */
+export const createItemsBulk = async (req: Request, res: Response) => {
+  try {
+    const {
+      count,
+      name,
+      product_id,
+      current_location_id,
+      created_by,
+      quantity,
+      stock,
+      status,
+      warehouse,
+      category,
+      item_limit,
+      value,
+      limbo,
+      notes,
+    }: CreateItemsBulkInput = createItemsBulkSchema.parse(req.body);
+
+    const validationPromises = [
+      pool.query('SELECT id FROM products WHERE id = $1', [product_id]),
+      pool.query('SELECT id FROM users WHERE id = $1', [created_by]),
+      pool.query('SELECT id FROM warehouse WHERE id = $1', [warehouse]),
+    ];
+
+    if (current_location_id) {
+      validationPromises.push(
+        pool.query('SELECT id FROM storage_locations WHERE id = $1', [current_location_id])
+      );
+    }
+
+    const validationResults = await Promise.all(validationPromises);
+
+    if (validationResults[0].rows.length === 0) {
+      return res.status(400).json({ error: 'Invalid product_id' });
+    }
+    if (validationResults[1].rows.length === 0) {
+      return res.status(400).json({ error: 'Invalid created_by user id' });
+    }
+    if (validationResults[2].rows.length === 0) {
+      return res.status(400).json({ error: 'Invalid warehouse id' });
+    }
+    if (current_location_id && validationResults[3]?.rows.length === 0) {
+      return res.status(400).json({ error: 'Invalid current_location_id' });
+    }
+
+    const newItems = await pool.query(
+      `INSERT INTO items (
+        name,
+        product_id,
+        quantity,
+        stock,
+        current_location_id,
+        status,
+        created_by,
+        warehouse,
+        category,
+        item_limit,
+        value,
+        limbo,
+        notes,
+        created_at,
+        updated_at
+      )
+      SELECT
+        $1,
+        $2,
+        $3,
+        $4,
+        $5,
+        $6,
+        $7,
+        $8,
+        $9,
+        $10,
+        $11,
+        $12,
+        $13,
+        NOW(),
+        NOW()
+      FROM generate_series(1, $14)
+      RETURNING *;`,
+      [
+        name,
+        product_id,
+        quantity,
+        stock ?? null,
+        current_location_id ?? null,
+        status,
+        created_by,
+        warehouse,
+        category ?? null,
+        item_limit ?? null,
+        value,
+        limbo ?? false,
+        notes ?? null,
+        count,
+      ]
+    );
+
+    const { fixture, locationCode } = await getLocationInfo(current_location_id ?? null);
+    await syncItemInfoStock(
+      name,
+      product_id,
+      category ?? 'UNKNOWN',
+      quantity,
+      value,
+      item_limit ?? 0,
+      fixture,
+      locationCode,
+      count,
+      true
+    );
+
+    res.status(201).json(newItems.rows);
+  } catch (error) {
+    if (error instanceof ZodError) {
+      return handleValidationError(error, res);
+    }
+    console.error('Error creating items in bulk:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -505,9 +669,46 @@ export const updateItem = async (req: Request, res: Response) => {
     }
 
     const { fixture, locationCode } = await getLocationInfo(newLocationId ?? null);
+    const updatedItem = rows[0];
+
     if (newName !== oldName) {
-      await syncItemInfoStock(oldName, 0, undefined, undefined, -1, false);
-      await syncItemInfoStock(newName, 0, fixture, locationCode, 1, true);
+      await syncItemInfoStock(
+        oldName,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        0,
+        undefined,
+        undefined,
+        -1,
+        false
+      );
+      await syncItemInfoStock(
+        newName,
+        updatedItem.product_id,
+        updatedItem.category ?? 'UNKNOWN',
+        updatedItem.quantity,
+        updatedItem.value,
+        updatedItem.item_limit ?? undefined,
+        fixture,
+        locationCode,
+        1,
+        true
+      );
+    } else if (validatedData.current_location_id) {
+      await syncItemInfoStock(
+        newName,
+        updatedItem.product_id,
+        updatedItem.category ?? 'UNKNOWN',
+        updatedItem.quantity,
+        updatedItem.value,
+        updatedItem.item_limit ?? undefined,
+        fixture,
+        locationCode,
+        0,
+        true
+      );
     }
     return res.json(rows[0]);
   } catch (error) {
@@ -543,7 +744,19 @@ export const deleteItem = async (req: Request, res: Response) => {
       }
 
       const itemName = deletedItem.rows[0].name;
-      await syncItemInfoStock(itemName, 0, undefined, undefined, -1, false, client);
+      await syncItemInfoStock(
+        itemName,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        0,
+        undefined,
+        undefined,
+        -1,
+        false,
+        client
+      );
 
       await client.query('COMMIT');
       return res.json({ message: 'Item deleted successfully' });
