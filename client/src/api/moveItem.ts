@@ -1,7 +1,7 @@
 import { Warehouse } from '../types/Warehouse';
 import { StorageLocation } from '../types/StorageLocation';
 import { Item, ItemGroup } from '../types/Item';
-import { InventoryMovement } from '../types/InventoryMovement';
+import { CreateInventoryMovementRequest, InventoryMovement } from '../types/InventoryMovement';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
 
@@ -35,7 +35,7 @@ export async function getItemsByLocation(locationId: string): Promise<Item[]> {
 }
 
 export async function createInventoryMovement(
-  movement: InventoryMovement
+  movement: CreateInventoryMovementRequest
 ): Promise<InventoryMovement> {
   const response = await fetch(`${API_BASE_URL}/inventory-movement`, {
     method: 'POST',

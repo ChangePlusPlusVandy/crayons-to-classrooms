@@ -372,21 +372,27 @@ export const createInventoryMovement = async (req: Request, res: Response) => {
 
     // Normalize from_location_id: undefined → null to avoid node-postgres invalid parameter errors
     const normalizedFromLocationId = from_location_id ?? null;
+    // Normalize to_location_id: null for DONATED and DISCARD actions (items leaving inventory)
+    const normalizedToLocationId = to_location_id ?? null;
 
-    // Check if item_id, product_id, from_location_id (if provided), to_location_id, performed_by_id exist in tables (in parallel)
+    // Check if item_id, product_id, from_location_id (if provided), to_location_id (if provided), performed_by_id exist in tables (in parallel)
     const checks = [
       pool.query('SELECT id FROM items WHERE id = $1', [item_id]),
       pool.query('SELECT id FROM products WHERE id = $1', [product_id]),
-      pool.query('SELECT id FROM storage_locations WHERE id = $1', [to_location_id]),
       pool.query('SELECT id FROM users WHERE id = $1', [performed_by]),
     ];
+
+    // Only check to_location_id if it's provided (it's null for DONATED and DISCARD actions)
+    if (normalizedToLocationId) {
+      checks.push(pool.query('SELECT id FROM storage_locations WHERE id = $1', [normalizedToLocationId]));
+    }
 
     // Only check from_location_id if it's provided (it's optional for ADD actions)
     if (normalizedFromLocationId) {
       checks.push(pool.query('SELECT id FROM storage_locations WHERE id = $1', [normalizedFromLocationId]));
     }
 
-    const [itemCheck, productCheck, toLocationCheck, userCheck, fromLocationCheck] =
+    const [itemCheck, productCheck, userCheck, ...optionalChecks] =
       await Promise.all(checks);
 
     if (itemCheck.rows.length === 0) {
@@ -395,28 +401,35 @@ export const createInventoryMovement = async (req: Request, res: Response) => {
     if (productCheck.rows.length === 0) {
       return res.status(400).json({ error: 'Invalid product_id' });
     }
-    if (toLocationCheck.rows.length === 0) {
-      return res.status(400).json({ error: 'Invalid to_location_id' });
-    }
     if (userCheck.rows.length === 0) {
       return res.status(400).json({ error: 'Invalid performed_by user id' });
     }
-    if (normalizedFromLocationId && fromLocationCheck && fromLocationCheck.rows.length === 0) {
-      return res.status(400).json({ error: 'Invalid from_location_id' });
+
+    let checkIdx = 0;
+    if (normalizedToLocationId) {
+      if (optionalChecks[checkIdx] && optionalChecks[checkIdx].rows.length === 0) {
+        return res.status(400).json({ error: 'Invalid to_location_id' });
+      }
+      checkIdx++;
+    }
+    if (normalizedFromLocationId) {
+      if (optionalChecks[checkIdx] && optionalChecks[checkIdx].rows.length === 0) {
+        return res.status(400).json({ error: 'Invalid from_location_id' });
+      }
     }
     const newInventoryAction = await pool.query(
       `
       INSERT INTO "inventory movement" (
-      inventory_action, 
-      item_id, 
-      product_id, 
-      from_location_id, 
-      to_location_id, 
-      quantity, 
-      performed_by, 
+      inventory_action,
+      item_id,
+      product_id,
+      from_location_id,
+      to_location_id,
+      quantity,
+      performed_by,
       note
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
       RETURNING *;
       `,
       [
@@ -424,7 +437,7 @@ export const createInventoryMovement = async (req: Request, res: Response) => {
         item_id,
         product_id,
         normalizedFromLocationId,
-        to_location_id,
+        normalizedToLocationId,
         quantity,
         performed_by,
         note || null,

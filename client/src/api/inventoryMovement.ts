@@ -84,6 +84,7 @@ export async function getMovementsOnAndAfterDate(date: string): Promise<Inventor
   return response.json();
 }
 
+
 // Create inventory movement
 export async function createInventoryMovement(
   data: CreateInventoryMovementRequest

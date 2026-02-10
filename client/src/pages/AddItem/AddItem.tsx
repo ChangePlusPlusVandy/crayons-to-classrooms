@@ -20,7 +20,7 @@ import {
   createInventoryMovement,
 } from '../../api/addItem';
 import { Warehouse } from '../../types/Warehouse';
-import { InventoryMovement } from '../../types/InventoryMovement';
+import { InventoryMovement, CreateInventoryMovementRequest } from '../../types/InventoryMovement';
 import { StorageLocation } from '../../types/StorageLocation';
 import { Product } from '../../types/Product';
 import {
@@ -193,7 +193,7 @@ export default function AddItem() {
 
       // Create a single inventory movement with the total quantity
       // Use the first item's ID for the movement record
-      const movementPayload: Omit<InventoryMovement, 'id' | 'performed_at'> = {
+      const movementPayload: CreateInventoryMovementRequest = {
         inventory_action: 'ADD',
         item_id: newItems[0].id,
         product_id: selectedProduct.id,

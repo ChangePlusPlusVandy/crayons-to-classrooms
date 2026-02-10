@@ -14,11 +14,12 @@ import {
   FormControl,
 } from '@mui/material';
 
-import { getItems, updateItem, deleteItem, getWarehouses } from '../../api/items';
-// import { createInventoryMovement } from '../../api/inventoryMovement';
+import { getItems, updateItem } from '../../api/items';
+import { createInventoryMovement } from '../../api/addItem';
 import { Item, UpdateItemRequest } from '../../types/Item';
 import { Warehouse } from '../../types/Warehouse';
 import { RemoveItemCard, RemoveItemFormLabel } from './RemoveItemPage.styles';
+import { WarehouseSelector } from '../../components/WarehouseSelector/WarehouseSelector';
 import { getStorageLocationById } from '../../api/storageLocation';
 import { StorageLocation } from '../../types/StorageLocation';
 import { useMemo } from 'react';
@@ -29,7 +30,6 @@ type ItemWithLocation = {
 
 export default function RemoveItemPage() {
   const [items, setItems] = useState<Item[]>([]);
-  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [selectedWarehouse, setSelectedWarehouse] = useState<Warehouse | null>(null);
   const removeByOptions: Array<'item' | 'slot' | 'product'> = ['item', 'slot', 'product'];
   const [removeBy, setRemoveBy] = useState<'item' | 'slot' | 'product'>('item');
@@ -39,6 +39,12 @@ export default function RemoveItemPage() {
   const [selectedSlot, setSelectedLocationCode] = useState('');
   const productOptions: string[] = ['Product A', 'Product B', 'Product C']; // hardcoded for now will change in later sprints
   const [selectedProduct, setSelectedProduct] = useState('');
+
+  const removalActionOptions = [
+    { value: 'DONATED' as const, label: 'Donate' },
+    { value: 'DISCARD' as const, label: 'Delete (Defective)' },
+  ];
+  const [removalAction, setRemovalAction] = useState<'DONATED' | 'DISCARD'>('DONATED');
 
   const [quantityToRemove, setQuantityToRemove] = useState<number | null>(null);
   const [moveToLimbo, setMoveToLimbo] = useState(false);
@@ -54,15 +60,14 @@ export default function RemoveItemPage() {
 
   // const CURRENT_USER_ID = '8f4a9cb7-909c-43b2-8006-c35ad8311aca'; // HARDCODED VALUE replace with logged-in user ID
 
-  // Load items and warehouses
+  // Load items
   useEffect(() => {
     async function loadData() {
       try {
-        const [itemsData, warehousesData] = await Promise.all([getItems(), getWarehouses()]);
+        const itemsData = await getItems();
         setItems(itemsData);
-        setWarehouses(warehousesData);
       } catch {
-        setError('Failed to load items and warehouses.');
+        setError('Failed to load items.');
       } finally {
         setLoading(false);
       }
@@ -76,7 +81,7 @@ export default function RemoveItemPage() {
     setSelectedItem(item);
     setQuantityToRemove(0);
   };
-  // Remove item handler
+  // Remove item handler (donate or delete/defective)
   const handleRemoveItem = async () => {
     if (!selectedItem || quantityToRemove === null || quantityToRemove <= 0) {
       setError('Please select an item and quantity to remove.');
@@ -94,19 +99,37 @@ export default function RemoveItemPage() {
 
     try {
       const isFullRemoval = quantityToRemove === selectedItem.quantity;
+      const newStatus = removalAction === 'DONATED' ? 'donated' : 'defective';
 
-      // Update or delete the item
       if (isFullRemoval) {
-        await deleteItem(selectedItem.id);
-      } else {
+        // Full removal: update status and nullify location fields
         const updateData: UpdateItemRequest = {
-          quantity: quantityToRemove,
+          status: newStatus,
+          current_location_id: null,
+          warehouse: null,
+          limbo: moveToLimbo,
+        };
+        await updateItem(selectedItem.id, updateData);
+      } else {
+        // Partial removal: just reduce quantity on existing item
+        const updateData: UpdateItemRequest = {
+          quantity: selectedItem.quantity - quantityToRemove,
           limbo: moveToLimbo,
         };
         await updateItem(selectedItem.id, updateData);
       }
 
-      // ADD INVENTORY MOVEMENT REQUEST LOGIC HERE
+      // Create inventory movement record
+      await createInventoryMovement({
+        inventory_action: removalAction,
+        item_id: selectedItem.id,
+        product_id: selectedItem.product_id,
+        from_location_id: selectedItem.current_location_id,
+        to_location_id: null,
+        quantity: quantityToRemove,
+        performed_by: 'b4974f63-ee89-42a1-bdb3-ce9df255c682', // Hardcoded user ID (matches Add/Move pages)
+        note: notes || undefined,
+      });
 
       // Refresh items
       const refreshedItems = await getItems();
@@ -114,11 +137,18 @@ export default function RemoveItemPage() {
 
       // Reset form
       setSelectedItem(null);
+      setSelectedOption(null);
       setQuantityToRemove(0);
       setMoveToLimbo(false);
+      setRemovalAction('DONATED');
       setNotes('');
 
-      setSuccess(isFullRemoval ? 'Item fully removed.' : 'Item quantity updated.');
+      const actionLabel = removalAction === 'DONATED' ? 'donated' : 'marked as defective';
+      setSuccess(
+        isFullRemoval
+          ? `Item fully ${actionLabel}.`
+          : `${quantityToRemove} item(s) ${actionLabel}.`
+      );
     } catch (err) {
       console.error(err);
       setError('Failed to remove item.');
@@ -235,21 +265,19 @@ export default function RemoveItemPage() {
             {error && <Alert severity="error">{error}</Alert>}
             {success && <Alert severity="success">{success}</Alert>}
             {/* Warehouse */}
-            <FormControl>
-              <RemoveItemFormLabel htmlFor="warehouse-select">Warehouse</RemoveItemFormLabel>
-              <Autocomplete
-                options={warehouses}
-                value={selectedWarehouse}
-                onChange={(_, newValue) => {
-                  setSelectedWarehouse(newValue);
-                }}
-                getOptionLabel={(option) => option.name}
-                isOptionEqualToValue={(option, value) => option.id === value.id}
-                renderInput={(params) => (
-                  <TextField {...params} placeholder="Select warehouse" fullWidth />
-                )}
-              />
-            </FormControl>
+            <WarehouseSelector
+              value={selectedWarehouse}
+              onChange={(newWarehouse) => {
+                setSelectedWarehouse(newWarehouse);
+                setSelectedItem(null);
+                setSelectedOption(null);
+                setQuantityToRemove(0);
+                setError('');
+              }}
+              label="Warehouse"
+              placeholder="Select warehouse"
+              fullWidth
+            />
             {/* Remove By */}{' '}
             <FormControl>
               <RemoveItemFormLabel htmlFor="remove-by-select">Remove By</RemoveItemFormLabel>
@@ -264,6 +292,25 @@ export default function RemoveItemPage() {
                 getOptionLabel={(option) => option.charAt(0).toUpperCase() + option.slice(1)}
                 renderInput={(params) => (
                   <TextField {...params} placeholder="Remove By" fullWidth />
+                )}
+              />
+            </FormControl>
+            {/* Removal Action */}
+            <FormControl>
+              <RemoveItemFormLabel htmlFor="removal-action-select">Removal Action</RemoveItemFormLabel>
+              <Autocomplete
+                options={removalActionOptions}
+                value={removalActionOptions.find((o) => o.value === removalAction) ?? removalActionOptions[0]}
+                onChange={(_, newValue) => {
+                  if (newValue) {
+                    setRemovalAction(newValue.value);
+                  }
+                }}
+                getOptionLabel={(option) => option.label}
+                isOptionEqualToValue={(option, value) => option.value === value.value}
+                disableClearable
+                renderInput={(params) => (
+                  <TextField {...params} placeholder="Select removal action" fullWidth />
                 )}
               />
             </FormControl>
@@ -373,8 +420,10 @@ export default function RemoveItemPage() {
                 variant="outlined"
                 onClick={() => {
                   setSelectedItem(null);
+                  setSelectedOption(null);
                   setQuantityToRemove(0);
                   setMoveToLimbo(false);
+                  setRemovalAction('DONATED');
                   setNotes('');
                 }}
               >
@@ -382,7 +431,7 @@ export default function RemoveItemPage() {
               </Button>
 
               <Button variant="contained" color="error" onClick={handleRemoveItem}>
-                Remove Item
+                {removalAction === 'DONATED' ? 'Donate Item' : 'Delete Item'}
               </Button>
             </Box>
           </Box>

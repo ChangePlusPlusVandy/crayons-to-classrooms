@@ -2,9 +2,9 @@ import { Product } from '../types/Product';
 import { Item } from '../types/Item';
 import { StorageLocation } from '../types/StorageLocation';
 import { Warehouse } from '../types/Warehouse';
-import { InventoryMovement } from '../types/InventoryMovement';
+import { InventoryMovement, CreateInventoryMovementRequest } from '../types/InventoryMovement';
 
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
+const API_BASE_URL = 'http://localhost:5001/api';
 
 export async function getProducts(): Promise<Product[]> {
   const response = await fetch(`${API_BASE_URL}/products`);
@@ -51,7 +51,7 @@ export async function createItem(itemData: {
 }
 
 export async function createInventoryMovement(
-  movement: Omit<InventoryMovement, 'id' | 'performed_at'>
+  movement: CreateInventoryMovementRequest
 ): Promise<InventoryMovement> {
   const response = await fetch(`${API_BASE_URL}/inventory-movement`, {
     method: 'POST',
