@@ -56,7 +56,11 @@ export const createItemSchema = z.object({
  * Requires: same fields as createItemSchema plus count
  */
 export const createItemsBulkSchema = createItemSchema.extend({
-  count: z.number().int().positive('Count must be a positive integer'),
+  count: z
+    .number()
+    .int()
+    .positive('Count must be a positive integer')
+    .max(1000, 'Count must be 1000 or less'),
 });
 
 /**

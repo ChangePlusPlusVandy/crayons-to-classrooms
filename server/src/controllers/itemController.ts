@@ -53,12 +53,12 @@ type DbClient = {
   query: (text: string, params?: any[]) => Promise<any>;
 };
 
-const getLocationInfo = async (locationId?: string | null) => {
+const getLocationInfo = async (locationId?: string | null, db: DbClient = pool) => {
   if (!locationId) {
     return { fixture: null, locationCode: null };
   }
 
-  const locationResult = await pool.query(
+  const locationResult = await db.query(
     'SELECT fixture, location_code FROM storage_locations WHERE id = $1',
     [locationId]
   );
@@ -474,102 +474,118 @@ export const createItemsBulk = async (req: Request, res: Response) => {
       notes,
     }: CreateItemsBulkInput = createItemsBulkSchema.parse(req.body);
 
-    const validationPromises = [
-      pool.query('SELECT id FROM products WHERE id = $1', [product_id]),
-      pool.query('SELECT id FROM users WHERE id = $1', [created_by]),
-      pool.query('SELECT id FROM warehouse WHERE id = $1', [warehouse]),
-    ];
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
 
-    if (current_location_id) {
-      validationPromises.push(
-        pool.query('SELECT id FROM storage_locations WHERE id = $1', [current_location_id])
+      const validationPromises = [
+        client.query('SELECT id FROM products WHERE id = $1', [product_id]),
+        client.query('SELECT id FROM users WHERE id = $1', [created_by]),
+        client.query('SELECT id FROM warehouse WHERE id = $1', [warehouse]),
+      ];
+
+      if (current_location_id) {
+        validationPromises.push(
+          client.query('SELECT id FROM storage_locations WHERE id = $1', [current_location_id])
+        );
+      }
+
+      const validationResults = await Promise.all(validationPromises);
+
+      if (validationResults[0].rows.length === 0) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ error: 'Invalid product_id' });
+      }
+      if (validationResults[1].rows.length === 0) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ error: 'Invalid created_by user id' });
+      }
+      if (validationResults[2].rows.length === 0) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ error: 'Invalid warehouse id' });
+      }
+      if (current_location_id && validationResults[3]?.rows.length === 0) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ error: 'Invalid current_location_id' });
+      }
+
+      const newItems = await client.query(
+        `INSERT INTO items (
+          name,
+          product_id,
+          quantity,
+          stock,
+          current_location_id,
+          status,
+          created_by,
+          warehouse,
+          category,
+          item_limit,
+          value,
+          limbo,
+          notes,
+          created_at,
+          updated_at
+        )
+        SELECT
+          $1,
+          $2,
+          $3,
+          $4,
+          $5,
+          $6,
+          $7,
+          $8,
+          $9,
+          $10,
+          $11,
+          $12,
+          $13,
+          NOW(),
+          NOW()
+        FROM generate_series(1, $14)
+        RETURNING *;`,
+        [
+          name,
+          product_id,
+          quantity,
+          stock ?? null,
+          current_location_id ?? null,
+          status,
+          created_by,
+          warehouse,
+          category ?? null,
+          item_limit ?? null,
+          value,
+          limbo ?? false,
+          notes ?? null,
+          count,
+        ]
       );
-    }
 
-    const validationResults = await Promise.all(validationPromises);
-
-    if (validationResults[0].rows.length === 0) {
-      return res.status(400).json({ error: 'Invalid product_id' });
-    }
-    if (validationResults[1].rows.length === 0) {
-      return res.status(400).json({ error: 'Invalid created_by user id' });
-    }
-    if (validationResults[2].rows.length === 0) {
-      return res.status(400).json({ error: 'Invalid warehouse id' });
-    }
-    if (current_location_id && validationResults[3]?.rows.length === 0) {
-      return res.status(400).json({ error: 'Invalid current_location_id' });
-    }
-
-    const newItems = await pool.query(
-      `INSERT INTO items (
+      const { fixture, locationCode } = await getLocationInfo(current_location_id ?? null, client);
+      await syncItemInfoStock(
         name,
         product_id,
+        category ?? 'UNKNOWN',
         quantity,
-        stock,
-        current_location_id,
-        status,
-        created_by,
-        warehouse,
-        category,
-        item_limit,
         value,
-        limbo,
-        notes,
-        created_at,
-        updated_at
-      )
-      SELECT
-        $1,
-        $2,
-        $3,
-        $4,
-        $5,
-        $6,
-        $7,
-        $8,
-        $9,
-        $10,
-        $11,
-        $12,
-        $13,
-        NOW(),
-        NOW()
-      FROM generate_series(1, $14)
-      RETURNING *;`,
-      [
-        name,
-        product_id,
-        quantity,
-        stock ?? null,
-        current_location_id ?? null,
-        status,
-        created_by,
-        warehouse,
-        category ?? null,
-        item_limit ?? null,
-        value,
-        limbo ?? false,
-        notes ?? null,
+        item_limit ?? 0,
+        fixture,
+        locationCode,
         count,
-      ]
-    );
+        true,
+        client
+      );
 
-    const { fixture, locationCode } = await getLocationInfo(current_location_id ?? null);
-    await syncItemInfoStock(
-      name,
-      product_id,
-      category ?? 'UNKNOWN',
-      quantity,
-      value,
-      item_limit ?? 0,
-      fixture,
-      locationCode,
-      count,
-      true
-    );
-
-    res.status(201).json(newItems.rows);
+      await client.query('COMMIT');
+      return res.status(201).json(newItems.rows);
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
   } catch (error) {
     if (error instanceof ZodError) {
       return handleValidationError(error, res);
