@@ -114,7 +114,7 @@ const syncItemInfoStock = async (
         category ?? null,
         quantity ?? null,
         value ?? null,
-        itemLimit ?? Number.MAX_SAFE_INTEGER,
+        itemLimit ?? null,
         stockDelta,
         lastKnownFixture ?? null,
         lastKnownLocationCode ?? null,
