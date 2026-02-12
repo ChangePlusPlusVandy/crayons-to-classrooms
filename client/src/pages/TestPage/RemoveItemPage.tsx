@@ -6,7 +6,6 @@ import {
   CircularProgress,
   Alert,
   TextField,
-  // MenuItem,
   Button,
   FormControlLabel,
   Checkbox,
@@ -21,7 +20,6 @@ import { Warehouse } from '../../types/Warehouse';
 import { RemoveItemCard, RemoveItemFormLabel } from './RemoveItemPage.styles';
 import { WarehouseSelector } from '../../components/WarehouseSelector/WarehouseSelector';
 import { getStorageLocationById } from '../../api/storageLocation';
-import { StorageLocation } from '../../types/StorageLocation';
 import { useMemo } from 'react';
 type ItemWithLocation = {
   item: Item;
@@ -34,9 +32,6 @@ export default function RemoveItemPage() {
   const removeByOptions: Array<'item' | 'slot' | 'product'> = ['item', 'slot', 'product'];
   const [removeBy, setRemoveBy] = useState<'item' | 'slot' | 'product'>('item');
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
-  const [itemSlots, setItemSlots] = useState<string[]>([]);
-  const slotOptions: string[] = ['A1', 'A2', 'B1', 'B2']; // hardcoded for now - will change in later sprints
-  const [selectedSlot, setSelectedLocationCode] = useState('');
   const productOptions: string[] = ['Product A', 'Product B', 'Product C']; // hardcoded for now will change in later sprints
   const [selectedProduct, setSelectedProduct] = useState('');
 
@@ -51,14 +46,12 @@ export default function RemoveItemPage() {
   const [notes, setNotes] = useState('');
 
   const [loading, setLoading] = useState(true);
-  const [loadingSlots, setLoadingSlots] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [itemOptions, setItemOptions] = useState<ItemWithLocation[]>([]);
   const [selectedOption, setSelectedOption] = useState<typeof itemOptions[0] | null>(null);
 
 
-  // const CURRENT_USER_ID = '8f4a9cb7-909c-43b2-8006-c35ad8311aca'; // HARDCODED VALUE replace with logged-in user ID
 
   // Load items
   useEffect(() => {
@@ -75,12 +68,6 @@ export default function RemoveItemPage() {
     loadData();
   }, []);
 
-  //Item selection handler
-  const handleItemSelect = (itemId: string) => {
-    const item = items.find((i) => i.id === itemId) || null;
-    setSelectedItem(item);
-    setQuantityToRemove(0);
-  };
   // Remove item handler (donate or delete/defective)
   const handleRemoveItem = async () => {
     if (!selectedItem || quantityToRemove === null || quantityToRemove <= 0) {
@@ -175,8 +162,6 @@ export default function RemoveItemPage() {
           itemsInSelectedWarehouse.map(async (item) => {
             const location = await getStorageLocationById(item.current_location_id);
 
-            // if (location.warehouse_id !== selectedWarehouse.id) return null;
-
             return {
               item,
               locationCode: location.location_code,
@@ -194,58 +179,6 @@ export default function RemoveItemPage() {
     buildItemOptions();
   }, [itemsInSelectedWarehouse, selectedWarehouse]);
 
-  useEffect(() => {
-    const fetchItemSlots = async () => {
-      if (!selectedWarehouse || !selectedItem) {
-        setItemSlots([]);
-        return;
-      }
-
-      // 1️⃣ Get all items with same name in the warehouse
-      const matchingItems = itemsInSelectedWarehouse.filter(
-        (item) => item.name === selectedItem.name
-      );
-
-      if (matchingItems.length === 0) {
-        setItemSlots([]);
-        return;
-      }
-
-      setLoadingSlots(true);
-
-      try {
-        // Fetch storage locations for each item's locationId
-        const slots = await Promise.all(
-          matchingItems.map(async (item) => {
-            const location = await getStorageLocationById(item.current_location_id);
-
-            // 3️⃣ Only keep if the storage location belongs to the selected warehouse
-            if (location.warehouse_id === selectedWarehouse.id) return location.location_code;
-            return null;
-          })
-        );
-
-        // Remove nulls
-        const validSlotCodes = slots.filter((slot): slot is string => slot !== null);
-
-        setItemSlots(validSlotCodes);
-      } catch (err) {
-        console.error('Failed to fetch item slots', err);
-        setItemSlots([]);
-      } finally {
-        setLoadingSlots(false);
-      }
-    };
-
-    fetchItemSlots();
-  }, [selectedItem, selectedWarehouse, itemsInSelectedWarehouse]);
-
-  // items with the same name in storage
-  const getItemsWithSameNameInWarehouse = () => {
-    if (!selectedWarehouse || !selectedItem) return [];
-
-    return itemsInSelectedWarehouse.filter((item) => item.name === selectedItem.name);
-  };
 
   return (
     <Container maxWidth="md" sx={{ py: 4 }}>
@@ -326,7 +259,6 @@ export default function RemoveItemPage() {
                   onChange={(_, newValue) => {
                     setSelectedOption(newValue);
                     setSelectedItem(newValue?.item ?? null);
-                    setSelectedLocationCode(newValue?.locationCode ?? '');
                   }}
                   isOptionEqualToValue={(option, value) => option.item.id === value.item.id}
                   getOptionLabel={(option) => option.item.name}

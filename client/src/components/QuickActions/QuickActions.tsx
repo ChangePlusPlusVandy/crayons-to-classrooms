@@ -23,7 +23,7 @@ export default function QuickActions() {
       borderColor: '#dc3545',
       bgColor: '#f8d7da',
       iconColor: '#a71d2a',
-      route: null, // Not implemented yet
+      route: '/remove-item',
     },
     {
       icon: <ArrowForwardIcon />,

@@ -412,6 +412,7 @@ export const createInventoryMovement = async (req: Request, res: Response) => {
       }
       checkIdx++;
     }
+    
     if (normalizedFromLocationId) {
       if (optionalChecks[checkIdx] && optionalChecks[checkIdx].rows.length === 0) {
         return res.status(400).json({ error: 'Invalid from_location_id' });
