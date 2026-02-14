@@ -313,19 +313,21 @@ export const getItemsByStatus = async (req: Request, res: Response) => {
 };
 
 /**
- * Core logic for creating a new item in the database.
- * Validates foreign key constraints and inserts the item.
+ * Core logic for creating items in the database.
+ * Validates foreign key constraints and inserts the item(s).
  * Can be used inside a transaction by passing a PoolClient.
  *
  * @param data - Validated CreateItemInput data
+ * @param count - Number of identical item rows to create (default 1)
  * @param db - Database client (pool or transaction client)
- * @returns The newly created item row
+ * @returns Array of newly created item rows
  * @throws {ForeignKeyError} If any foreign key reference is invalid
  */
 export async function createItemCore(
   data: CreateItemInput,
+  count: number = 1,
   db: DbClient = pool
-): Promise<any> {
+): Promise<any[]> {
   const {
     name,
     product_id,
@@ -371,8 +373,8 @@ export async function createItemCore(
     throw new ForeignKeyError('current_location_id');
   }
 
-  const newItem = await db.query(
-    'INSERT INTO items (name, product_id, quantity, stock, current_location_id, status, created_by, warehouse, category, item_limit, value, limbo, notes, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW(), NOW()) RETURNING *',
+  const newItems = await db.query(
+    'INSERT INTO items (name, product_id, quantity, stock, current_location_id, status, created_by, warehouse, category, item_limit, value, limbo, notes, created_at, updated_at) SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW(), NOW() FROM generate_series(1, $14) RETURNING *',
     [
       name,
       product_id,
@@ -387,13 +389,14 @@ export async function createItemCore(
       value,
       limbo ?? false,
       notes ?? null,
+      count,
     ]
   );
 
   const { fixture, locationCode } = await getLocationInfo(current_location_id ?? null, db);
-  await syncItemInfoStock(name, item_limit ?? 0, fixture, locationCode, 1, true, db);
+  await syncItemInfoStock(name, item_limit ?? 0, fixture, locationCode, count, true, db);
 
-  return newItem.rows[0];
+  return newItems.rows;
 }
 
 /**
@@ -421,8 +424,8 @@ export async function createItemCore(
 export const createItem = async (req: Request, res: Response) => {
   try {
     const data: CreateItemInput = createItemSchema.parse(req.body);
-    const createdItem = await createItemCore(data);
-    res.status(201).json(createdItem);
+    const createdItems = await createItemCore(data);
+    res.status(201).json(createdItems[0]);
   } catch (error) {
     if (error instanceof ZodError) {
       return handleValidationError(error, res);

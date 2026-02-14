@@ -555,15 +555,16 @@ export const deleteInventoryMovement = async (req: Request, res: Response) => {
 };
 
 /**
- * Creates a new item and an associated inventory movement atomically in a transaction.
- * If either operation fails, neither is committed.
+ * Creates multiple identical items and an associated inventory movement atomically in a transaction.
+ * The number of items created is derived from movement.quantity.
+ * If any operation fails, none are committed.
  *
  * @param {Request} req - Express request object with nested body:
  *   - item: Object with all createItem fields (name, product_id, quantity, etc.)
  *   - movement: Object with movement fields (inventory_action, to_location_id, quantity, performed_by, etc.)
- *     Note: item_id and product_id are derived from the created item.
+ *     Note: item_id and product_id are derived from the first created item.
  * @param {Response} res - Express response object
- * @returns {Promise<Response>} JSON object with { item, movement } or error message
+ * @returns {Promise<Response>} JSON object with { items, movement } or error message
  * @throws {400} Validation error or invalid foreign key
  * @throws {500} Internal server error
  */
@@ -574,12 +575,12 @@ export const createItemWithMovement = async (req: Request, res: Response) => {
 
     await client.query('BEGIN');
 
-    const createdItem = await createItemCore(itemData, client);
+    const createdItems = await createItemCore(itemData, movementData.quantity, client);
 
     const fullMovementData: CreateInventoryInput = {
       inventory_action: movementData.inventory_action,
-      item_id: createdItem.id,
-      product_id: createdItem.product_id,
+      item_id: createdItems[0].id,
+      product_id: createdItems[0].product_id,
       from_location_id: movementData.from_location_id,
       to_location_id: movementData.to_location_id,
       quantity: movementData.quantity,
@@ -591,7 +592,7 @@ export const createItemWithMovement = async (req: Request, res: Response) => {
 
     await client.query('COMMIT');
 
-    res.status(201).json({ item: createdItem, movement: createdMovement });
+    res.status(201).json({ items: createdItems, movement: createdMovement });
   } catch (error) {
     await client.query('ROLLBACK');
     if (error instanceof ZodError) {
@@ -600,7 +601,7 @@ export const createItemWithMovement = async (req: Request, res: Response) => {
     if (error instanceof ForeignKeyError) {
       return res.status(400).json({ error: error.message });
     }
-    console.error('Error creating item with movement:', error);
+    console.error('Error creating items with movement:', error);
     res.status(500).json({ error: 'Internal server error' });
   } finally {
     client.release();
