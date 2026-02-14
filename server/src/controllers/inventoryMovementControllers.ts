@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import pool from '../db.js';
 import {
   movementIdParamSchema,
+  MovementIdParamType,
   createInventoryMovementSchema,
   updateInventoryMovementSchema,
   itemIdParamSchema,
@@ -17,7 +18,7 @@ import {
 } from '../utils/inventoryMovementsModel.js';
 import { ZodError } from 'zod';
 import { DbClient } from '../utils/dbTypes.js';
-import { ForeignKeyError } from '../utils/errors.js';
+import { ForeignKeyError, NotFoundError, UndoConflictError } from '../utils/errors.js';
 import { createItemCore } from './itemController.js';
 
 /**
@@ -379,7 +380,9 @@ export async function createInventoryMovementCore(
 
   // Only check from_location_id if it's provided (it's optional for ADD actions)
   if (normalizedFromLocationId) {
-    checks.push(db.query('SELECT id FROM storage_locations WHERE id = $1', [normalizedFromLocationId]));
+    checks.push(
+      db.query('SELECT id FROM storage_locations WHERE id = $1', [normalizedFromLocationId])
+    );
   }
 
   const [itemCheck, productCheck, toLocationCheck, userCheck, fromLocationCheck] =
@@ -608,62 +611,82 @@ export const createItemWithMovement = async (req: Request, res: Response) => {
   }
 };
 
+export const undoInventoryMovementCore = async (
+  { id }: MovementIdParamType,
+  db: DbClient = pool
+) => {
+  const result = await db.query('SELECT * FROM "inventory movement" WHERE id = $1', [id]);
+  if (result.rows.length === 0) {
+    throw new NotFoundError('Inventory movement not found');
+  }
+
+  const inventoryMovement = result.rows[0];
+
+  if (inventoryMovement.inventory_action === 'MOVE') {
+    const itemsAtDestination = await db.query(
+      'SELECT id FROM items WHERE product_id = $1 AND current_location_id = $2 LIMIT $3',
+      [inventoryMovement.product_id, inventoryMovement.to_location_id, inventoryMovement.quantity]
+    );
+
+    if (itemsAtDestination.rows.length < inventoryMovement.quantity) {
+      throw new UndoConflictError('Cannot undo: items have been moved again or deleted');
+    }
+
+    const itemIds = itemsAtDestination.rows.map((row) => row.id);
+    for (const itemId of itemIds) {
+      await db.query('UPDATE items SET current_location_id = $1 WHERE id = $2', [
+        inventoryMovement.from_location_id,
+        itemId,
+      ]);
+    }
+  } else if (inventoryMovement.inventory_action === 'ADD') {
+    const itemsAtDestination = await db.query(
+      'SELECT id FROM items WHERE product_id = $1 AND current_location_id = $2 LIMIT $3',
+      [inventoryMovement.product_id, inventoryMovement.to_location_id, inventoryMovement.quantity]
+    );
+
+    if (itemsAtDestination.rows.length < inventoryMovement.quantity) {
+      throw new UndoConflictError('Cannot undo: items have been moved or deleted');
+    }
+
+    // Delete movement record FIRST to avoid foreign key constraint
+    await db.query('DELETE FROM "inventory movement" WHERE id = $1', [id]);
+
+    const itemIds = itemsAtDestination.rows.map((row) => row.id);
+    for (const itemId of itemIds) {
+      // Delete item only if not referenced by other movements
+      await db.query(
+        'DELETE FROM items WHERE id = $1 AND NOT EXISTS (SELECT 1 FROM "inventory movement" WHERE item_id = $1)',
+        [itemId]
+      );
+    }
+  } else {
+    // For other action types, just delete the movement record
+    await db.query('DELETE FROM "inventory movement" WHERE id = $1', [id]);
+  }
+
+  // Delete movement record for MOVE (already handled for ADD above)
+  if (inventoryMovement.inventory_action === 'MOVE') {
+    await db.query('DELETE FROM "inventory movement" WHERE id = $1', [id]);
+  }
+};
+
 export const undoInventoryMovement = async (req: Request, res: Response) => {
   try {
     const { id } = movementIdParamSchema.parse(req.params);
-    const result = await pool.query('SELECT * FROM "inventory movement" WHERE id = $1', [id]);
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error : "Inventory movement not found" });
-    }
-
-    const inventoryMovement = result.rows[0];
-
-    if (inventoryMovement.inventory_action === 'MOVE') {
-      const itemsAtDestination = await pool.query('SELECT id FROM items WHERE product_id = $1 AND current_location_id = $2 LIMIT $3',
-        [inventoryMovement.product_id, inventoryMovement.to_location_id, inventoryMovement.quantity]
-      );
-
-      if (itemsAtDestination.rows.length < inventoryMovement.quantity) {
-        return res.status(400).json({ error : "Cannot undo: items have been moved again or deleted" });
-      }
-
-      const itemIds = itemsAtDestination.rows.map(row => row.id);
-      for (const itemId of itemIds) {
-        await pool.query('UPDATE items SET current_location_id = $1 WHERE id = $2', 
-          [inventoryMovement.from_location_id, itemId]);
-      }
-    } else if (inventoryMovement.inventory_action === 'ADD') {
-      const itemsAtDestination = await pool.query('SELECT id FROM items WHERE product_id = $1 AND current_location_id = $2 LIMIT $3',
-        [inventoryMovement.product_id, inventoryMovement.to_location_id, inventoryMovement.quantity]
-      );
-
-      if (itemsAtDestination.rows.length < inventoryMovement.quantity) {
-        return res.status(400).json({ error : "Cannot undo: items have been moved or deleted" });
-      }
-
-      // Delete movement record FIRST to avoid foreign key constraint
-      await pool.query('DELETE FROM "inventory movement" WHERE id = $1', [id]);
-
-      const itemIds = itemsAtDestination.rows.map(row => row.id);
-      for (const itemId of itemIds) {
-        // Delete item only if not referenced by other movements
-        await pool.query('DELETE FROM items WHERE id = $1 AND NOT EXISTS (SELECT 1 FROM "inventory movement" WHERE item_id = $1)', [itemId]);
-      }
-    } else {
-      // For other action types, just delete the movement record
-      await pool.query('DELETE FROM "inventory movement" WHERE id = $1', [id]);
-    }
-
-    // Delete movement record for MOVE (already handled for ADD above)
-    if (inventoryMovement.inventory_action === 'MOVE') {
-      await pool.query('DELETE FROM "inventory movement" WHERE id = $1', [id]);
-    }
-    res.json({ message : 'Inventory movement undone successfully' });
+    await undoInventoryMovementCore({ id });
+    res.json({ message: 'Inventory movement undone successfully' });
   } catch (error) {
     if (error instanceof ZodError) {
       return handleValidationError(error, res);
     }
+    if (error instanceof NotFoundError) {
+      return res.status(404).json({ error: error.message });
+    }
+    if (error instanceof UndoConflictError) {
+      return res.status(400).json({ error: error.message });
+    }
     console.error('Error undoing inventory movement:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
-}
+};

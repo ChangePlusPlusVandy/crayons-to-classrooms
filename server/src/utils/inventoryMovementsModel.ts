@@ -99,3 +99,4 @@ export type CreateInventoryInput = z.infer<typeof createInventoryMovementSchema>
 export type UpdateInventoryInput = z.infer<typeof updateInventoryMovementSchema>;
 export type InventoryStatusType = z.infer<typeof actionQuerySchema>;
 export type CreateItemWithMovementInput = z.infer<typeof createItemWithMovementSchema>;
+export type MovementIdParamType = z.infer<typeof movementIdParamSchema>;
