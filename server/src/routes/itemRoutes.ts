@@ -8,6 +8,7 @@ import {
   getItemsByProductId,
   getItemsByLocationId,
   getItemsByWarehouseId,
+  getItemsByItemInfoId,
   getItemsByStatus,
   createItemsBulk,
 } from '../controllers/itemController.js';
@@ -25,6 +26,8 @@ router.get('/location/:locationId', getItemsByLocationId);
 router.get('/product/:productId', getItemsByProductId);
 // get items by warehouse id
 router.get('/warehouse/:warehouseId', getItemsByWarehouseId);
+// get items by item_info id
+router.get('/item-info/:itemInfoId', getItemsByItemInfoId);
 // get all items
 router.get('/', getItems);
 // create a new item

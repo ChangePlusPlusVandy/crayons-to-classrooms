@@ -15,16 +15,16 @@ export const nameParamSchema = z.object({
 
 /**
  * Schema for validating item creation
- * Requires: name, product_id, category, quantity, value, item_limit, stock, last_known_location_code, time_last_updated
- * Optional: last_known_fixture, notes
+ * Requires: name, last_known_location_code, time_last_updated, stock, quantity
+ * Optional: last_known_fixture, notes, product_id, category, value, item_limit
  */
 export const createItemInfoSchema = z.object({
   name: z.string().min(1, 'Name is required').max(255, 'Name must be less than 255 characters'),
-  product_id: uuidSchema,
-  category: z.string().min(1, 'Category is required'),
+  product_id: uuidSchema.optional(),
+  category: z.string().optional(),
   quantity: z.number().int().nonnegative('Quantity cannot be negative'),
-  value: z.number().nonnegative('Value cannot be negative'),
-  item_limit: z.number().int().nonnegative('Limit cannot be negative'),
+  value: z.number().nonnegative('Value cannot be negative').optional(),
+  item_limit: z.number().int().nonnegative('Limit cannot be negative').optional(),
   stock: z.number().int().nonnegative('Stock cannot be negative'),
   last_known_fixture: z.string().optional(),
   last_known_location_code: z.string(),

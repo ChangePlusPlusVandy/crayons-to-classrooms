@@ -25,6 +25,10 @@ export const warehouseIdParamSchema = z.object({
   warehouseId: uuidSchema,
 });
 
+export const itemInfoIdParamSchema = z.object({
+  itemInfoId: uuidSchema,
+});
+
 /**
  * Valid status values for items
  */
@@ -75,6 +79,7 @@ export const updateItemSchema = z
       .max(255, 'Name must be less than 255 characters')
       .optional(),
     product_id: uuidSchema.optional(),
+    item_info: uuidSchema.optional(),
     quantity: z.number().int().nonnegative('Quantity cannot be negative').optional(),
     stock: z.number().int().nonnegative('Stock cannot be negative').optional(),
     current_location_id: uuidSchema.optional(),

@@ -10,6 +10,7 @@ import {
   productIdParamSchema,
   locationIdParamSchema,
   warehouseIdParamSchema,
+  itemInfoIdParamSchema,
   CreateItemInput,
   CreateItemsBulkInput,
   UpdateItemInput,
@@ -88,18 +89,19 @@ const syncItemInfoStock = async (
 ) => {
   try {
     if (!createIfMissing) {
-      await db.query(
-        'UPDATE item_info SET stock = stock + $1, last_known_fixture = COALESCE($2, last_known_fixture), last_known_location_code = COALESCE($3, last_known_location_code), time_last_updated = NOW() WHERE name = $4',
+      const updateResult = await db.query(
+        'UPDATE item_info SET stock = stock + $1, limbo = (stock + $1) = 0, last_known_fixture = COALESCE($2, last_known_fixture), last_known_location_code = COALESCE($3, last_known_location_code), time_last_updated = NOW() WHERE name = $4 RETURNING id',
         [stockDelta, lastKnownFixture ?? null, lastKnownLocationCode ?? null, itemName]
       );
-      return;
+      return updateResult.rows[0]?.id ?? null;
     }
 
-    await db.query(
+    const upsertResult = await db.query(
       `INSERT INTO item_info (name, product_id, category, quantity, value, item_limit, stock, last_known_fixture, last_known_location_code, time_last_updated, notes)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), $10)
        ON CONFLICT (name) DO UPDATE
        SET stock = item_info.stock + EXCLUDED.stock,
+           limbo = (item_info.stock + EXCLUDED.stock) = 0,
            product_id = COALESCE(EXCLUDED.product_id, item_info.product_id),
            category = COALESCE(EXCLUDED.category, item_info.category),
            quantity = COALESCE(EXCLUDED.quantity, item_info.quantity),
@@ -107,7 +109,8 @@ const syncItemInfoStock = async (
            item_limit = COALESCE(EXCLUDED.item_limit, item_info.item_limit),
            last_known_fixture = COALESCE(EXCLUDED.last_known_fixture, item_info.last_known_fixture),
            last_known_location_code = COALESCE(EXCLUDED.last_known_location_code, item_info.last_known_location_code),
-           time_last_updated = NOW()`,
+           time_last_updated = NOW()
+       RETURNING id`,
       [
         itemName,
         productId ?? null,
@@ -121,6 +124,7 @@ const syncItemInfoStock = async (
         null,
       ]
     );
+    return upsertResult.rows[0]?.id ?? null;
   } catch (error) {
     console.error('Error syncing item info stock:', {
       itemName,
@@ -303,6 +307,32 @@ export const getItemsByWarehouseId = async (req: Request, res: Response) => {
     res.status(500).json({ error: 'Internal server error' });
   }
 };
+
+/**
+ * Retrieves all items associated with a specific item_info ID.
+ *
+ * @param {Request} req - Express request object with:
+ *   - itemInfoId: UUID of the item_info (in params)
+ * @param {Response} res - Express response object
+ * @returns {Promise<Response>} JSON array of items matching the item_info ID or error message
+ * @throws {500} Internal server error if database query fails
+ */
+export const getItemsByItemInfoId = async (req: Request, res: Response) => {
+  try {
+    const { itemInfoId } = itemInfoIdParamSchema.parse(req.params);
+    const items = await pool.query('SELECT * FROM items WHERE item_info = $1', [itemInfoId]);
+    if (!countRows(items.rows, res)) {
+      return;
+    }
+    res.json(items.rows);
+  } catch (error) {
+    if (error instanceof ZodError) {
+      return handleValidationError(error, res);
+    }
+    console.error('Error fetching items by item_info ID:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
 /**
  * Retrieves all items with a specific status.
  *
@@ -421,20 +451,31 @@ export const createItem = async (req: Request, res: Response) => {
     );
 
     const { fixture, locationCode } = await getLocationInfo(current_location_id ?? null);
-    await syncItemInfoStock(
+    const itemInfoId = await syncItemInfoStock(
       name,
       product_id,
       category ?? 'UNKNOWN',
       quantity,
       value,
-      item_limit ?? 0,
+      item_limit ?? Number.MAX_SAFE_INTEGER,
       fixture,
       locationCode,
       1,
       true
     );
 
-    res.status(201).json(newItem.rows[0]);
+    let createdItem = newItem.rows[0];
+    if (itemInfoId) {
+      const updatedItem = await pool.query(
+        'UPDATE items SET item_info = $1, updated_at = NOW() WHERE id = $2 RETURNING *',
+        [itemInfoId, createdItem.id]
+      );
+      if (updatedItem.rows[0]) {
+        createdItem = updatedItem.rows[0];
+      }
+    }
+
+    res.status(201).json(createdItem);
   } catch (error) {
     if (error instanceof ZodError) {
       return handleValidationError(error, res);
@@ -564,19 +605,27 @@ export const createItemsBulk = async (req: Request, res: Response) => {
       );
 
       const { fixture, locationCode } = await getLocationInfo(current_location_id ?? null, client);
-      await syncItemInfoStock(
+      const itemInfoId = await syncItemInfoStock(
         name,
         product_id,
         category ?? 'UNKNOWN',
         quantity,
         value,
-        item_limit ?? 0,
+        item_limit ?? Number.MAX_SAFE_INTEGER,
         fixture,
         locationCode,
         count,
         true,
         client
       );
+
+      if (itemInfoId) {
+        const newItemIds = newItems.rows.map((row: { id: string }) => row.id);
+        await client.query(
+          'UPDATE items SET item_info = $1, updated_at = NOW() WHERE id = ANY($2::uuid[])',
+          [itemInfoId, newItemIds]
+        );
+      }
 
       await client.query('COMMIT');
       return res.status(201).json(newItems.rows);
@@ -598,16 +647,17 @@ export const createItemsBulk = async (req: Request, res: Response) => {
 /**
  * Updates an existing item in the database.
  * Only updates fields that are provided in the request body.
- * Allowed fields: name, product_id, quantity, current_location_id, status, warehouse, category, limit, value, limbo, notes.
+ * Allowed fields: name, product_id, quantity, current_location_id, status, warehouse, category, limit, value, limbo, notes, item_info.
  *
  * @param {Request} req - Express request object with:
  *   - id: UUID of the item to update (in params)
- *   - Updatable fields in body (name, product_id, quantity, current_location_id, status, warehouse, category, limit, value, limbo, notes)
+ *   - Updatable fields in body (name, product_id, quantity, current_location_id, status, warehouse, category, limit, value, limbo, notes, item_info)
  * @param {Response} res - Express response object
  * @returns {Promise<Response>} JSON object of the updated item or error message
  * @throws {400} Invalid id or product_id (must be valid UUIDs)
  * @throws {400} Invalid product_id if product doesn't exist in database
  * @throws {400} Invalid warehouse if warehouse doesn't exist in database
+ * @throws {400} Invalid item_info if item_info doesn't exist in database
  * @throws {400} No updatable fields provided if request body is empty or contains no allowed fields
  * @throws {404} Item not found if no item matches the provided ID
  * @throws {500} Internal server error if database query fails
@@ -646,6 +696,15 @@ export const updateItem = async (req: Request, res: Response) => {
       ]);
       if (warehouseCheck.rows.length === 0) {
         return res.status(400).json({ error: 'Invalid warehouse id' });
+      }
+    }
+
+    if (validatedData.item_info) {
+      const itemInfoCheck = await pool.query('SELECT id FROM item_info WHERE id = $1', [
+        validatedData.item_info,
+      ]);
+      if (itemInfoCheck.rows.length === 0) {
+        return res.status(400).json({ error: 'Invalid item_info id' });
       }
     }
 
