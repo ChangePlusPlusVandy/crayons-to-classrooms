@@ -95,7 +95,17 @@ export const createItemWithMovementSchema = z.object({
   movement: movementFieldsSchema,
 });
 
+/**
+ * Schema for the combined move-items-with-movement request body.
+ * item_ids are the existing items to relocate; movement records the action.
+ */
+export const moveItemsWithMovementSchema = z.object({
+  item_ids: z.array(uuidSchema).nonempty('At least one item_id is required'),
+  movement: movementFieldsSchema,
+});
+
 export type CreateInventoryInput = z.infer<typeof createInventoryMovementSchema>;
 export type UpdateInventoryInput = z.infer<typeof updateInventoryMovementSchema>;
 export type InventoryStatusType = z.infer<typeof actionQuerySchema>;
 export type CreateItemWithMovementInput = z.infer<typeof createItemWithMovementSchema>;
+export type MoveItemsWithMovementInput = z.infer<typeof moveItemsWithMovementSchema>;

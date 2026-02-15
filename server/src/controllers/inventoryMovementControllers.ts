@@ -14,6 +14,7 @@ import {
   UpdateInventoryInput,
   actionQuerySchema,
   createItemWithMovementSchema,
+  moveItemsWithMovementSchema,
 } from '../utils/inventoryMovementsModel.js';
 import { ZodError } from 'zod';
 import { DbClient } from '../utils/dbTypes.js';
@@ -652,6 +653,67 @@ export const createItemWithMovement = async (req: Request, res: Response) => {
       return res.status(400).json({ error: error.message });
     }
     console.error('Error creating items with movement:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  } finally {
+    client.release();
+  }
+};
+
+/**
+ * Moves existing items to a new location and creates an inventory movement record atomically.
+ * All item location updates and the movement record are wrapped in a single transaction.
+ *
+ * @param {Request} req - Express request object with nested body:
+ *   - item_ids: Array of UUIDs of items to move
+ *   - movement: Object with movement fields (inventory_action, from_location_id, to_location_id, quantity, performed_by, note)
+ * @param {Response} res - Express response object
+ * @returns {Promise<Response>} JSON object with { updatedCount, movement } or error message
+ */
+export const moveItemsWithMovement = async (req: Request, res: Response) => {
+  const client = await pool.connect();
+  try {
+    const { item_ids, movement: movementData } = moveItemsWithMovementSchema.parse(req.body);
+
+    await client.query('BEGIN');
+
+    // Update all items' location in a single query
+    const updateResult = await client.query(
+      `UPDATE items SET current_location_id = $1, updated_at = NOW() WHERE id = ANY($2) RETURNING *`,
+      [movementData.to_location_id, item_ids]
+    );
+
+    if (updateResult.rows.length === 0) {
+      throw new Error('No items found with the provided IDs');
+    }
+
+    // Use the first item as the representative for the movement record
+    const representativeItem = updateResult.rows[0];
+
+    const fullMovementData: CreateInventoryInput = {
+      inventory_action: movementData.inventory_action,
+      item_id: representativeItem.id,
+      product_id: representativeItem.product_id,
+      from_location_id: movementData.from_location_id,
+      to_location_id: movementData.to_location_id,
+      quantity: movementData.quantity,
+      performed_by: movementData.performed_by,
+      note: movementData.note,
+    };
+
+    const createdMovement = await createInventoryMovementCore(fullMovementData, client);
+
+    await client.query('COMMIT');
+
+    res.status(201).json({ updatedCount: updateResult.rowCount, movement: createdMovement });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    if (error instanceof ZodError) {
+      return handleValidationError(error, res);
+    }
+    if (error instanceof ForeignKeyError) {
+      return res.status(400).json({ error: error.message });
+    }
+    console.error('Error moving items with movement:', error);
     res.status(500).json({ error: 'Internal server error' });
   } finally {
     client.release();

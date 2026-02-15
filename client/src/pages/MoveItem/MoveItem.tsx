@@ -17,8 +17,7 @@ import AddIcon from '@mui/icons-material/Add';
 import {
   getStorageLocations,
   getItemsByLocation,
-  createInventoryMovement,
-  updateItemLocation,
+  moveItemsWithMovement,
   groupItemsByLocation,
 } from '../../api/moveItem';
 import { Warehouse } from '../../types/Warehouse';
@@ -322,23 +321,16 @@ export default function MoveItem() {
         throw new Error('Insufficient items in group to move');
       }
 
-      // TODO: Replace with batch update API endpoint when available
-      await Promise.all(
-        itemsToMove.map((item) => updateItemLocation(item.id, destinationLocation.id))
-      );
-
-      // Record one inventory movement for the entire operation
-      // Use the first item's ID and product_id as representative
-      const representativeItem = itemsToMove[0];
-      await createInventoryMovement({
-        inventory_action: 'MOVE',
-        item_id: representativeItem.id,
-        product_id: representativeItem.product_id,
-        from_location_id: selectedSourceSlot.id,
-        to_location_id: destinationLocation.id,
-        quantity: quantityToMove,
-        performed_by: 'b4974f63-ee89-42a1-bdb3-ce9df255c682', // TODO: Get user ID
-        note: notes || undefined,
+      await moveItemsWithMovement({
+        item_ids: itemsToMove.map((item) => item.id),
+        movement: {
+          inventory_action: 'MOVE',
+          from_location_id: selectedSourceSlot.id,
+          to_location_id: destinationLocation.id,
+          quantity: quantityToMove,
+          performed_by: 'b4974f63-ee89-42a1-bdb3-ce9df255c682', // TODO: Get user ID
+          note: notes || undefined,
+        },
       });
 
       setSuccess('Item moved successfully!');
