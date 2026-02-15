@@ -56,20 +56,19 @@ type DbClient = {
 
 const getLocationInfo = async (locationId?: string | null, db: DbClient = pool) => {
   if (!locationId) {
-    return { fixture: null, locationCode: null };
+    return { locationCode: null };
   }
 
   const locationResult = await db.query(
-    'SELECT fixture, location_code FROM storage_locations WHERE id = $1',
+    'SELECT location_code FROM storage_locations WHERE id = $1',
     [locationId]
   );
 
   if (locationResult.rows.length === 0) {
-    return { fixture: null, locationCode: null };
+    return { locationCode: null };
   }
 
   return {
-    fixture: locationResult.rows[0].fixture ?? null,
     locationCode: locationResult.rows[0].location_code ?? null,
   };
 };
@@ -81,7 +80,7 @@ const syncItemInfoStock = async (
   quantity: number | undefined,
   value: number | undefined,
   itemLimit: number | undefined,
-  lastKnownFixture: string | null | undefined,
+  fixture: string | null | undefined,
   lastKnownLocationCode: string | null | undefined,
   stockDelta: number,
   createIfMissing: boolean,
@@ -90,14 +89,14 @@ const syncItemInfoStock = async (
   try {
     if (!createIfMissing) {
       const updateResult = await db.query(
-        'UPDATE item_info SET stock = stock + $1, limbo = (stock + $1) = 0, last_known_fixture = COALESCE($2, last_known_fixture), last_known_location_code = COALESCE($3, last_known_location_code), time_last_updated = NOW() WHERE name = $4 RETURNING id',
-        [stockDelta, lastKnownFixture ?? null, lastKnownLocationCode ?? null, itemName]
+        'UPDATE item_info SET stock = stock + $1, limbo = (stock + $1) = 0, fixture = COALESCE($2, fixture), last_known_location_code = COALESCE($3, last_known_location_code), time_last_updated = NOW() WHERE name = $4 RETURNING id',
+        [stockDelta, fixture ?? null, lastKnownLocationCode ?? null, itemName]
       );
       return updateResult.rows[0]?.id ?? null;
     }
 
     const upsertResult = await db.query(
-      `INSERT INTO item_info (name, product_id, category, quantity, value, item_limit, stock, last_known_fixture, last_known_location_code, time_last_updated, notes)
+      `INSERT INTO item_info (name, product_id, category, quantity, value, item_limit, stock, fixture, last_known_location_code, time_last_updated, notes)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), $10)
        ON CONFLICT (name) DO UPDATE
        SET stock = item_info.stock + EXCLUDED.stock,
@@ -107,7 +106,7 @@ const syncItemInfoStock = async (
            quantity = COALESCE(EXCLUDED.quantity, item_info.quantity),
            value = COALESCE(EXCLUDED.value, item_info.value),
            item_limit = COALESCE(EXCLUDED.item_limit, item_info.item_limit),
-           last_known_fixture = COALESCE(EXCLUDED.last_known_fixture, item_info.last_known_fixture),
+           fixture = COALESCE(EXCLUDED.fixture, item_info.fixture),
            last_known_location_code = COALESCE(EXCLUDED.last_known_location_code, item_info.last_known_location_code),
            time_last_updated = NOW()
        RETURNING id`,
@@ -119,7 +118,7 @@ const syncItemInfoStock = async (
         value ?? null,
         itemLimit ?? null,
         stockDelta,
-        lastKnownFixture ?? null,
+        fixture ?? null,
         lastKnownLocationCode ?? null,
         null,
       ]
@@ -134,7 +133,7 @@ const syncItemInfoStock = async (
       value,
       stockDelta,
       itemLimit,
-      lastKnownFixture,
+      fixture,
       lastKnownLocationCode,
       createIfMissing,
       error,
@@ -390,6 +389,7 @@ export const createItem = async (req: Request, res: Response) => {
       name,
       product_id,
       current_location_id,
+      fixture,
       created_by,
       quantity,
       stock,
@@ -450,7 +450,8 @@ export const createItem = async (req: Request, res: Response) => {
       ]
     );
 
-    const { fixture, locationCode } = await getLocationInfo(current_location_id ?? null);
+    const { locationCode } = await getLocationInfo(current_location_id ?? null);
+    const fixtureOverride = fixture ?? null;
     const itemInfoId = await syncItemInfoStock(
       name,
       product_id,
@@ -458,7 +459,7 @@ export const createItem = async (req: Request, res: Response) => {
       quantity,
       value,
       item_limit ?? Number.MAX_SAFE_INTEGER,
-      fixture,
+      fixtureOverride,
       locationCode,
       1,
       true
@@ -503,6 +504,7 @@ export const createItemsBulk = async (req: Request, res: Response) => {
       name,
       product_id,
       current_location_id,
+      fixture,
       created_by,
       quantity,
       stock,
@@ -604,7 +606,8 @@ export const createItemsBulk = async (req: Request, res: Response) => {
         ]
       );
 
-      const { fixture, locationCode } = await getLocationInfo(current_location_id ?? null, client);
+      const { locationCode } = await getLocationInfo(current_location_id ?? null, client);
+      const fixtureOverride = fixture ?? null;
       const itemInfoId = await syncItemInfoStock(
         name,
         product_id,
@@ -612,7 +615,7 @@ export const createItemsBulk = async (req: Request, res: Response) => {
         quantity,
         value,
         item_limit ?? Number.MAX_SAFE_INTEGER,
-        fixture,
+        fixtureOverride,
         locationCode,
         count,
         true,
@@ -743,7 +746,7 @@ export const updateItem = async (req: Request, res: Response) => {
       return;
     }
 
-    const { fixture, locationCode } = await getLocationInfo(newLocationId ?? null);
+    const { locationCode } = await getLocationInfo(newLocationId ?? null);
     const updatedItem = rows[0];
 
     if (newName !== oldName) {
@@ -766,7 +769,7 @@ export const updateItem = async (req: Request, res: Response) => {
         updatedItem.quantity,
         updatedItem.value,
         updatedItem.item_limit ?? undefined,
-        fixture,
+        undefined,
         locationCode,
         1,
         true
@@ -779,7 +782,7 @@ export const updateItem = async (req: Request, res: Response) => {
         updatedItem.quantity,
         updatedItem.value,
         updatedItem.item_limit ?? undefined,
-        fixture,
+        undefined,
         locationCode,
         0,
         true
