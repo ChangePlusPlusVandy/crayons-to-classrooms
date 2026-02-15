@@ -611,6 +611,68 @@ export const createItemWithMovement = async (req: Request, res: Response) => {
   }
 };
 
+export const editInventoryMovementAdd = async (req: Request, res: Response) => {
+  const client = await pool.connect();
+  try {
+    const { id } = movementIdParamSchema.parse(req.params);
+    const { item: itemData, movement: movementData } = createItemWithMovementSchema.parse(req.body);
+
+    // Validation
+    const original = await client.query(
+      'SELECT inventory_action FROM "inventory movement" WHERE id = $1',
+      [id]
+    );
+    if (original.rows.length === 0) {
+      throw new NotFoundError('Inventory movement not found');
+    }
+    if (original.rows[0].inventory_action !== 'ADD') {
+      return res
+        .status(400)
+        .json({ error: 'Can only edit ADD type movements with this endpoint' });
+    }
+
+    await client.query('BEGIN');
+
+    await undoInventoryMovementCore({ id }, client);
+
+    const createdItems = await createItemCore(itemData, movementData.quantity, client);
+
+    const fullMovementData: CreateInventoryInput = {
+      inventory_action: movementData.inventory_action,
+      item_id: createdItems[0].id,
+      product_id: createdItems[0].product_id,
+      from_location_id: movementData.from_location_id,
+      to_location_id: movementData.to_location_id,
+      quantity: movementData.quantity,
+      performed_by: movementData.performed_by,
+      note: movementData.note,
+    };
+    const createdMovement = await createInventoryMovementCore(fullMovementData, client);
+
+    await client.query('COMMIT');
+
+    res.status(201).json({ items: createdItems, movement: createdMovement });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    if (error instanceof ZodError) {
+      return handleValidationError(error, res);
+    }
+    if (error instanceof ForeignKeyError) {
+      return res.status(400).json({ error: error.message });
+    }
+    if (error instanceof NotFoundError) {
+      return res.status(404).json({ error: error.message });
+    }
+    if (error instanceof UndoConflictError) {
+      return res.status(400).json({ error: error.message });
+    }
+    console.error('Error editing ADD inventory movement:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  } finally {
+    client.release();
+  }
+};
+
 export const undoInventoryMovementCore = async (
   { id }: MovementIdParamType,
   db: DbClient = pool
