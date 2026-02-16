@@ -676,16 +676,24 @@ export const moveItemsWithMovement = async (req: Request, res: Response) => {
 
     await client.query('BEGIN');
 
-    // Update all items' location in a single query
+    // Update all items' location in a single query, ensuring they are currently at from_location_id
     const updateResult = await client.query(
-      `UPDATE items SET current_location_id = $1, updated_at = NOW() WHERE id = ANY($2) RETURNING *`,
-      [movementData.to_location_id, item_ids]
+      `UPDATE items
+       SET current_location_id = $1,
+           updated_at = NOW()
+       WHERE id = ANY($2)
+         AND current_location_id = $3
+       RETURNING *`,
+      [movementData.to_location_id, item_ids, movementData.from_location_id]
     );
 
     if (updateResult.rows.length === 0) {
-      throw new Error('No items found with the provided IDs');
+      throw new Error('No items found with the provided IDs and from_location_id');
     }
 
+    if (updateResult.rowCount !== item_ids.length) {
+      throw new Error('Some items were not at the expected from_location_id');
+    }
     // Use the first item as the representative for the movement record
     const representativeItem = updateResult.rows[0];
 
