@@ -2,7 +2,7 @@ import { Product } from '../types/Product';
 import { Item } from '../types/Item';
 import { StorageLocation } from '../types/StorageLocation';
 import { Warehouse } from '../types/Warehouse';
-import { InventoryMovement } from '../types/InventoryMovement';
+import { InventoryMovement, InventoryMovementSchema } from '../types/InventoryMovement';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
 
@@ -61,7 +61,8 @@ export async function createInventoryMovement(
     body: JSON.stringify(movement),
   });
   if (!response.ok) throw new Error('Failed to create inventory movement');
-  return response.json();
+  const data = await response.json();
+  return InventoryMovementSchema.parse(data);
 }
 
 export async function createItemWithMovement(payload: {
@@ -97,5 +98,6 @@ export async function createItemWithMovement(payload: {
     body: JSON.stringify(payload),
   });
   if (!response.ok) throw new Error('Failed to create items with movement');
-  return response.json();
+  const data = await response.json();
+  return { ...data, movement: InventoryMovementSchema.parse(data.movement) };
 }

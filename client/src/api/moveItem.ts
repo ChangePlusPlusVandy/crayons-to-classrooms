@@ -1,7 +1,7 @@
 import { Warehouse } from '../types/Warehouse';
 import { StorageLocation } from '../types/StorageLocation';
 import { Item, ItemGroup } from '../types/Item';
-import { InventoryMovement } from '../types/InventoryMovement';
+import { InventoryMovement, InventoryMovementSchema } from '../types/InventoryMovement';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
 
@@ -35,7 +35,7 @@ export async function getItemsByLocation(locationId: string): Promise<Item[]> {
 }
 
 export async function createInventoryMovement(
-  movement: InventoryMovement
+  movement: Omit<InventoryMovement, 'id' | 'performed_at'>
 ): Promise<InventoryMovement> {
   const response = await fetch(`${API_BASE_URL}/inventory-movement`, {
     method: 'POST',
@@ -45,7 +45,8 @@ export async function createInventoryMovement(
     body: JSON.stringify(movement),
   });
   if (!response.ok) throw new Error('Failed to create inventory movement');
-  return response.json();
+  const data = await response.json();
+  return InventoryMovementSchema.parse(data);
 }
 
 export async function createItem(itemData: {
