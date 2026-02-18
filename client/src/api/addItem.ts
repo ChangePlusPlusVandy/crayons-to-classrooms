@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import { Product } from '../types/Product';
 import { Item } from '../types/Item';
 import { StorageLocation } from '../types/StorageLocation';
@@ -22,6 +23,13 @@ export async function getStorageLocations(): Promise<StorageLocation[]> {
   const response = await fetch(`${API_BASE_URL}/storage-locations`);
   if (!response.ok) throw new Error('Failed to fetch storage locations');
   return response.json();
+}
+
+export async function getInventoryMovements(): Promise<InventoryMovement[]> {
+  const response = await fetch(`${API_BASE_URL}/inventory-movement`);
+  if (!response.ok) throw new Error('Failed to fetch inventory movements');
+  const data = await response.json();
+  return z.array(InventoryMovementSchema).parse(data);
 }
 
 export async function createItem(itemData: {

@@ -1,118 +1,293 @@
-import { Card, CardContent, Typography, Box, IconButton, Button } from '@mui/material';
+import { useEffect, useState } from 'react';
+import {
+  Card,
+  CardContent,
+  Typography,
+  Box,
+  IconButton,
+  Button,
+  CircularProgress,
+  Alert,
+  Snackbar,
+} from '@mui/material';
 import UndoIcon from '@mui/icons-material/Undo';
 import EditIcon from '@mui/icons-material/Edit';
 import { activityLogStyles } from './ActivityLog.styles';
+import { InventoryMovement } from '../../types/InventoryMovement';
+import { Product } from '../../types/Product';
+import { StorageLocation } from '../../types/StorageLocation';
+import { Warehouse } from '../../types/Warehouse';
+import { getProducts, getStorageLocations, getInventoryMovements } from '../../api/addItem';
+import { getWarehouses } from '../../api/moveItem';
+import EditAddDialog from '../EditAddDialog/EditAddDialog';
 
-interface Activity {
-  id: string;
-  action: string;
-  item: string;
-  from?: string;
-  to?: string;
-  user: string;
-  timestamp: string;
-  color: string;
+const ACTION_COLORS: Record<string, string> = {
+  ADD: '#4caf50',
+  MOVE: '#2196f3',
+  CHECKOUT: '#ff9800',
+  DISCARD: '#f44336',
+  ADJUSTMENT: '#9c27b0',
+};
+
+function formatTimestamp(dateStr: string): string {
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMin = Math.floor(diffMs / 60000);
+
+  if (diffMin < 1) return 'A few seconds ago';
+  if (diffMin < 60) return `${diffMin} min ago`;
+  const diffHours = Math.floor(diffMin / 60);
+  if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+  return date.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
 }
 
 export default function ActivityLog() {
-  const activities: Activity[] = [
-    {
-      id: '1',
-      action: 'Move',
-      item: 'Crayons Box (24ct)',
-      from: '??',
-      to: '??',
-      user: 'John Smith',
-      timestamp: 'A few seconds ago',
-      color: '#2196f3',
-    },
-    {
-      id: '2',
-      action: 'Remove',
-      item: 'Pencil Box (12ct)',
-      from: 'Fixture A',
-      to: 'Fixture F',
-      user: 'John Smith',
-      timestamp: '2 min ago',
-      color: '#f44336',
-    },
-    {
-      id: '3',
-      action: 'Add',
-      item: 'Pencil Box (12ct)',
-      from: 'Fixture A',
-      to: 'Fixture F',
-      user: 'John Smith',
-      timestamp: 'Nov 9 2025, 10:14 AM',
-      color: '#4caf50',
-    },
-  ];
+  const [movements, setMovements] = useState<InventoryMovement[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [storageLocations, setStorageLocations] = useState<StorageLocation[]>([]);
+  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Edit dialog state
+  const [editingMovement, setEditingMovement] = useState<InventoryMovement | null>(null);
+  const [showSuccessAlert, setShowSuccessAlert] = useState(false);
+
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        const [movementsData, productsData, locationsData, warehousesData] = await Promise.all([
+          getInventoryMovements(),
+          getProducts(),
+          getStorageLocations(),
+          getWarehouses(),
+        ]);
+
+        // Show most recent first
+        const sorted = movementsData.sort((a, b) => {
+          const dateA = a.performed_at ? new Date(a.performed_at).getTime() : 0;
+          const dateB = b.performed_at ? new Date(b.performed_at).getTime() : 0;
+          return dateB - dateA;
+        });
+        setMovements(sorted);
+        setProducts(productsData);
+        setStorageLocations(locationsData);
+        setWarehouses(warehousesData);
+      } catch (err) {
+        console.error('Failed to load activity log data:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchData();
+  }, []);
+
+  const getProductName = (productId: string): string => {
+    const product = products.find((p) => p.id === productId);
+    return product?.name || 'Unknown Product';
+  };
+
+  const getLocationLabel = (locationId: string | null): string | undefined => {
+    if (!locationId) return undefined;
+    const loc = storageLocations.find((l) => l.id === locationId);
+    if (!loc) return 'Unknown';
+    return loc.fixture ? `${loc.slot} / ${loc.fixture}` : loc.slot;
+  };
+
+  const handleEditClick = (movement: InventoryMovement) => {
+    if (movement.inventory_action === 'ADD') {
+      setEditingMovement(movement);
+    }
+  };
+
+  const handleEditClose = () => {
+    setEditingMovement(null);
+  };
+
+  const handleEditSuccess = async () => {
+    setShowSuccessAlert(true);
+    // Refresh movements after successful edit
+    try {
+      const movementsData = await getInventoryMovements();
+      const sorted = movementsData.sort((a, b) => {
+        const dateA = a.performed_at ? new Date(a.performed_at).getTime() : 0;
+        const dateB = b.performed_at ? new Date(b.performed_at).getTime() : 0;
+        return dateB - dateA;
+      });
+      setMovements(sorted);
+    } catch (err) {
+      console.error('Failed to refresh movements:', err);
+    }
+  };
+
+  // Resolve edit dialog props from the editing movement
+  const getEditDialogProps = () => {
+    if (!editingMovement) return null;
+
+    const product = products.find((p) => p.id === editingMovement.product_id);
+    const location = storageLocations.find((l) => l.id === editingMovement.to_location_id);
+    const warehouse = location
+      ? warehouses.find((w) => w.id === location.warehouse_id)
+      : null;
+
+    console.log('product: ', product)
+    console.log('location:', location)
+    console.log('warehouse:', warehouse)
+
+    if (!product || !location || !warehouse) return null;
+
+    return {
+      product,
+      warehouse,
+      slot: location.slot,
+      fixture: location.fixture || 'None',
+    };
+  };
+
+  const editDialogProps = getEditDialogProps();
+
+  // Show limited entries in the activity log
+  const displayedMovements = movements.slice(0, 10);
 
   return (
-    <Card sx={{ boxShadow: 1, borderRadius: 2 }}>
-      <CardContent>
-        <Typography variant="h6" sx={{ mb: 3, fontWeight: 600 }}>
-          Activity Log
-        </Typography>
+    <>
+      <Card sx={{ boxShadow: 1, borderRadius: 2 }}>
+        <CardContent>
+          <Typography variant="h6" sx={{ mb: 3, fontWeight: 600 }}>
+            Activity Log
+          </Typography>
 
-        <Box sx={activityLogStyles.activitiesContainer}>
-          {activities.map((activity) => (
-            <Box key={activity.id} sx={activityLogStyles.activityItem}>
-              <Box sx={{ flexGrow: 1, minWidth: 0 }}>
-                <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                  {activity.item}
-                </Typography>
-                <Typography variant="body2" sx={{ color: activity.color }}>
-                  {activity.action}
-                </Typography>
-                {activity.from && activity.to && (
-                  <Typography variant="caption" color="text.secondary">
-                    {activity.from} → {activity.to}
-                  </Typography>
-                )}
-                <Box sx={{ display: 'flex', alignItems: 'center', mt: 0.5, gap: 4 }}>
-                  <Typography variant="caption" color="text.secondary" sx={{ flexShrink: 0 }}>
-                    {activity.user}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary" sx={{ ml: 'auto' }}>
-                    {activity.timestamp}
-                  </Typography>
-                </Box>
-              </Box>
-
-              <Box sx={{ display: 'flex', gap: 0.5, flexDirection: 'row', ml: 2, flexShrink: 0 }}>
-                <IconButton
-                  size="small"
-                  aria-label={`Undo ${activity.action.toLowerCase()} for ${activity.item}`}
-                >
-                  <UndoIcon fontSize="small" />
-                </IconButton>
-                <IconButton
-                  size="small"
-                  aria-label={`Edit ${activity.action.toLowerCase()} for ${activity.item}`}
-                >
-                  <EditIcon fontSize="small" />
-                </IconButton>
-              </Box>
+          {loading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+              <CircularProgress size={24} />
             </Box>
-          ))}
-        </Box>
+          ) : (
+            <Box sx={activityLogStyles.activitiesContainer}>
+              {displayedMovements.map((movement) => {
+                const fromLabel = getLocationLabel(movement.from_location_id);
+                const toLabel = getLocationLabel(movement.to_location_id);
 
-        <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end' }}>
-          <Button
-            variant="text"
-            sx={{
-              color: 'black',
-              fontWeight: 500,
-              textTransform: 'none',
-              '&:hover': { bgcolor: 'transparent', textDecoration: 'underline' },
-            }}
-            aria-label="View all activities"
-          >
-            View All Activities →
-          </Button>
-        </Box>
-      </CardContent>
-    </Card>
+                return (
+                  <Box key={movement.id} sx={activityLogStyles.activityItem}>
+                    <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+                      <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                        {getProductName(movement.product_id)}
+                      </Typography>
+                      <Typography
+                        variant="body2"
+                        sx={{ color: ACTION_COLORS[movement.inventory_action] || '#666' }}
+                      >
+                        {movement.inventory_action} (x{movement.quantity})
+                      </Typography>
+                      {(fromLabel || toLabel) && (
+                        <Typography variant="caption" color="text.secondary">
+                          {fromLabel && toLabel
+                            ? `${fromLabel} → ${toLabel}`
+                            : toLabel
+                              ? `→ ${toLabel}`
+                              : ''}
+                        </Typography>
+                      )}
+                      <Box sx={{ display: 'flex', alignItems: 'center', mt: 0.5, gap: 4 }}>
+                        <Typography
+                          variant="caption"
+                          color="text.secondary"
+                          sx={{ ml: 'auto' }}
+                        >
+                          {movement.performed_at
+                            ? formatTimestamp(movement.performed_at)
+                            : ''}
+                        </Typography>
+                      </Box>
+                    </Box>
+
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        gap: 0.5,
+                        flexDirection: 'row',
+                        ml: 2,
+                        flexShrink: 0,
+                      }}
+                    >
+                      <IconButton
+                        size="small"
+                        aria-label={`Undo ${movement.inventory_action.toLowerCase()} for ${getProductName(movement.product_id)}`}
+                      >
+                        <UndoIcon fontSize="small" />
+                      </IconButton>
+                      {movement.inventory_action === 'ADD' && (
+                        <IconButton
+                          size="small"
+                          aria-label={`Edit ${movement.inventory_action.toLowerCase()} for ${getProductName(movement.product_id)}`}
+                          onClick={() => handleEditClick(movement)}
+                        >
+                          <EditIcon fontSize="small" />
+                        </IconButton>
+                      )}
+                    </Box>
+                  </Box>
+                );
+              })}
+              {displayedMovements.length === 0 && (
+                <Typography variant="body2" color="text.secondary">
+                  No activity yet.
+                </Typography>
+              )}
+            </Box>
+          )}
+
+          <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end' }}>
+            <Button
+              variant="text"
+              sx={{
+                color: 'black',
+                fontWeight: 500,
+                textTransform: 'none',
+                '&:hover': { bgcolor: 'transparent', textDecoration: 'underline' },
+              }}
+              aria-label="View all activities"
+            >
+              View All Activities →
+            </Button>
+          </Box>
+        </CardContent>
+      </Card>
+
+      {editingMovement && editDialogProps && (
+        <EditAddDialog
+          open={!!editingMovement}
+          onClose={handleEditClose}
+          movement={editingMovement}
+          product={editDialogProps.product}
+          warehouse={editDialogProps.warehouse}
+          slot={editDialogProps.slot}
+          fixture={editDialogProps.fixture}
+          onSuccess={handleEditSuccess}
+        />
+      )}
+
+      <Snackbar
+        open={showSuccessAlert}
+        autoHideDuration={4000}
+        onClose={() => setShowSuccessAlert(false)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert
+          onClose={() => setShowSuccessAlert(false)}
+          severity="success"
+          variant="filled"
+        >
+          Movement updated successfully
+        </Alert>
+      </Snackbar>
+    </>
   );
 }
