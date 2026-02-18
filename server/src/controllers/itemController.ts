@@ -394,7 +394,7 @@ export async function createItemCore(
   );
 
   const { fixture, locationCode } = await getLocationInfo(current_location_id ?? null, db);
-  // await syncItemInfoStock(name, item_limit ?? 0, fixture, locationCode, count, true, db); // TODO: this need to be uncommented, only commented for testing since remote db fields have changed
+  await syncItemInfoStock(name, item_limit ?? 0, fixture, locationCode, count, true, db); // TODO: this need to be uncommented, only commented for testing since remote db fields have changed
 
   return newItems.rows;
 }
