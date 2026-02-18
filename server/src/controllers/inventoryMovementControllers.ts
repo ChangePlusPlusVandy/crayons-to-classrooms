@@ -620,10 +620,19 @@ export const deleteInventoryMovement = async (req: Request, res: Response) => {
  * @throws {500} Internal server error
  */
 export const createItemWithMovement = async (req: Request, res: Response) => {
+  let parsedData;
+  try {
+    parsedData = createItemWithMovementSchema.parse(req.body);
+  } catch (error) {
+    if (error instanceof ZodError) {
+      return handleValidationError(error, res);
+    }
+    return res.status(400).json({ error: 'Invalid request body' });
+  }
+
+  const { item: itemData, movement: movementData } = parsedData;
   const client = await pool.connect();
   try {
-    const { item: itemData, movement: movementData } = createItemWithMovementSchema.parse(req.body);
-
     await client.query('BEGIN');
 
     const createdItems = await createItemCore(itemData, movementData.quantity, client);
@@ -646,9 +655,6 @@ export const createItemWithMovement = async (req: Request, res: Response) => {
     res.status(201).json({ items: createdItems, movement: createdMovement });
   } catch (error) {
     await client.query('ROLLBACK');
-    if (error instanceof ZodError) {
-      return handleValidationError(error, res);
-    }
     if (error instanceof ForeignKeyError) {
       return res.status(400).json({ error: error.message });
     }
@@ -670,10 +676,19 @@ export const createItemWithMovement = async (req: Request, res: Response) => {
  * @returns {Promise<Response>} JSON object with { updatedCount, movement } or error message
  */
 export const moveItemsWithMovement = async (req: Request, res: Response) => {
+  let parsedData;
+  try {
+    parsedData = moveItemsWithMovementSchema.parse(req.body);
+  } catch (error) {
+    if (error instanceof ZodError) {
+      return handleValidationError(error, res);
+    }
+    return res.status(400).json({ error: 'Invalid request body' });
+  }
+
+  const { item_ids, movement: movementData } = parsedData;
   const client = await pool.connect();
   try {
-    const { item_ids, movement: movementData } = moveItemsWithMovementSchema.parse(req.body);
-
     await client.query('BEGIN');
 
     // Update all items' location in a single query, ensuring they are currently at from_location_id
@@ -715,9 +730,6 @@ export const moveItemsWithMovement = async (req: Request, res: Response) => {
     res.status(201).json({ updatedCount: updateResult.rowCount, movement: createdMovement });
   } catch (error) {
     await client.query('ROLLBACK');
-    if (error instanceof ZodError) {
-      return handleValidationError(error, res);
-    }
     if (error instanceof ForeignKeyError) {
       return res.status(400).json({ error: error.message });
     }
