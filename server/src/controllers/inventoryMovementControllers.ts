@@ -728,7 +728,7 @@ export const moveItemsWithMovement = async (req: Request, res: Response) => {
       product_id: representativeItem.product_id,
       from_location_id: normalizedFromLocationId,
       to_location_id: movementData.to_location_id,
-      quantity: movementData.quantity,
+      quantity: updateResult.rowCount,
       performed_by: movementData.performed_by,
       note: movementData.note,
     };
