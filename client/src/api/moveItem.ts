@@ -140,10 +140,3 @@ export async function moveItemsWithMovement(payload: {
   if (!response.ok) throw new Error('Failed to move items');
   return response.json();
 }
-
-export async function undoInventoryMovement(movementId: string): Promise<void> {                             
-  const response = await fetch(`${API_BASE_URL}/inventory-movement/${movementId}/undo`, {                    
-    method: 'POST',                                                                                          
-  });                                                                                                        
-  if (!response.ok) throw new Error('Failed to undo movement');                                              
-} 
