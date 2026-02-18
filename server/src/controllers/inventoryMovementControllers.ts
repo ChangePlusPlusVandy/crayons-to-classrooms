@@ -682,7 +682,7 @@ export const moveItemsWithMovement = async (req: Request, res: Response) => {
        SET current_location_id = $1,
            updated_at = NOW()
        WHERE id = ANY($2)
-         AND current_location_id = $3
+         AND current_location_id IS NOT DISTINCT FROM $3
        RETURNING *`,
       [movementData.to_location_id, item_ids, movementData.from_location_id]
     );
