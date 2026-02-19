@@ -105,7 +105,7 @@ export function EditMoveDialog({
         <MoveItemForm
           initialWarehouse={warehouse}
           initialSourceSlot={sourceSlot}
-          initialProductName={productName}
+          initialProductId={movement.product_id}
           initialDestinationSlot={destinationSlot}
           initialDestinationFixture={destinationFixture}
           initialQuantity={movement.quantity}

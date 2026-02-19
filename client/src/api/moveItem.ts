@@ -102,7 +102,7 @@ export function groupItemsByLocation(items: Item[]): ItemGroup[] {
   const groupMap = new Map<string, ItemGroup>();
 
   items.forEach((item) => {
-    const key = `${item.warehouse}|${item.current_location_id}|${item.name}`;
+    const key = `${item.warehouse}|${item.current_location_id}|${item.product_id}`;
 
     if (groupMap.has(key)) {
       const group = groupMap.get(key)!;

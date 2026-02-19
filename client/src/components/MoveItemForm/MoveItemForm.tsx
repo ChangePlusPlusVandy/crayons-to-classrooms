@@ -42,7 +42,7 @@ export interface MoveItemFormData {
 interface MoveItemFormProps {
   initialWarehouse?: Warehouse | null;
   initialSourceSlot?: StorageLocation | null;
-  initialProductName?: string | null;
+  initialProductId?: string | null;
   initialDestinationSlot?: string | null;
   initialDestinationFixture?: string | null;
   initialQuantity?: number;
@@ -56,7 +56,7 @@ interface MoveItemFormProps {
 export default function MoveItemForm({
   initialWarehouse = null,
   initialSourceSlot = null,
-  initialProductName = null,
+  initialProductId = null,
   initialDestinationSlot = null,
   initialDestinationFixture = null,
   initialQuantity,
@@ -81,8 +81,8 @@ export default function MoveItemForm({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
-  // Track whether we still need to auto-select the item group from initialProductName
-  const [pendingAutoSelect, setPendingAutoSelect] = useState(!!initialProductName);
+  // Track whether we still need to auto-select the item group from initialProductId
+  const [pendingAutoSelect, setPendingAutoSelect] = useState(!!initialProductId);
 
   // Fetch storage locations on mount
   useEffect(() => {
@@ -150,8 +150,8 @@ export default function MoveItemForm({
         setItemGroupsInSourceSlot(groups);
 
         // Auto-select item group if initialProductName is provided
-        if (pendingAutoSelect && initialProductName) {
-          const matchingGroup = groups.find((g) => g.name === initialProductName);
+        if (pendingAutoSelect && initialProductId) {
+          const matchingGroup = groups.find((g) => g.product_id === initialProductId);
           if (matchingGroup) {
             setSelectedItemGroup(matchingGroup);
             if (initialQuantity === undefined) {
