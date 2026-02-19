@@ -18,7 +18,7 @@ interface EditAddDialogProps {
   onSuccess?: () => void;
 }
 
-export default function EditAddDialog({
+export function EditAddDialog({
   open,
   onClose,
   movement,

@@ -118,3 +118,31 @@ export async function editAddMovementTransaction(
   const data = await response.json();
   return { ...data, movement: InventoryMovementSchema.parse(data.movement) };
 }
+
+/**
+ * Edit an existing MOVE movement using the transactional backend endpoint.
+ * Undoes the original movement and relocates items atomically.
+ */
+export async function editMoveMovementTransaction(
+  movementId: string,
+  payload: {
+    from_location_id: string;
+    to_location_id: string;
+    product_id: string;
+    quantity: number;
+    performed_by: string;
+    note?: string;
+  }
+): Promise<{ movement: InventoryMovement }> {
+  const response = await fetch(
+    `${API_BASE_URL}/inventory-movement/${movementId}/edit-move`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }
+  );
+  if (!response.ok) throw new Error('Failed to edit movement');
+  const data = await response.json();
+  return { movement: InventoryMovementSchema.parse(data.movement) };
+}

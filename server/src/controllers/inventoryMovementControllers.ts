@@ -15,6 +15,7 @@ import {
   UpdateInventoryInput,
   actionQuerySchema,
   createItemWithMovementSchema,
+  editMoveSchema,
 } from '../utils/inventoryMovementsModel.js';
 import { ZodError } from 'zod';
 import { DbClient } from '../utils/dbTypes.js';
@@ -667,6 +668,90 @@ export const editInventoryMovementAdd = async (req: Request, res: Response) => {
       return res.status(400).json({ error: error.message });
     }
     console.error('Error editing ADD inventory movement:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  } finally {
+    client.release();
+  }
+};
+
+export const editInventoryMovementMove = async (req: Request, res: Response) => {
+  const client = await pool.connect();
+  try {
+    const { id } = movementIdParamSchema.parse(req.params);
+    const moveData = editMoveSchema.parse(req.body);
+
+    // Validation
+    const original = await client.query(
+      'SELECT inventory_action FROM "inventory movement" WHERE id = $1',
+      [id]
+    );
+    if (original.rows.length === 0) {
+      throw new NotFoundError('Inventory movement not found');
+    }
+    if (original.rows[0].inventory_action !== 'MOVE') {
+      return res
+        .status(400)
+        .json({ error: 'Can only edit MOVE type movements with this endpoint' });
+    }
+
+    await client.query('BEGIN');
+
+    // Undo the original MOVE (reverses item locations, deletes movement record)
+    await undoInventoryMovementCore({ id }, client);
+
+    // Find items at the new source location matching product_id (LIFO order)
+    const itemsAtSource = await client.query(
+      'SELECT id FROM items WHERE product_id = $1 AND current_location_id = $2 ORDER BY created_at DESC LIMIT $3',
+      [moveData.product_id, moveData.from_location_id, moveData.quantity]
+    );
+
+    if (itemsAtSource.rows.length < moveData.quantity) {
+      throw new UndoConflictError(
+        `Not enough items at source location: found ${itemsAtSource.rows.length}, need ${moveData.quantity}`
+      );
+    }
+
+    // Move each item to the new destination
+    const itemIds: string[] = itemsAtSource.rows.map((row: { id: string }) => row.id);
+    for (const itemId of itemIds) {
+      await client.query('UPDATE items SET current_location_id = $1 WHERE id = $2', [
+        moveData.to_location_id,
+        itemId,
+      ]);
+    }
+
+    // Create new MOVE movement record
+    const representativeItemId = itemIds[0];
+    const fullMovementData: CreateInventoryInput = {
+      inventory_action: 'MOVE',
+      item_id: representativeItemId,
+      product_id: moveData.product_id,
+      from_location_id: moveData.from_location_id,
+      to_location_id: moveData.to_location_id,
+      quantity: moveData.quantity,
+      performed_by: moveData.performed_by,
+      note: moveData.note,
+    };
+    const createdMovement = await createInventoryMovementCore(fullMovementData, client);
+
+    await client.query('COMMIT');
+
+    res.status(201).json({ movement: createdMovement });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    if (error instanceof ZodError) {
+      return handleValidationError(error, res);
+    }
+    if (error instanceof ForeignKeyError) {
+      return res.status(400).json({ error: error.message });
+    }
+    if (error instanceof NotFoundError) {
+      return res.status(404).json({ error: error.message });
+    }
+    if (error instanceof UndoConflictError) {
+      return res.status(400).json({ error: error.message });
+    }
+    console.error('Error editing MOVE inventory movement:', error);
     res.status(500).json({ error: 'Internal server error' });
   } finally {
     client.release();

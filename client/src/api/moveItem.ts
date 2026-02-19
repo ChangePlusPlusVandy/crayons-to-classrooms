@@ -112,6 +112,7 @@ export function groupItemsByLocation(items: Item[]): ItemGroup[] {
         current_location_id: item.current_location_id,
         warehouse: item.warehouse,
         name: item.name ?? 'Unknown',
+        product_id: item.product_id,
         quantity: 1,
       });
     }

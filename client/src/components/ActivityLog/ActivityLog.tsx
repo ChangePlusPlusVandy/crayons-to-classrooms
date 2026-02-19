@@ -19,7 +19,8 @@ import { StorageLocation } from '../../types/StorageLocation';
 import { Warehouse } from '../../types/Warehouse';
 import { getProducts, getStorageLocations, getInventoryMovements } from '../../api/addItem';
 import { getWarehouses } from '../../api/moveItem';
-import EditAddDialog from '../EditAddDialog/EditAddDialog';
+import { EditAddDialog } from '../EditAddDialog/EditAddDialog';
+import { EditMoveDialog } from '../EditMoveDialog/EditMoveDialog';
 
 const ACTION_COLORS: Record<string, string> = {
   ADD: '#4caf50',
@@ -102,7 +103,7 @@ export default function ActivityLog() {
   };
 
   const handleEditClick = (movement: InventoryMovement) => {
-    if (movement.inventory_action === 'ADD') {
+    if (movement.inventory_action === 'ADD' || movement.inventory_action === 'MOVE') {
       setEditingMovement(movement);
     }
   };
@@ -133,13 +134,7 @@ export default function ActivityLog() {
 
     const product = products.find((p) => p.id === editingMovement.product_id);
     const location = storageLocations.find((l) => l.id === editingMovement.to_location_id);
-    const warehouse = location
-      ? warehouses.find((w) => w.id === location.warehouse_id)
-      : null;
-
-    console.log('product: ', product)
-    console.log('location:', location)
-    console.log('warehouse:', warehouse)
+    const warehouse = location ? warehouses.find((w) => w.id === location.warehouse_id) : null;
 
     if (!product || !location || !warehouse) return null;
 
@@ -152,6 +147,30 @@ export default function ActivityLog() {
   };
 
   const editDialogProps = getEditDialogProps();
+
+  // Resolve edit move dialog props from the editing movement
+  const getEditMoveDialogProps = () => {
+    if (!editingMovement || editingMovement.inventory_action !== 'MOVE') return null;
+
+    const product = products.find((p) => p.id === editingMovement.product_id);
+    const sourceLocation = storageLocations.find((l) => l.id === editingMovement.from_location_id);
+    const destLocation = storageLocations.find((l) => l.id === editingMovement.to_location_id);
+    const warehouse = sourceLocation
+      ? warehouses.find((w) => w.id === sourceLocation.warehouse_id)
+      : null;
+
+    if (!product || !sourceLocation || !destLocation || !warehouse) return null;
+
+    return {
+      warehouse,
+      sourceSlot: sourceLocation,
+      productName: product.name,
+      destinationSlot: destLocation.slot,
+      destinationFixture: destLocation.fixture || 'N/A',
+    };
+  };
+
+  const editMoveDialogProps = getEditMoveDialogProps();
 
   // Show limited entries in the activity log
   const displayedMovements = movements.slice(0, 10);
@@ -196,14 +215,8 @@ export default function ActivityLog() {
                         </Typography>
                       )}
                       <Box sx={{ display: 'flex', alignItems: 'center', mt: 0.5, gap: 4 }}>
-                        <Typography
-                          variant="caption"
-                          color="text.secondary"
-                          sx={{ ml: 'auto' }}
-                        >
-                          {movement.performed_at
-                            ? formatTimestamp(movement.performed_at)
-                            : ''}
+                        <Typography variant="caption" color="text.secondary" sx={{ ml: 'auto' }}>
+                          {movement.performed_at ? formatTimestamp(movement.performed_at) : ''}
                         </Typography>
                       </Box>
                     </Box>
@@ -223,7 +236,8 @@ export default function ActivityLog() {
                       >
                         <UndoIcon fontSize="small" />
                       </IconButton>
-                      {movement.inventory_action === 'ADD' && (
+                      {(movement.inventory_action === 'ADD' ||
+                        movement.inventory_action === 'MOVE') && (
                         <IconButton
                           size="small"
                           aria-label={`Edit ${movement.inventory_action.toLowerCase()} for ${getProductName(movement.product_id)}`}
@@ -261,7 +275,7 @@ export default function ActivityLog() {
         </CardContent>
       </Card>
 
-      {editingMovement && editDialogProps && (
+      {editingMovement && editingMovement.inventory_action === 'ADD' && editDialogProps && (
         <EditAddDialog
           open={!!editingMovement}
           onClose={handleEditClose}
@@ -274,17 +288,27 @@ export default function ActivityLog() {
         />
       )}
 
+      {editingMovement && editingMovement.inventory_action === 'MOVE' && editMoveDialogProps && (
+        <EditMoveDialog
+          open={!!editingMovement}
+          onClose={handleEditClose}
+          movement={editingMovement}
+          warehouse={editMoveDialogProps.warehouse}
+          sourceSlot={editMoveDialogProps.sourceSlot}
+          productName={editMoveDialogProps.productName}
+          destinationSlot={editMoveDialogProps.destinationSlot}
+          destinationFixture={editMoveDialogProps.destinationFixture}
+          onSuccess={handleEditSuccess}
+        />
+      )}
+
       <Snackbar
         open={showSuccessAlert}
         autoHideDuration={4000}
         onClose={() => setShowSuccessAlert(false)}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       >
-        <Alert
-          onClose={() => setShowSuccessAlert(false)}
-          severity="success"
-          variant="filled"
-        >
+        <Alert onClose={() => setShowSuccessAlert(false)} severity="success" variant="filled">
           Movement updated successfully
         </Alert>
       </Snackbar>
