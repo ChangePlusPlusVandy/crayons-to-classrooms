@@ -1,10 +1,7 @@
 import { Item } from '../types/Item';
 import { InventoryMovement, InventoryMovementSchema } from '../types/InventoryMovement';
 import { Product } from '../types/Product';
-import {
-  createItem,
-  createInventoryMovement,
-} from './addItem';
+import { createItem, createInventoryMovement } from './addItem';
 import { undoInventoryMovement } from './moveItem';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
@@ -33,9 +30,7 @@ export async function editAddMovement(
 
   // Step 2: Create new items (one per quantity, same as AddItem page)
   const itemLimit =
-    typeof product.item_limit === 'string'
-      ? parseInt(product.item_limit, 10)
-      : product.item_limit;
+    typeof product.item_limit === 'string' ? parseInt(product.item_limit, 10) : product.item_limit;
 
   const itemPromises = [];
   for (let i = 0; i < quantity; i++) {
@@ -106,14 +101,11 @@ export async function editAddMovementTransaction(
     };
   }
 ): Promise<{ items: Item[]; movement: InventoryMovement }> {
-  const response = await fetch(
-    `${API_BASE_URL}/inventory-movement/${movementId}/edit-add`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    }
-  );
+  const response = await fetch(`${API_BASE_URL}/inventory-movement/${movementId}/edit-add`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
   if (!response.ok) throw new Error('Failed to edit movement');
   const data = await response.json();
   return { ...data, movement: InventoryMovementSchema.parse(data.movement) };
@@ -134,14 +126,11 @@ export async function editMoveMovementTransaction(
     note?: string;
   }
 ): Promise<{ movement: InventoryMovement }> {
-  const response = await fetch(
-    `${API_BASE_URL}/inventory-movement/${movementId}/edit-move`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    }
-  );
+  const response = await fetch(`${API_BASE_URL}/inventory-movement/${movementId}/edit-move`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
   if (!response.ok) throw new Error('Failed to edit movement');
   const data = await response.json();
   return { movement: InventoryMovementSchema.parse(data.movement) };

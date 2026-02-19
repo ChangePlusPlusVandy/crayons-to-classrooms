@@ -11,11 +11,7 @@ import {
 } from '@mui/material';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import AddIcon from '@mui/icons-material/Add';
-import {
-  getStorageLocations,
-  getItemsByLocation,
-  groupItemsByLocation,
-} from '../../api/moveItem';
+import { getStorageLocations, getItemsByLocation, groupItemsByLocation } from '../../api/moveItem';
 import { Warehouse } from '../../types/Warehouse';
 import { StorageLocation } from '../../types/StorageLocation';
 import { Item, ItemGroup } from '../../types/Item';
@@ -69,11 +65,14 @@ export default function MoveItemForm({
   const [storageLocations, setStorageLocations] = useState<StorageLocation[]>([]);
   const [allItems, setAllItems] = useState<Item[]>([]);
   const [selectedWarehouse, setSelectedWarehouse] = useState<Warehouse | null>(initialWarehouse);
-  const [selectedSourceSlot, setSelectedSourceSlot] = useState<StorageLocation | null>(initialSourceSlot);
-  const [itemsInSourceSlot, setItemsInSourceSlot] = useState<Item[]>([]);
+  const [selectedSourceSlot, setSelectedSourceSlot] = useState<StorageLocation | null>(
+    initialSourceSlot
+  );
   const [itemGroupsInSourceSlot, setItemGroupsInSourceSlot] = useState<ItemGroup[]>([]);
   const [selectedItemGroup, setSelectedItemGroup] = useState<ItemGroup | null>(null);
-  const [selectedDestinationSlot, setSelectedDestinationSlot] = useState<string | null>(initialDestinationSlot);
+  const [selectedDestinationSlot, setSelectedDestinationSlot] = useState<string | null>(
+    initialDestinationSlot
+  );
   const [selectedFixture, setSelectedFixture] = useState<string | null>(initialDestinationFixture);
   const [notes, setNotes] = useState(initialNotes);
   const [quantityToMove, setQuantityToMove] = useState<number>(initialQuantity ?? 0);
@@ -133,14 +132,12 @@ export default function MoveItemForm({
   useEffect(() => {
     async function fetchItemsInSlot() {
       if (!selectedSourceSlot) {
-        setItemsInSourceSlot([]);
         setItemGroupsInSourceSlot([]);
         return;
       }
 
       try {
         const items = await getItemsByLocation(selectedSourceSlot.id);
-        setItemsInSourceSlot(items);
 
         // Generate groups for display, with optional adjustment from parent
         let groups = groupItemsByLocation(items);
@@ -163,13 +160,12 @@ export default function MoveItemForm({
       } catch (err) {
         console.error('Error fetching items:', err);
         setError('Failed to load items for the selected slot.');
-        setItemsInSourceSlot([]);
         setItemGroupsInSourceSlot([]);
       }
     }
 
     fetchItemsInSlot();
-  }, [selectedSourceSlot]);
+  }, [selectedSourceSlot, adjustItemGroups, initialProductId, initialQuantity, pendingAutoSelect]);
 
   // Create location-to-items map for efficient lookup
   const locationItemsMap = useMemo(() => {
@@ -383,7 +379,6 @@ export default function MoveItemForm({
         onChange={(newWarehouse) => {
           setSelectedWarehouse(newWarehouse);
           setSelectedSourceSlot(null);
-          setItemsInSourceSlot([]);
           setItemGroupsInSourceSlot([]);
           setSelectedItemGroup(null);
           setSelectedDestinationSlot(null);
@@ -424,7 +419,6 @@ export default function MoveItemForm({
           value={selectedSourceSlot}
           onChange={(_, newValue) => {
             setSelectedSourceSlot(newValue);
-            setItemsInSourceSlot([]);
             setItemGroupsInSourceSlot([]);
             setSelectedItemGroup(null);
             setQuantityToMove(0);
@@ -434,9 +428,7 @@ export default function MoveItemForm({
             <TextField
               {...params}
               placeholder={
-                !selectedWarehouse
-                  ? 'Select warehouse first'
-                  : 'Search by slot code or item name'
+                !selectedWarehouse ? 'Select warehouse first' : 'Search by slot code or item name'
               }
             />
           )}
@@ -460,9 +452,7 @@ export default function MoveItemForm({
           renderInput={(params) => (
             <TextField
               {...params}
-              placeholder={
-                !selectedSourceSlot ? 'Select source slot first' : 'Select item to move'
-              }
+              placeholder={!selectedSourceSlot ? 'Select source slot first' : 'Select item to move'}
             />
           )}
           noOptionsText="No matching items found"
@@ -504,10 +494,7 @@ export default function MoveItemForm({
       </FormControl>
 
       <Box sx={{ display: 'flex', justifyContent: 'center', my: 2 }}>
-        <ArrowDownwardIcon
-          aria-hidden="true"
-          sx={{ fontSize: '2rem', color: 'text.secondary' }}
-        />
+        <ArrowDownwardIcon aria-hidden="true" sx={{ fontSize: '2rem', color: 'text.secondary' }} />
       </Box>
       <Stack spacing={0}>
         <SlotSelector
@@ -569,11 +556,7 @@ export default function MoveItemForm({
       </FormControl>
 
       <Box sx={{ display: 'flex', gap: 2, mt: 3 }}>
-        <Button
-          variant="outlined"
-          fullWidth
-          onClick={onCancel}
-        >
+        <Button variant="outlined" fullWidth onClick={onCancel}>
           Cancel
         </Button>
         <Button

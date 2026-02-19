@@ -627,9 +627,7 @@ export const editInventoryMovementAdd = async (req: Request, res: Response) => {
       throw new NotFoundError('Inventory movement not found');
     }
     if (original.rows[0].inventory_action !== 'ADD') {
-      return res
-        .status(400)
-        .json({ error: 'Can only edit ADD type movements with this endpoint' });
+      return res.status(400).json({ error: 'Can only edit ADD type movements with this endpoint' });
     }
 
     await client.query('BEGIN');

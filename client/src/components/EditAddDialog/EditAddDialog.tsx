@@ -68,7 +68,8 @@ export function EditAddDialog({
       onSuccess?.();
       onClose();
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to save changes. Please try again.';
+      const message =
+        err instanceof Error ? err.message : 'Failed to save changes. Please try again.';
       setError(message);
     }
   };

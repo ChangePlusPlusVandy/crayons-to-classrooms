@@ -121,9 +121,9 @@ export function groupItemsByLocation(items: Item[]): ItemGroup[] {
   return Array.from(groupMap.values()).sort((a, b) => a.name.localeCompare(b.name));
 }
 
-export async function undoInventoryMovement(movementId: string): Promise<void> {                             
-  const response = await fetch(`${API_BASE_URL}/inventory-movement/${movementId}/undo`, {                    
-    method: 'POST',                                                                                          
-  });                                                                                                        
-  if (!response.ok) throw new Error('Failed to undo movement');                                              
-} 
+export async function undoInventoryMovement(movementId: string): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/inventory-movement/${movementId}/undo`, {
+    method: 'POST',
+  });
+  if (!response.ok) throw new Error('Failed to undo movement');
+}

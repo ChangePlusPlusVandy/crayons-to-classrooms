@@ -236,9 +236,7 @@ export default function AddItemForm({
           filterOptions={(options, state) => {
             const searchTerm = state.inputValue.toLowerCase().trim();
             if (!searchTerm) return options;
-            return options.filter((product) =>
-              product.name?.toLowerCase().includes(searchTerm)
-            );
+            return options.filter((product) => product.name?.toLowerCase().includes(searchTerm));
           }}
           renderOption={(props, option, state) => {
             const { key, ...otherProps } = props;
@@ -262,9 +260,7 @@ export default function AddItemForm({
             setSelectedProduct(newValue);
             setError('');
           }}
-          renderInput={(params) => (
-            <TextField {...params} placeholder="Search for an item name" />
-          )}
+          renderInput={(params) => <TextField {...params} placeholder="Search for an item name" />}
           noOptionsText="No matching products found"
         />
         <Button
@@ -356,12 +352,7 @@ export default function AddItemForm({
         <Button variant="outlined" fullWidth onClick={onCancel}>
           Cancel
         </Button>
-        <Button
-          variant="contained"
-          fullWidth
-          type="submit"
-          disabled={submitting || !isFormValid()}
-        >
+        <Button variant="contained" fullWidth type="submit" disabled={submitting || !isFormValid()}>
           {submitting ? <CircularProgress size={24} /> : submitLabel}
         </Button>
       </Box>
