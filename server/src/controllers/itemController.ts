@@ -370,6 +370,7 @@ export const getItemsByStatus = async (req: Request, res: Response) => {
  *   - product_id: UUID of the product (in body)
  *   - quantity: Number of items (in body)
  *   - current_location_id: UUID of the current location (in body, optional)
+ *   - fixture: Fixture string (in body, optional)
  *   - status: Current status of the item ie ('active', 'inactive', 'discontinued', 'checked out') (in body)
  *   - created_by: UUID of the user creating the item (in body)
  *   - warehouse: UUID of the warehouse (in body, required)
@@ -622,16 +623,20 @@ export const createItemsBulk = async (req: Request, res: Response) => {
         client
       );
 
+      let responseItems = newItems.rows;
       if (itemInfoId) {
         const newItemIds = newItems.rows.map((row: { id: string }) => row.id);
         await client.query(
           'UPDATE items SET item_info = $1, updated_at = NOW() WHERE id = ANY($2::uuid[])',
           [itemInfoId, newItemIds]
         );
+        const updatedItems = await client.query('SELECT * FROM items WHERE id = ANY($1::uuid[])', [
+          newItemIds,
+        ]);
+        responseItems = updatedItems.rows;
       }
-
       await client.query('COMMIT');
-      return res.status(201).json(newItems.rows);
+      return res.status(201).json(responseItems);
     } catch (error) {
       await client.query('ROLLBACK');
       throw error;
