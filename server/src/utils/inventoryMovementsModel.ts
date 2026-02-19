@@ -92,7 +92,9 @@ export const movementFieldsSchema = z.object({
  */
 export const createItemWithMovementSchema = z.object({
   item: createItemSchema,
-  movement: movementFieldsSchema,
+  movement: movementFieldsSchema.extend({
+    inventory_action: z.literal('ADD'),
+  }),
 });
 
 /**
@@ -101,7 +103,9 @@ export const createItemWithMovementSchema = z.object({
  */
 export const moveItemsWithMovementSchema = z.object({
   item_ids: z.array(uuidSchema).nonempty('At least one item_id is required'),
-  movement: movementFieldsSchema,
+  movement: movementFieldsSchema.extend({
+    inventory_action: z.literal('MOVE'),
+  }),
 });
 
 export type CreateInventoryInput = z.infer<typeof createInventoryMovementSchema>;

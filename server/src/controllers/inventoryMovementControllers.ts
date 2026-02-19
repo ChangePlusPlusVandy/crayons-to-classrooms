@@ -631,11 +631,20 @@ export const createItemWithMovement = async (req: Request, res: Response) => {
   }
 
   const { item: itemData, movement: movementData } = parsedData;
+
+  if (movementData.quantity <= 0) {
+    return res.status(400).json({ error: 'Quantity must be greater than 0' });
+  }
+
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
 
     const createdItems = await createItemCore(itemData, movementData.quantity, client);
+
+    if (createdItems.length === 0) {
+      throw new Error('No items were created');
+    }
 
     const fullMovementData: CreateInventoryInput = {
       inventory_action: movementData.inventory_action,
@@ -687,6 +696,7 @@ export const moveItemsWithMovement = async (req: Request, res: Response) => {
   }
 
   const { item_ids, movement: movementData } = parsedData;
+  const normalizedFromLocationId = movementData.from_location_id ?? null;
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -699,7 +709,7 @@ export const moveItemsWithMovement = async (req: Request, res: Response) => {
        WHERE id = ANY($2)
          AND current_location_id IS NOT DISTINCT FROM $3
        RETURNING *`,
-      [movementData.to_location_id, item_ids, movementData.from_location_id]
+      [movementData.to_location_id, item_ids, normalizedFromLocationId]
     );
 
     if (updateResult.rows.length === 0) {
@@ -716,7 +726,7 @@ export const moveItemsWithMovement = async (req: Request, res: Response) => {
       inventory_action: movementData.inventory_action,
       item_id: representativeItem.id,
       product_id: representativeItem.product_id,
-      from_location_id: movementData.from_location_id,
+      from_location_id: normalizedFromLocationId,
       to_location_id: movementData.to_location_id,
       quantity: movementData.quantity,
       performed_by: movementData.performed_by,
