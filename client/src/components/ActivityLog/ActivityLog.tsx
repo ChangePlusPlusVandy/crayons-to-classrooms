@@ -215,7 +215,7 @@ export default function ActivityLog() {
                         </Typography>
                       )}
                       <Box sx={{ display: 'flex', alignItems: 'center', mt: 0.5, gap: 4 }}>
-                        <Typography variant="caption" color="text.secondary" sx={{ ml: 'auto' }}>
+                        <Typography variant="caption" color="text.secondary">
                           {movement.performed_at ? formatTimestamp(movement.performed_at) : ''}
                         </Typography>
                       </Box>
