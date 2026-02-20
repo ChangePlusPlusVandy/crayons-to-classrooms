@@ -118,3 +118,25 @@ export function groupItemsByLocation(items: Item[]): ItemGroup[] {
 
   return Array.from(groupMap.values()).sort((a, b) => a.name.localeCompare(b.name));
 }
+
+export async function moveItemsWithMovement(payload: {
+  item_ids: string[];
+  movement: {
+    inventory_action: 'MOVE';
+    from_location_id: string | null;
+    to_location_id: string;
+    quantity: number;
+    performed_by: string;
+    note?: string;
+  };
+}): Promise<{ updatedCount: number; movement: InventoryMovement }> {
+  const response = await fetch(`${API_BASE_URL}/inventory-movement/with-move`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) throw new Error('Failed to move items');
+  return response.json();
+}
