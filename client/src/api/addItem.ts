@@ -81,7 +81,7 @@ export async function createItemWithMovement(payload: {
     notes?: string;
   };
   movement: {
-    inventory_action: 'ADD' | 'MOVE' | 'CHECKOUT' | 'DISCARD' | 'ADJUSTMENT';
+    inventory_action: 'ADD';
     from_location_id?: string | null;
     to_location_id: string;
     quantity: number;

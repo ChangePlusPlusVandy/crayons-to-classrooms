@@ -122,7 +122,7 @@ export function groupItemsByLocation(items: Item[]): ItemGroup[] {
 export async function moveItemsWithMovement(payload: {
   item_ids: string[];
   movement: {
-    inventory_action: string;
+    inventory_action: 'MOVE';
     from_location_id: string | null;
     to_location_id: string;
     quantity: number;
