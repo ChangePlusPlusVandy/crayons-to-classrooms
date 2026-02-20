@@ -706,7 +706,7 @@ export const moveItemsWithMovement = async (req: Request, res: Response) => {
       `UPDATE items
        SET current_location_id = $1,
            updated_at = NOW()
-       WHERE id = ANY($2)
+       WHERE id = ANY($2::uuid[])
          AND current_location_id IS NOT DISTINCT FROM $3
        RETURNING *`,
       [movementData.to_location_id, item_ids, normalizedFromLocationId]
