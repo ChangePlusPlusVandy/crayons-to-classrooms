@@ -71,7 +71,7 @@ const getLocationInfo = async (locationId?: string | null, db: DbClient = pool) 
   };
 };
 
-const syncItemInfoStock = async (
+export const syncItemInfoStock = async (
   itemName: string,
   productId: string | undefined,
   category: string | undefined,
