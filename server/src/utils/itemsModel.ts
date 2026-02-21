@@ -25,6 +25,10 @@ export const warehouseIdParamSchema = z.object({
   warehouseId: uuidSchema,
 });
 
+export const itemInfoIdParamSchema = z.object({
+  itemInfoId: uuidSchema,
+});
+
 /**
  * Valid status values for items
  */
@@ -39,6 +43,7 @@ export const createItemSchema = z.object({
   name: z.string().min(1, 'Name is required').max(255, 'Name must be less than 255 characters'),
   product_id: uuidSchema,
   current_location_id: uuidSchema.optional(),
+  fixture: z.string().optional(),
   created_by: uuidSchema,
   quantity: z.number().int().nonnegative('Quantity cannot be negative'),
   stock: z.number().int().nonnegative('Stock cannot be negative').optional(),
@@ -49,6 +54,18 @@ export const createItemSchema = z.object({
   value: z.number().nonnegative('Value cannot be negative'),
   limbo: z.boolean().default(false),
   notes: z.string().optional(),
+});
+
+/**
+ * Schema for validating bulk item creation
+ * Requires: same fields as createItemSchema plus count
+ */
+export const createItemsBulkSchema = createItemSchema.extend({
+  count: z
+    .number()
+    .int()
+    .positive('Count must be a positive integer')
+    .max(1000, 'Count must be 1000 or less'),
 });
 
 /**
@@ -63,6 +80,7 @@ export const updateItemSchema = z
       .max(255, 'Name must be less than 255 characters')
       .optional(),
     product_id: uuidSchema.optional(),
+    item_info: uuidSchema.optional(),
     quantity: z.number().int().nonnegative('Quantity cannot be negative').optional(),
     stock: z.number().int().nonnegative('Stock cannot be negative').optional(),
     current_location_id: uuidSchema.optional(),
@@ -89,5 +107,6 @@ export const statusQuerySchema = z.object({
  * Type exports for TypeScript
  */
 export type CreateItemInput = z.infer<typeof createItemSchema>;
+export type CreateItemsBulkInput = z.infer<typeof createItemsBulkSchema>;
 export type UpdateItemInput = z.infer<typeof updateItemSchema>;
 export type ItemStatusType = z.infer<typeof ItemStatus>;

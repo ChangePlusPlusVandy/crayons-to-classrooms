@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { createItemSchema } from './itemsModel.js';
 
 export const uuidSchema = z.uuid('Invalid UUID format');
 
@@ -45,7 +46,7 @@ export const createInventoryMovementSchema = z.object({
   product_id: uuidSchema,
   from_location_id: uuidSchema.nullable().optional(),
   to_location_id: uuidSchema,
-  quantity: z.number().int().nonnegative('Quantity must be a nonnegative integer'),
+  quantity: z.number().int().positive('Quantity must be a positive integer'),
   performed_by: uuidSchema,
   note: z.string().optional(),
 });
@@ -73,6 +74,42 @@ export const actionQuerySchema = z.object({
   inventory_action: ActionParamSchema,
 });
 
+/**
+ * Schema for the movement portion of the combined create-item-with-movement endpoint.
+ * item_id and product_id are omitted because they come from the newly created item.
+ */
+export const movementFieldsSchema = z.object({
+  inventory_action: ActionParamSchema,
+  from_location_id: uuidSchema.nullable().optional(),
+  to_location_id: uuidSchema,
+  quantity: z.number().int().nonnegative('Quantity must be a nonnegative integer'),
+  performed_by: uuidSchema,
+  note: z.string().optional(),
+});
+
+/**
+ * Schema for the combined create-item-with-movement request body.
+ */
+export const createItemWithMovementSchema = z.object({
+  item: createItemSchema,
+  movement: movementFieldsSchema.extend({
+    inventory_action: z.literal('ADD'),
+  }),
+});
+
+/**
+ * Schema for the combined move-items-with-movement request body.
+ * item_ids are the existing items to relocate; movement records the action.
+ */
+export const moveItemsWithMovementSchema = z.object({
+  item_ids: z.array(uuidSchema).nonempty('At least one item_id is required'),
+  movement: movementFieldsSchema.extend({
+    inventory_action: z.literal('MOVE'),
+  }),
+});
+
 export type CreateInventoryInput = z.infer<typeof createInventoryMovementSchema>;
 export type UpdateInventoryInput = z.infer<typeof updateInventoryMovementSchema>;
 export type InventoryStatusType = z.infer<typeof actionQuerySchema>;
+export type CreateItemWithMovementInput = z.infer<typeof createItemWithMovementSchema>;
+export type MoveItemsWithMovementInput = z.infer<typeof moveItemsWithMovementSchema>;
