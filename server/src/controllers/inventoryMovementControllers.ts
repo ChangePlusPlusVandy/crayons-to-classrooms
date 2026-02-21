@@ -798,10 +798,20 @@ export const undoInventoryMovement = async (req: Request, res: Response) => {
       const fromLocation = fromLocationResult.rows[0];
 
       const itemIds = itemsAtDestination.rows.map((row: { id: string }) => row.id);
-      await client.query(
-        'UPDATE items SET current_location_id = $1 WHERE id = ANY($2::uuid[])',
-        [inventoryMovement.from_location_id, itemIds]
+
+      // Update items, verifying they're still at the expected location (prevents race conditions)
+      const updateResult = await client.query(
+        'UPDATE items SET current_location_id = $1, updated_at = NOW() WHERE id = ANY($2::uuid[]) AND current_location_id = $3',
+        [inventoryMovement.from_location_id, itemIds, inventoryMovement.to_location_id]
       );
+
+      // Verify all items were updated (all-or-nothing)
+      if (updateResult.rowCount !== inventoryMovement.quantity) {
+        await client.query('ROLLBACK');
+        client.release();
+        client = null;
+        return res.status(409).json({ error: 'Cannot undo: some items have been moved by another operation' });
+      }
 
       // Update item_info location tracking for each unique item name
       const uniqueItemNames = [...new Set(itemsAtDestination.rows.map((row: { name: string }) => row.name))];
@@ -834,15 +844,37 @@ export const undoInventoryMovement = async (req: Request, res: Response) => {
         return res.status(400).json({ error: 'Cannot undo: items have been moved or deleted' });
       }
 
+      const itemIds = itemsAtDestination.rows.map((row: { id: string }) => row.id);
+
+      // Check if any items are referenced by other movements (can't be deleted)
+      const referencedItems = await client.query(
+        'SELECT DISTINCT item_id FROM "inventory movement" WHERE item_id = ANY($1::uuid[]) AND id != $2',
+        [itemIds, id]
+      );
+
+      if (referencedItems.rows.length > 0) {
+        await client.query('ROLLBACK');
+        client.release();
+        client = null;
+        return res.status(400).json({ error: 'Cannot undo: some items have subsequent movements' });
+      }
+
       // Delete movement record FIRST to avoid foreign key constraint
       await client.query('DELETE FROM "inventory movement" WHERE id = $1', [id]);
 
-      const itemIds = itemsAtDestination.rows.map((row: { id: string }) => row.id);
-      // Delete items only if not referenced by other movements
+      // Delete items - constrain by current_location_id to avoid deleting items that moved
       const deleteResult = await client.query(
-        'DELETE FROM items WHERE id = ANY($1::uuid[]) AND NOT EXISTS (SELECT 1 FROM "inventory movement" m WHERE m.item_id = items.id) RETURNING name',
-        [itemIds]
+        'DELETE FROM items WHERE id = ANY($1::uuid[]) AND current_location_id = $2 RETURNING name',
+        [itemIds, inventoryMovement.to_location_id]
       );
+
+      // Verify all items were deleted (all-or-nothing)
+      if (deleteResult.rowCount !== inventoryMovement.quantity) {
+        await client.query('ROLLBACK');
+        client.release();
+        client = null;
+        return res.status(400).json({ error: 'Cannot undo: some items have been moved since the ADD operation' });
+      }
 
       // Decrement item_info stock for each deleted item
       const deletedCountsByName: Record<string, number> = {};

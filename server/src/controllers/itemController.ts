@@ -441,7 +441,19 @@ export async function createItemCore(
   );
 
   const { fixture, locationCode } = await getLocationInfo(current_location_id ?? null, db);
-  await syncItemInfoStock(name, item_limit ?? 0, fixture, locationCode, count, true, db);
+  await syncItemInfoStock(
+    name,
+    product_id,
+    category ?? undefined,
+    quantity,
+    value,
+    item_limit ?? undefined,
+    fixture,
+    locationCode,
+    count, // stockDelta - number of items created
+    true, // createIfMissing
+    db
+  );
 
   return newItems.rows;
 }
