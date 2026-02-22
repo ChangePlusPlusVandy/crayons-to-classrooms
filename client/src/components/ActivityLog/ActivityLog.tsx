@@ -28,6 +28,7 @@ const ACTION_COLORS: Record<string, string> = {
   CHECKOUT: '#ff9800',
   DISCARD: '#f44336',
   ADJUSTMENT: '#9c27b0',
+  DONATED: '#e91e63',
 };
 
 function formatTimestamp(dateStr: string): string {
