@@ -20,7 +20,7 @@ import {
   createInventoryMovement,
 } from '../../api/addItem';
 import { Warehouse } from '../../types/Warehouse';
-import { InventoryMovement, CreateInventoryMovementRequest } from '../../types/InventoryMovement';
+import { CreateInventoryMovementRequest } from '../../types/InventoryMovement';
 import { StorageLocation } from '../../types/StorageLocation';
 import { Product } from '../../types/Product';
 import {
