@@ -806,7 +806,7 @@ export const undoInventoryMovement = async (req: Request, res: Response) => {
       );
 
       // Verify all items were updated (all-or-nothing)
-      if (updateResult.rowCount !== inventoryMovement.quantity) {
+      if (updateResult.rowCount !== itemIds.length) {
         await client.query('ROLLBACK');
         client.release();
         client = null;
@@ -869,7 +869,7 @@ export const undoInventoryMovement = async (req: Request, res: Response) => {
       );
 
       // Verify all items were deleted (all-or-nothing)
-      if (deleteResult.rowCount !== inventoryMovement.quantity) {
+      if (deleteResult.rowCount !== itemIds.length) {
         await client.query('ROLLBACK');
         client.release();
         client = null;
