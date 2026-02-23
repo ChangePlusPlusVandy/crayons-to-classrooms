@@ -14,8 +14,9 @@ import {
   CreateInventoryInput,
   UpdateInventoryInput,
   actionQuerySchema,
-  createItemWithMovementSchema,
   editMoveSchema,
+  createItemWithMovementSchema,
+  moveItemsWithMovementSchema,
 } from '../utils/inventoryMovementsModel.js';
 import { ZodError } from 'zod';
 import { DbClient } from '../utils/dbTypes.js';
@@ -62,6 +63,56 @@ export async function getAllInventoryMovements(req: Request, res: Response): Pro
   try {
     const result = await pool.query('SELECT * FROM "inventory movement"');
     res.json(result.rows);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+}
+
+// GET all rows with JOINed details and server-side pagination
+export async function getAllMovementsDetailed(req: Request, res: Response): Promise<void> {
+  try {
+    const page = Math.max(1, parseInt(req.query.page as string) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 10));
+    const offset = (page - 1) * limit;
+
+    const [dataResult, countResult] = await Promise.all([
+      pool.query(
+        `SELECT
+          im.id,
+          im.item_id,
+          im.product_id,
+          im.from_location_id,
+          im.to_location_id,
+          im.quantity,
+          im.performed_by,
+          im.note,
+          im.performed_at,
+          im.inventory_action,
+          p.name AS product_name,
+          from_loc.location_code AS from_location_name,
+          to_loc.location_code AS to_location_name,
+          u.name AS user_name
+        FROM "inventory movement" im
+        LEFT JOIN products p ON im.product_id = p.id
+        LEFT JOIN storage_locations from_loc ON im.from_location_id = from_loc.id
+        LEFT JOIN storage_locations to_loc ON im.to_location_id = to_loc.id
+        LEFT JOIN users u ON im.performed_by = u.id
+        ORDER BY im.performed_at DESC NULLS LAST
+        LIMIT $1 OFFSET $2`,
+        [limit, offset]
+      ),
+      pool.query('SELECT COUNT(*) FROM "inventory movement"'),
+    ]);
+
+    const total = parseInt(countResult.rows[0].count, 10);
+
+    res.json({
+      data: dataResult.rows,
+      total,
+      page,
+      limit,
+    });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Internal Server Error' });
@@ -557,7 +608,6 @@ export const deleteInventoryMovement = async (req: Request, res: Response) => {
     res.status(500).json({ error: 'Internal server error' });
   }
 };
-
 /**
  * Creates multiple identical items and an associated inventory movement atomically in a transaction.
  * The number of items created is derived from movement.quantity.
@@ -573,13 +623,31 @@ export const deleteInventoryMovement = async (req: Request, res: Response) => {
  * @throws {500} Internal server error
  */
 export const createItemWithMovement = async (req: Request, res: Response) => {
+  let parsedData;
+  try {
+    parsedData = createItemWithMovementSchema.parse(req.body);
+  } catch (error) {
+    if (error instanceof ZodError) {
+      return handleValidationError(error, res);
+    }
+    return res.status(400).json({ error: 'Invalid request body' });
+  }
+
+  const { item: itemData, movement: movementData } = parsedData;
+
+  if (movementData.quantity <= 0) {
+    return res.status(400).json({ error: 'Quantity must be greater than 0' });
+  }
+
   const client = await pool.connect();
   try {
-    const { item: itemData, movement: movementData } = createItemWithMovementSchema.parse(req.body);
-
     await client.query('BEGIN');
 
     const createdItems = await createItemCore(itemData, movementData.quantity, client);
+
+    if (createdItems.length === 0) {
+      throw new Error('No items were created');
+    }
 
     const fullMovementData: CreateInventoryInput = {
       inventory_action: movementData.inventory_action,
@@ -599,9 +667,6 @@ export const createItemWithMovement = async (req: Request, res: Response) => {
     res.status(201).json({ items: createdItems, movement: createdMovement });
   } catch (error) {
     await client.query('ROLLBACK');
-    if (error instanceof ZodError) {
-      return handleValidationError(error, res);
-    }
     if (error instanceof ForeignKeyError) {
       return res.status(400).json({ error: error.message });
     }
@@ -612,6 +677,81 @@ export const createItemWithMovement = async (req: Request, res: Response) => {
   }
 };
 
+/**
+ * Moves existing items to a new location and creates an inventory movement record atomically.
+ * All item location updates and the movement record are wrapped in a single transaction.
+ *
+ * @param {Request} req - Express request object with nested body:
+ *   - item_ids: Array of UUIDs of items to move
+ *   - movement: Object with movement fields (inventory_action, from_location_id, to_location_id, quantity, performed_by, note)
+ * @param {Response} res - Express response object
+ * @returns {Promise<Response>} JSON object with { updatedCount, movement } or error message
+ */
+export const moveItemsWithMovement = async (req: Request, res: Response) => {
+  let parsedData;
+  try {
+    parsedData = moveItemsWithMovementSchema.parse(req.body);
+  } catch (error) {
+    if (error instanceof ZodError) {
+      return handleValidationError(error, res);
+    }
+    return res.status(400).json({ error: 'Invalid request body' });
+  }
+
+  const { item_ids, movement: movementData } = parsedData;
+  const normalizedFromLocationId = movementData.from_location_id ?? null;
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // Update all items' location in a single query, ensuring they are currently at from_location_id
+    const updateResult = await client.query(
+      `UPDATE items
+       SET current_location_id = $1,
+           updated_at = NOW()
+       WHERE id = ANY($2::uuid[])
+         AND current_location_id IS NOT DISTINCT FROM $3
+       RETURNING *`,
+      [movementData.to_location_id, item_ids, normalizedFromLocationId]
+    );
+
+    if (updateResult.rows.length === 0) {
+      throw new Error('No items found with the provided IDs and from_location_id');
+    }
+
+    if (updateResult.rowCount !== item_ids.length) {
+      throw new Error('Some items were not at the expected from_location_id');
+    }
+    // Use the first item as the representative for the movement record
+    const representativeItem = updateResult.rows[0];
+
+    const fullMovementData: CreateInventoryInput = {
+      inventory_action: movementData.inventory_action,
+      item_id: representativeItem.id,
+      product_id: representativeItem.product_id,
+      from_location_id: normalizedFromLocationId,
+      to_location_id: movementData.to_location_id,
+      quantity: updateResult.rowCount,
+      performed_by: movementData.performed_by,
+      note: movementData.note,
+    };
+
+    const createdMovement = await createInventoryMovementCore(fullMovementData, client);
+
+    await client.query('COMMIT');
+
+    res.status(201).json({ updatedCount: updateResult.rowCount, movement: createdMovement });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    if (error instanceof ForeignKeyError) {
+      return res.status(400).json({ error: error.message });
+    }
+    console.error('Error moving items with movement:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  } finally {
+    client.release();
+  }
+};
 export const editInventoryMovementAdd = async (req: Request, res: Response) => {
   const client = await pool.connect();
   try {
@@ -835,3 +975,5 @@ export const undoInventoryMovement = async (req: Request, res: Response) => {
     res.status(500).json({ error: 'Internal server error' });
   }
 };
+
+

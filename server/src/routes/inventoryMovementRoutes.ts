@@ -1,6 +1,7 @@
 import express from 'express';
 import {
   getAllInventoryMovements,
+  getAllMovementsDetailed,
   getMovementById,
   getMovementsByAction,
   getMovementsByItemId,
@@ -12,6 +13,7 @@ import {
   getMovementsOnAndAfterDate,
   createInventoryMovement,
   createItemWithMovement,
+  moveItemsWithMovement,
   updateInventoryMovement,
   deleteInventoryMovement,
   undoInventoryMovement,
@@ -21,6 +23,7 @@ import {
 
 const router = express.Router();
 router.get('/', getAllInventoryMovements); // GET /api/inventory-movement
+router.get('/detailed', getAllMovementsDetailed); // GET /api/inventory-movement/detailed?page=1&limit=10
 router.get('/:id', getMovementById); // GET /api/inventory-movement/:id
 router.get('/action/:inventory_action', getMovementsByAction); // GET /api/inventory-movement/action/:inventory_action
 router.get('/item/:item_id', getMovementsByItemId); // GET /api/inventory-movement/item/:item_id
@@ -32,6 +35,7 @@ router.get('/before/:date', getMovementsOnAndBeforeDate); // GET /api/inventory-
 router.get('/after/:date', getMovementsOnAndAfterDate); // GET /api/inventory-movement/after/:date
 router.post('/', createInventoryMovement); // POST /api/inventory-movement
 router.post('/with-item', createItemWithMovement); // POST /api/inventory-movement/with-item
+router.post('/with-move', moveItemsWithMovement); // POST /api/inventory-movement/with-move
 router.patch('/:id', updateInventoryMovement); // PATCH /api/inventory-movement/:id
 router.delete('/:id', deleteInventoryMovement); // DELETE /api/inventory-movement/:id
 router.post('/:id/undo', undoInventoryMovement); // POST /api/inventory-movement/:id/undo

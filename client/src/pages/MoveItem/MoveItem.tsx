@@ -4,6 +4,8 @@ import {
   getItemsByLocation,
   createInventoryMovement,
   updateItemLocation,
+  moveItemsWithMovement,
+  groupItemsByLocation,
 } from '../../api/moveItem';
 import MoveItemForm, { MoveItemFormData } from '../../components/MoveItemForm/MoveItemForm';
 
@@ -36,22 +38,16 @@ export default function MoveItem() {
         throw new Error('Insufficient items in group to move');
       }
 
-      // TODO: Replace with batch update API endpoint when available
-      await Promise.all(
-        itemsToMove.map((item) => updateItemLocation(item.id, destinationLocationId))
-      );
-
-      // Record one inventory movement for the entire operation
-      const representativeItem = itemsToMove[0];
-      await createInventoryMovement({
-        inventory_action: 'MOVE',
-        item_id: representativeItem.id,
-        product_id: representativeItem.product_id,
-        from_location_id: sourceSlot.id,
-        to_location_id: destinationLocationId,
-        quantity,
-        performed_by: 'b4974f63-ee89-42a1-bdb3-ce9df255c682', // TODO: Get user ID
-        note: notes || undefined,
+      await moveItemsWithMovement({
+        item_ids: itemsToMove.map((item) => item.id),
+        movement: {
+          inventory_action: 'MOVE',
+          from_location_id: sourceSlot.id,
+          to_location_id: destinationLocationId,
+          quantity,
+          performed_by: 'b4974f63-ee89-42a1-bdb3-ce9df255c682', // TODO: Get user ID
+          note: notes || undefined,
+        },
       });
 
       setSuccess(`${quantity} item${quantity > 1 ? 's' : ''} moved successfully!`);

@@ -90,7 +90,7 @@ export async function createItemWithMovement(payload: {
     notes?: string;
   };
   movement: {
-    inventory_action: 'ADD' | 'MOVE' | 'CHECKOUT' | 'DISCARD' | 'ADJUSTMENT';
+    inventory_action: 'ADD';
     from_location_id?: string | null;
     to_location_id: string;
     quantity: number;
@@ -106,6 +106,5 @@ export async function createItemWithMovement(payload: {
     body: JSON.stringify(payload),
   });
   if (!response.ok) throw new Error('Failed to create items with movement');
-  const data = await response.json();
-  return { ...data, movement: InventoryMovementSchema.parse(data.movement) };
+  return response.json();
 }

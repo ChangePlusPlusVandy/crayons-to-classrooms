@@ -1,6 +1,7 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import DashboardLayout from './components/DashboardLayout/DashboardLayout';
 import Dashboard from './pages/Dashboard/Dashboard';
+import Activities from './pages/Activities/Activities';
 import MoveItem from './pages/MoveItem/MoveItem';
 import AddItem from './pages/AddItem/AddItem';
 import './App.css';
@@ -19,10 +20,7 @@ function App() {
             path="/inventory"
             element={<div style={{ padding: '2rem' }}>Inventory Page (Coming Soon)</div>}
           />
-          <Route
-            path="/activity-log"
-            element={<div style={{ padding: '2rem' }}>Activity Log Page (Coming Soon)</div>}
-          />
+          <Route path="/activity-log" element={<Activities />} />
           <Route
             path="/limbo-items"
             element={<div style={{ padding: '2rem' }}>Limbo Items Page (Coming Soon)</div>}

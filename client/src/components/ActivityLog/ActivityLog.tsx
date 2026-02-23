@@ -10,6 +10,7 @@ import {
   Alert,
   Snackbar,
 } from '@mui/material';
+import { useNavigate } from 'react-router-dom';
 import UndoIcon from '@mui/icons-material/Undo';
 import EditIcon from '@mui/icons-material/Edit';
 import { activityLogStyles } from './ActivityLog.styles';
@@ -51,6 +52,7 @@ function formatTimestamp(dateStr: string): string {
 }
 
 export default function ActivityLog() {
+  const navigate = useNavigate();
   const [movements, setMovements] = useState<InventoryMovement[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [storageLocations, setStorageLocations] = useState<StorageLocation[]>([]);
@@ -269,6 +271,7 @@ export default function ActivityLog() {
                 '&:hover': { bgcolor: 'transparent', textDecoration: 'underline' },
               }}
               aria-label="View all activities"
+              onClick={() => navigate('/activity-log')}
             >
               View All Activities →
             </Button>
