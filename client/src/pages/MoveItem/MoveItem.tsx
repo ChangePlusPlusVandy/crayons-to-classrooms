@@ -1,9 +1,6 @@
 import { useState } from 'react';
 import { Container, Typography, Paper, Alert } from '@mui/material';
-import {
-  getItemsByLocation,
-  moveItemsWithMovement,
-} from '../../api/moveItem';
+import { getItemsByLocation, moveItemsWithMovement } from '../../api/moveItem';
 import MoveItemForm, { MoveItemFormData } from '../../components/MoveItemForm/MoveItemForm';
 
 export default function MoveItem() {

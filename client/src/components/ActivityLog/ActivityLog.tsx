@@ -29,7 +29,6 @@ const ACTION_COLORS: Record<string, string> = {
 
 const PAGE_SIZE = 10;
 
-
 function formatTimestamp(dateStr: string): string {
   const date = new Date(dateStr);
   const now = new Date();

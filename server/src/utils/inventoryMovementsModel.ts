@@ -112,7 +112,6 @@ export const editMoveSchema = z.object({
 
 export type EditMoveInput = z.infer<typeof editMoveSchema>;
 
-
 /**
  * Schema for the combined move-items-with-movement request body.
  * item_ids are the existing items to relocate; movement records the action.

@@ -40,7 +40,11 @@ export default function Activities() {
   const [editingMovement, setEditingMovement] = useState<ActivityDisplay | null>(null);
   const [showSuccessAlert, setShowSuccessAlert] = useState(false);
   const [undoingId, setUndoingId] = useState<string | null>(null);
-  const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
+  const [snackbar, setSnackbar] = useState<{
+    open: boolean;
+    message: string;
+    severity: 'success' | 'error';
+  }>({
     open: false,
     message: '',
     severity: 'success',
@@ -75,7 +79,11 @@ export default function Activities() {
 
   const handleUndoClick = (activity: ActivityDisplay) => {
     if (!activity.id) {
-      setSnackbar({ open: true, message: 'Cannot undo: activity ID is missing', severity: 'error' });
+      setSnackbar({
+        open: true,
+        message: 'Cannot undo: activity ID is missing',
+        severity: 'error',
+      });
       return;
     }
 
@@ -84,7 +92,7 @@ export default function Activities() {
       setSnackbar({
         open: true,
         message: `Cannot undo ${activity.inventory_action} actions. Only MOVE and ADD can be undone.`,
-        severity: 'error'
+        severity: 'error',
       });
       return;
     }
@@ -105,7 +113,7 @@ export default function Activities() {
       setSnackbar({
         open: true,
         message: `Successfully undid ${activity.inventory_action} for ${activity.product_name || 'item'}`,
-        severity: 'success'
+        severity: 'success',
       });
       // Refresh the activities list
       fetchActivities();
@@ -113,7 +121,7 @@ export default function Activities() {
       setSnackbar({
         open: true,
         message: err instanceof Error ? err.message : 'Failed to undo movement',
-        severity: 'error'
+        severity: 'error',
       });
     } finally {
       setUndoingId(null);

@@ -441,14 +441,26 @@ export async function createItemCore(
 
   const { locationCode } = await getLocationInfo(current_location_id ?? null, db);
   const fixtureOverride = fixture ?? null;
-  const itemInfoId = await syncItemInfoStock(name, product_id, category ?? 'UNKNOWN', quantity, value, item_limit ?? 0, fixtureOverride, locationCode, count, true, db);
+  const itemInfoId = await syncItemInfoStock(
+    name,
+    product_id,
+    category ?? 'UNKNOWN',
+    quantity,
+    value,
+    item_limit ?? 0,
+    fixtureOverride,
+    locationCode,
+    count,
+    true,
+    db
+  );
   let createdItem = newItems.rows[0];
-  if(itemInfoId){
+  if (itemInfoId) {
     const updatedItem = await pool.query(
       'UPDATE items SET item_info = $1, updated_at = NOW() WHERE id = $2 RETURNING *',
       [itemInfoId, createdItem.id]
-    )
-    if(updatedItem.rows[0]){
+    );
+    if (updatedItem.rows[0]) {
       createdItem = updatedItem.rows[0];
     }
   }

@@ -911,7 +911,9 @@ export const undoInventoryMovementCore = async (
   if (inventoryMovement.inventory_action === 'MOVE') {
     // Validate that both from and to locations exist before undoing MOVE
     if (!inventoryMovement.from_location_id || !inventoryMovement.to_location_id) {
-      throw new UndoConflictError('Cannot undo: movement has null from_location_id or to_location_id');
+      throw new UndoConflictError(
+        'Cannot undo: movement has null from_location_id or to_location_id'
+      );
     }
 
     // Get items at destination with their names for item_info sync
@@ -945,7 +947,9 @@ export const undoInventoryMovementCore = async (
     }
 
     // Update item_info location tracking for each unique item name
-    const uniqueItemNames = [...new Set(itemsAtDestination.rows.map((row: { name: string }) => row.name))];
+    const uniqueItemNames = [
+      ...new Set(itemsAtDestination.rows.map((row: { name: string }) => row.name)),
+    ];
     for (const itemName of uniqueItemNames) {
       await syncItemInfoStock(
         itemName,
@@ -1024,7 +1028,9 @@ export const undoInventoryMovementCore = async (
       );
     }
   } else {
-    throw new UndoConflictError('Undo operation is only supported for MOVE and ADD inventory actions');
+    throw new UndoConflictError(
+      'Undo operation is only supported for MOVE and ADD inventory actions'
+    );
   }
 };
 
