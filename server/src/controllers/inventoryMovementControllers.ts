@@ -19,7 +19,7 @@ import {
 import { ZodError } from 'zod';
 import { DbClient } from '../utils/dbTypes.js';
 import { ForeignKeyError } from '../utils/errors.js';
-import { createItemCore } from './itemController.js';
+import { createItemCore, syncItemInfoStock } from './itemController.js';
 
 /**
  * Checks if the query returned any rows.
@@ -763,32 +763,23 @@ export const undoInventoryMovement = async (req: Request, res: Response) => {
       await client.query('ROLLBACK');
       client.release();
       client = null;
-      return res.status(404).json({ error: "Inventory movement not found" });
+      return res.status(404).json({ error: 'Inventory movement not found' });
     }
 
     const inventoryMovement = result.rows[0];
 
     if (inventoryMovement.inventory_action === 'MOVE') {
-      const itemsAtDestination = await client.query(
-        'SELECT id FROM items WHERE product_id = $1 AND current_location_id = $2 LIMIT $3',
-        [inventoryMovement.product_id, inventoryMovement.to_location_id, inventoryMovement.quantity]
-      );
-
-      if (itemsAtDestination.rows.length < inventoryMovement.quantity) {
+      // Validate that both from and to locations exist before undoing MOVE
+      if (!inventoryMovement.from_location_id || !inventoryMovement.to_location_id) {
         await client.query('ROLLBACK');
         client.release();
         client = null;
-        return res.status(400).json({ error: "Cannot undo: items have been moved again or deleted" });
+        return res.status(400).json({ error: 'Cannot undo: movement has null from_location_id or to_location_id' });
       }
 
-      const itemIds = itemsAtDestination.rows.map(row => row.id);
-      await client.query(
-        'UPDATE items SET current_location_id = $1 WHERE id = ANY($2::int[])',
-        [inventoryMovement.from_location_id, itemIds]
-      );
-    } else if (inventoryMovement.inventory_action === 'ADD') {
+      // Get items at destination with their names for item_info sync
       const itemsAtDestination = await client.query(
-        'SELECT id FROM items WHERE product_id = $1 AND current_location_id = $2 LIMIT $3',
+        'SELECT id, name FROM items WHERE product_id = $1 AND current_location_id = $2 LIMIT $3',
         [inventoryMovement.product_id, inventoryMovement.to_location_id, inventoryMovement.quantity]
       );
 
@@ -796,21 +787,123 @@ export const undoInventoryMovement = async (req: Request, res: Response) => {
         await client.query('ROLLBACK');
         client.release();
         client = null;
-        return res.status(400).json({ error: "Cannot undo: items have been moved or deleted" });
+        return res.status(400).json({ error: 'Cannot undo because item has since been moved' });
+      }
+
+      // Get from_location details for item_info update
+      const fromLocationResult = await client.query(
+        'SELECT location_code, fixture FROM storage_locations WHERE id = $1',
+        [inventoryMovement.from_location_id]
+      );
+      const fromLocation = fromLocationResult.rows[0];
+
+      const itemIds = itemsAtDestination.rows.map((row: { id: string }) => row.id);
+
+      // Update items, verifying they're still at the expected location (prevents race conditions)
+      const updateResult = await client.query(
+        'UPDATE items SET current_location_id = $1, updated_at = NOW() WHERE id = ANY($2::uuid[]) AND current_location_id = $3',
+        [inventoryMovement.from_location_id, itemIds, inventoryMovement.to_location_id]
+      );
+
+      // Verify all items were updated (all-or-nothing)
+      if (updateResult.rowCount !== itemIds.length) {
+        await client.query('ROLLBACK');
+        client.release();
+        client = null;
+        return res.status(409).json({ error: 'Cannot undo because item has since been moved' });
+      }
+
+      // Update item_info location tracking for each unique item name
+      const uniqueItemNames = [...new Set(itemsAtDestination.rows.map((row: { name: string }) => row.name))];
+      for (const itemName of uniqueItemNames) {
+        await syncItemInfoStock(
+          itemName,
+          undefined, // productId - don't update
+          undefined, // category - don't update
+          undefined, // quantity - don't update
+          undefined, // value - don't update
+          undefined, // itemLimit - don't update
+          fromLocation?.fixture ?? null,
+          fromLocation?.location_code ?? null,
+          0, // stockDelta - no change to stock count for MOVE
+          false, // createIfMissing - don't create new item_info
+          client
+        );
+      }
+    } else if (inventoryMovement.inventory_action === 'ADD') {
+      // Get items at destination with their names for item_info sync
+      const itemsAtDestination = await client.query(
+        'SELECT id, name FROM items WHERE product_id = $1 AND current_location_id = $2 LIMIT $3',
+        [inventoryMovement.product_id, inventoryMovement.to_location_id, inventoryMovement.quantity]
+      );
+
+      if (itemsAtDestination.rows.length < inventoryMovement.quantity) {
+        await client.query('ROLLBACK');
+        client.release();
+        client = null;
+        return res.status(400).json({ error: 'Cannot undo because item has since been moved' });
+      }
+
+      const itemIds = itemsAtDestination.rows.map((row: { id: string }) => row.id);
+
+      // Check if any items are referenced by other movements (can't be deleted)
+      const referencedItems = await client.query(
+        'SELECT DISTINCT item_id FROM "inventory movement" WHERE item_id = ANY($1::uuid[]) AND id != $2',
+        [itemIds, id]
+      );
+
+      if (referencedItems.rows.length > 0) {
+        await client.query('ROLLBACK');
+        client.release();
+        client = null;
+        return res.status(400).json({ error: 'Cannot undo: some items have subsequent movements' });
       }
 
       // Delete movement record FIRST to avoid foreign key constraint
       await client.query('DELETE FROM "inventory movement" WHERE id = $1', [id]);
 
-      const itemIds = itemsAtDestination.rows.map(row => row.id);
-      // Delete items only if not referenced by other movements
-      await client.query(
-        'DELETE FROM items WHERE id = ANY($1::int[]) AND NOT EXISTS (SELECT 1 FROM "inventory movement" m WHERE m.item_id = items.id)',
-        [itemIds]
+      // Delete items - constrain by current_location_id to avoid deleting items that moved
+      const deleteResult = await client.query(
+        'DELETE FROM items WHERE id = ANY($1::uuid[]) AND current_location_id = $2 RETURNING name',
+        [itemIds, inventoryMovement.to_location_id]
       );
+
+      // Verify all items were deleted (all-or-nothing)
+      if (deleteResult.rowCount !== itemIds.length) {
+        await client.query('ROLLBACK');
+        client.release();
+        client = null;
+        return res.status(400).json({ error: 'Cannot undo because item has since been moved' });
+      }
+
+      // Decrement item_info stock for each deleted item
+      const deletedCountsByName: Record<string, number> = {};
+      for (const row of deleteResult.rows) {
+        const name = (row as { name: string }).name;
+        deletedCountsByName[name] = (deletedCountsByName[name] || 0) + 1;
+      }
+
+      for (const [itemName, deletedCount] of Object.entries(deletedCountsByName)) {
+        await syncItemInfoStock(
+          itemName,
+          undefined, // productId - don't update
+          undefined, // category - don't update
+          undefined, // quantity - don't update
+          undefined, // value - don't update
+          undefined, // itemLimit - don't update
+          null, // fixture - don't update
+          null, // locationCode - don't update
+          -deletedCount, // stockDelta - decrement by number of deleted items
+          false, // createIfMissing - don't create new item_info
+          client
+        );
+      }
     } else {
-      // For other action types, just delete the movement record
-      await client.query('DELETE FROM "inventory movement" WHERE id = $1', [id]);
+      // Undo is only supported for MOVE and ADD actions
+      await client.query('ROLLBACK');
+      client.release();
+      client = null;
+      return res.status(422).json({ error: 'Undo operation is only supported for MOVE and ADD inventory actions' });
     }
 
     // Delete movement record for MOVE (already handled for ADD above)
@@ -839,4 +932,4 @@ export const undoInventoryMovement = async (req: Request, res: Response) => {
     console.error('Error undoing inventory movement:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
-}
+};
