@@ -25,6 +25,24 @@ export async function getStorageLocations(): Promise<StorageLocation[]> {
   return response.json();
 }
 
+export async function getProductById(id: string): Promise<Product> {
+  const response = await fetch(`${API_BASE_URL}/products/${id}`);
+  if (!response.ok) throw new Error('Failed to fetch product');
+  return response.json();
+}
+
+export async function getStorageLocationById(id: string): Promise<StorageLocation> {
+  const response = await fetch(`${API_BASE_URL}/storage-locations/${id}`);
+  if (!response.ok) throw new Error('Failed to fetch storage location');
+  return response.json();
+}
+
+export async function getWarehouseById(id: string): Promise<Warehouse> {
+  const response = await fetch(`${API_BASE_URL}/warehouses/${id}`);
+  if (!response.ok) throw new Error('Failed to fetch warehouse');
+  return response.json();
+}
+
 export async function getInventoryMovements(): Promise<InventoryMovement[]> {
   const response = await fetch(`${API_BASE_URL}/inventory-movement`);
   if (!response.ok) throw new Error('Failed to fetch inventory movements');

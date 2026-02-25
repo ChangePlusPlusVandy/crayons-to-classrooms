@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Dialog, DialogTitle, DialogContent, IconButton, Alert } from '@mui/material';
+import { useState, useEffect } from 'react';
+import { Dialog, DialogTitle, DialogContent, IconButton, Alert, Box, CircularProgress } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import MoveItemForm, { MoveItemFormData } from '../MoveItemForm/MoveItemForm';
 import { editMoveMovementTransaction } from '../../api/editMovement';
@@ -7,31 +7,52 @@ import { InventoryMovement } from '../../types/InventoryMovement';
 import { ItemGroup } from '../../types/Item';
 import { Warehouse } from '../../types/Warehouse';
 import { StorageLocation } from '../../types/StorageLocation';
+import { getProductById, getStorageLocationById, getWarehouseById } from '../../api/addItem';
 
 interface EditMoveDialogProps {
   open: boolean;
   onClose: () => void;
   movement: InventoryMovement;
-  warehouse: Warehouse;
-  sourceSlot: StorageLocation;
-  productName: string;
-  destinationSlot: string;
-  destinationFixture: string;
   onSuccess?: () => void;
 }
 
-export function EditMoveDialog({
-  open,
-  onClose,
-  movement,
-  warehouse,
-  sourceSlot,
-  productName,
-  destinationSlot,
-  destinationFixture,
-  onSuccess,
-}: EditMoveDialogProps) {
-  const [error, setError] = useState('');
+export function EditMoveDialog({ open, onClose, movement, onSuccess }: EditMoveDialogProps) {
+  const [submitError, setSubmitError] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState('');
+  const [warehouse, setWarehouse] = useState<Warehouse | null>(null);
+  const [sourceSlot, setSourceSlot] = useState<StorageLocation | null>(null);
+  const [productName, setProductName] = useState('');
+  const [destinationSlot, setDestinationSlot] = useState('');
+  const [destinationFixture, setDestinationFixture] = useState('');
+
+  useEffect(() => {
+    if (!open) return;
+    setLoading(true);
+    setFetchError('');
+
+    async function fetchData() {
+      try {
+        const [src, dest, prod] = await Promise.all([
+          getStorageLocationById(movement.from_location_id!),
+          getStorageLocationById(movement.to_location_id!),
+          getProductById(movement.product_id),
+        ]);
+        const wh = await getWarehouseById(src.warehouse_id);
+        setWarehouse(wh);
+        setSourceSlot(src);
+        setProductName(prod.name);
+        setDestinationSlot(dest.slot);
+        setDestinationFixture(dest.fixture || 'N/A');
+      } catch {
+        setFetchError('Failed to load movement details');
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchData();
+  }, [open, movement.product_id, movement.from_location_id, movement.to_location_id]);
 
   // Simulate post-undo state: adjust item group quantities based on what
   // the undo of the original movement would do to item locations
@@ -47,7 +68,7 @@ export function EditMoveDialog({
         // Group doesn't exist yet (all items of this product were moved away)
         adjusted.push({
           current_location_id: sourceSlotId,
-          warehouse: warehouse.id,
+          warehouse: warehouse!.id,
           name: productName,
           product_id: movement.product_id,
           quantity: movement.quantity,
@@ -68,7 +89,7 @@ export function EditMoveDialog({
   };
 
   const handleSubmit = async (data: MoveItemFormData) => {
-    setError('');
+    setSubmitError('');
 
     try {
       await editMoveMovementTransaction(movement.id!, {
@@ -85,7 +106,7 @@ export function EditMoveDialog({
     } catch (err) {
       const message =
         err instanceof Error ? err.message : 'Failed to save changes. Please try again.';
-      setError(message);
+      setSubmitError(message);
     }
   };
 
@@ -98,24 +119,34 @@ export function EditMoveDialog({
         </IconButton>
       </DialogTitle>
       <DialogContent>
-        {error && (
-          <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
-            {error}
-          </Alert>
+        {loading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+            <CircularProgress size={24} />
+          </Box>
+        ) : fetchError ? (
+          <Alert severity="error">{fetchError}</Alert>
+        ) : (
+          <>
+            {submitError && (
+              <Alert severity="error" sx={{ mb: 2 }} onClose={() => setSubmitError('')}>
+                {submitError}
+              </Alert>
+            )}
+            <MoveItemForm
+              initialWarehouse={warehouse}
+              initialSourceSlot={sourceSlot}
+              initialProductId={movement.product_id}
+              initialDestinationSlot={destinationSlot}
+              initialDestinationFixture={destinationFixture}
+              initialQuantity={movement.quantity}
+              initialNotes={movement.note || ''}
+              onSubmit={handleSubmit}
+              onCancel={onClose}
+              submitLabel="Save Changes"
+              adjustItemGroups={adjustItemGroups}
+            />
+          </>
         )}
-        <MoveItemForm
-          initialWarehouse={warehouse}
-          initialSourceSlot={sourceSlot}
-          initialProductId={movement.product_id}
-          initialDestinationSlot={destinationSlot}
-          initialDestinationFixture={destinationFixture}
-          initialQuantity={movement.quantity}
-          initialNotes={movement.note || ''}
-          onSubmit={handleSubmit}
-          onCancel={onClose}
-          submitLabel="Save Changes"
-          adjustItemGroups={adjustItemGroups}
-        />
       </DialogContent>
     </Dialog>
   );

@@ -1,34 +1,54 @@
-import { useState } from 'react';
-import { Dialog, DialogTitle, DialogContent, IconButton, Alert } from '@mui/material';
+import { useState, useEffect } from 'react';
+import { Dialog, DialogTitle, DialogContent, IconButton, Alert, Box, CircularProgress } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import AddItemForm, { AddItemFormData } from '../AddItemForm/AddItemForm';
 import { editAddMovementTransaction } from '../../api/editMovement';
 import { InventoryMovement } from '../../types/InventoryMovement';
 import { Product } from '../../types/Product';
 import { Warehouse } from '../../types/Warehouse';
+import { getProductById, getStorageLocationById, getWarehouseById } from '../../api/addItem';
 
 interface EditAddDialogProps {
   open: boolean;
   onClose: () => void;
   movement: InventoryMovement;
-  product: Product;
-  warehouse: Warehouse;
-  slot: string;
-  fixture: string;
   onSuccess?: () => void;
 }
 
-export function EditAddDialog({
-  open,
-  onClose,
-  movement,
-  product,
-  warehouse,
-  slot,
-  fixture,
-  onSuccess,
-}: EditAddDialogProps) {
-  const [error, setError] = useState('');
+export function EditAddDialog({ open, onClose, movement, onSuccess }: EditAddDialogProps) {
+  const [submitError, setSubmitError] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState('');
+  const [product, setProduct] = useState<Product | null>(null);
+  const [warehouse, setWarehouse] = useState<Warehouse | null>(null);
+  const [slot, setSlot] = useState('');
+  const [fixture, setFixture] = useState('');
+
+  useEffect(() => {
+    if (!open) return;
+    setLoading(true);
+    setFetchError('');
+
+    async function fetchData() {
+      try {
+        const [prod, location] = await Promise.all([
+          getProductById(movement.product_id),
+          getStorageLocationById(movement.to_location_id!),
+        ]);
+        const wh = await getWarehouseById(location.warehouse_id);
+        setProduct(prod);
+        setWarehouse(wh);
+        setSlot(location.slot);
+        setFixture(location.fixture || 'None');
+      } catch {
+        setFetchError('Failed to load movement details');
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchData();
+  }, [open, movement.product_id, movement.to_location_id]);
 
   const handleSubmit = async (data: AddItemFormData) => {
     const itemLimit =
@@ -36,7 +56,7 @@ export function EditAddDialog({
         ? parseInt(data.product.item_limit, 10)
         : data.product.item_limit;
 
-    setError('');
+    setSubmitError('');
 
     try {
       await editAddMovementTransaction(movement.id!, {
@@ -70,7 +90,7 @@ export function EditAddDialog({
     } catch (err) {
       const message =
         err instanceof Error ? err.message : 'Failed to save changes. Please try again.';
-      setError(message);
+      setSubmitError(message);
     }
   };
 
@@ -83,22 +103,32 @@ export function EditAddDialog({
         </IconButton>
       </DialogTitle>
       <DialogContent>
-        {error && (
-          <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
-            {error}
-          </Alert>
+        {loading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+            <CircularProgress size={24} />
+          </Box>
+        ) : fetchError ? (
+          <Alert severity="error">{fetchError}</Alert>
+        ) : (
+          <>
+            {submitError && (
+              <Alert severity="error" sx={{ mb: 2 }} onClose={() => setSubmitError('')}>
+                {submitError}
+              </Alert>
+            )}
+            <AddItemForm
+              initialWarehouse={warehouse}
+              initialProduct={product}
+              initialSlot={slot}
+              initialFixture={fixture}
+              initialQuantity={movement.quantity}
+              initialNotes={movement.note || ''}
+              onSubmit={handleSubmit}
+              onCancel={onClose}
+              submitLabel="Save Changes"
+            />
+          </>
         )}
-        <AddItemForm
-          initialWarehouse={warehouse}
-          initialProduct={product}
-          initialSlot={slot}
-          initialFixture={fixture}
-          initialQuantity={movement.quantity}
-          initialNotes={movement.note || ''}
-          onSubmit={handleSubmit}
-          onCancel={onClose}
-          submitLabel="Save Changes"
-        />
       </DialogContent>
     </Dialog>
   );

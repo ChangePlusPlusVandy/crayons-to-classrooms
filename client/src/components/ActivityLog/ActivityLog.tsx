@@ -14,12 +14,7 @@ import { useNavigate } from 'react-router-dom';
 import UndoIcon from '@mui/icons-material/Undo';
 import EditIcon from '@mui/icons-material/Edit';
 import { activityLogStyles } from './ActivityLog.styles';
-import { InventoryMovement } from '../../types/InventoryMovement';
-import { Product } from '../../types/Product';
-import { StorageLocation } from '../../types/StorageLocation';
-import { Warehouse } from '../../types/Warehouse';
-import { getProducts, getStorageLocations, getInventoryMovements } from '../../api/addItem';
-import { getWarehouses } from '../../api/moveItem';
+import { getActivities, ActivityDisplay } from '../../api/activities';
 import { EditAddDialog } from '../EditAddDialog/EditAddDialog';
 import { EditMoveDialog } from '../EditMoveDialog/EditMoveDialog';
 
@@ -53,36 +48,16 @@ function formatTimestamp(dateStr: string): string {
 
 export default function ActivityLog() {
   const navigate = useNavigate();
-  const [movements, setMovements] = useState<InventoryMovement[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [storageLocations, setStorageLocations] = useState<StorageLocation[]>([]);
-  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
+  const [activities, setActivities] = useState<ActivityDisplay[]>([]);
   const [loading, setLoading] = useState(true);
-
-  // Edit dialog state
-  const [editingMovement, setEditingMovement] = useState<InventoryMovement | null>(null);
+  const [editingMovement, setEditingMovement] = useState<ActivityDisplay | null>(null);
   const [showSuccessAlert, setShowSuccessAlert] = useState(false);
 
   useEffect(() => {
     async function fetchData() {
       try {
-        const [movementsData, productsData, locationsData, warehousesData] = await Promise.all([
-          getInventoryMovements(),
-          getProducts(),
-          getStorageLocations(),
-          getWarehouses(),
-        ]);
-
-        // Show most recent first
-        const sorted = movementsData.sort((a, b) => {
-          const dateA = a.performed_at ? new Date(a.performed_at).getTime() : 0;
-          const dateB = b.performed_at ? new Date(b.performed_at).getTime() : 0;
-          return dateB - dateA;
-        });
-        setMovements(sorted);
-        setProducts(productsData);
-        setStorageLocations(locationsData);
-        setWarehouses(warehousesData);
+        const data = await getActivities(1, 10);
+        setActivities(data.data);
       } catch (err) {
         console.error('Failed to load activity log data:', err);
       } finally {
@@ -93,21 +68,9 @@ export default function ActivityLog() {
     fetchData();
   }, []);
 
-  const getProductName = (productId: string): string => {
-    const product = products.find((p) => p.id === productId);
-    return product?.name || 'Unknown Product';
-  };
-
-  const getLocationLabel = (locationId: string | null): string | undefined => {
-    if (!locationId) return undefined;
-    const loc = storageLocations.find((l) => l.id === locationId);
-    if (!loc) return 'Unknown';
-    return loc.fixture ? `${loc.slot} / ${loc.fixture}` : loc.slot;
-  };
-
-  const handleEditClick = (movement: InventoryMovement) => {
-    if (movement.inventory_action === 'ADD' || movement.inventory_action === 'MOVE') {
-      setEditingMovement(movement);
+  const handleEditClick = (activity: ActivityDisplay) => {
+    if (activity.inventory_action === 'ADD' || activity.inventory_action === 'MOVE') {
+      setEditingMovement(activity);
     }
   };
 
@@ -117,66 +80,14 @@ export default function ActivityLog() {
 
   const handleEditSuccess = async () => {
     setShowSuccessAlert(true);
-    // Refresh movements after successful edit
+    setEditingMovement(null);
     try {
-      const movementsData = await getInventoryMovements();
-      const sorted = movementsData.sort((a, b) => {
-        const dateA = a.performed_at ? new Date(a.performed_at).getTime() : 0;
-        const dateB = b.performed_at ? new Date(b.performed_at).getTime() : 0;
-        return dateB - dateA;
-      });
-      setMovements(sorted);
+      const data = await getActivities(1, 10);
+      setActivities(data.data);
     } catch (err) {
-      console.error('Failed to refresh movements:', err);
+      console.error('Failed to refresh activities:', err);
     }
   };
-
-  // Resolve edit dialog props from the editing movement
-  const getEditDialogProps = () => {
-    if (!editingMovement) return null;
-
-    const product = products.find((p) => p.id === editingMovement.product_id);
-    const location = storageLocations.find((l) => l.id === editingMovement.to_location_id);
-    const warehouse = location ? warehouses.find((w) => w.id === location.warehouse_id) : null;
-
-    if (!product || !location || !warehouse) return null;
-
-    return {
-      product,
-      warehouse,
-      slot: location.slot,
-      fixture: location.fixture || 'None',
-    };
-  };
-
-  const editDialogProps = getEditDialogProps();
-
-  // Resolve edit move dialog props from the editing movement
-  const getEditMoveDialogProps = () => {
-    if (!editingMovement || editingMovement.inventory_action !== 'MOVE') return null;
-
-    const product = products.find((p) => p.id === editingMovement.product_id);
-    const sourceLocation = storageLocations.find((l) => l.id === editingMovement.from_location_id);
-    const destLocation = storageLocations.find((l) => l.id === editingMovement.to_location_id);
-    const warehouse = sourceLocation
-      ? warehouses.find((w) => w.id === sourceLocation.warehouse_id)
-      : null;
-
-    if (!product || !sourceLocation || !destLocation || !warehouse) return null;
-
-    return {
-      warehouse,
-      sourceSlot: sourceLocation,
-      productName: product.name,
-      destinationSlot: destLocation.slot,
-      destinationFixture: destLocation.fixture || 'N/A',
-    };
-  };
-
-  const editMoveDialogProps = getEditMoveDialogProps();
-
-  // Show limited entries in the activity log
-  const displayedMovements = movements.slice(0, 10);
 
   return (
     <>
@@ -192,21 +103,22 @@ export default function ActivityLog() {
             </Box>
           ) : (
             <Box sx={activityLogStyles.activitiesContainer}>
-              {displayedMovements.map((movement) => {
-                const fromLabel = getLocationLabel(movement.from_location_id);
-                const toLabel = getLocationLabel(movement.to_location_id);
+              {activities.map((activity) => {
+                const fromLabel = activity.from_location_name ?? undefined;
+                const toLabel = activity.to_location_name ?? undefined;
+                const productName = activity.product_name || 'Unknown Product';
 
                 return (
-                  <Box key={movement.id} sx={activityLogStyles.activityItem}>
+                  <Box key={activity.id} sx={activityLogStyles.activityItem}>
                     <Box sx={{ flexGrow: 1, minWidth: 0 }}>
                       <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                        {getProductName(movement.product_id)}
+                        {productName}
                       </Typography>
                       <Typography
                         variant="body2"
-                        sx={{ color: ACTION_COLORS[movement.inventory_action] || '#666' }}
+                        sx={{ color: ACTION_COLORS[activity.inventory_action] || '#666' }}
                       >
-                        {movement.inventory_action} (x{movement.quantity})
+                        {activity.inventory_action} (x{activity.quantity})
                       </Typography>
                       {(fromLabel || toLabel) && (
                         <Typography variant="caption" color="text.secondary">
@@ -219,7 +131,7 @@ export default function ActivityLog() {
                       )}
                       <Box sx={{ display: 'flex', alignItems: 'center', mt: 0.5, gap: 4 }}>
                         <Typography variant="caption" color="text.secondary">
-                          {movement.performed_at ? formatTimestamp(movement.performed_at) : ''}
+                          {activity.performed_at ? formatTimestamp(activity.performed_at) : ''}
                         </Typography>
                       </Box>
                     </Box>
@@ -235,16 +147,16 @@ export default function ActivityLog() {
                     >
                       <IconButton
                         size="small"
-                        aria-label={`Undo ${movement.inventory_action.toLowerCase()} for ${getProductName(movement.product_id)}`}
+                        aria-label={`Undo ${activity.inventory_action.toLowerCase()} for ${productName}`}
                       >
                         <UndoIcon fontSize="small" />
                       </IconButton>
-                      {(movement.inventory_action === 'ADD' ||
-                        movement.inventory_action === 'MOVE') && (
+                      {(activity.inventory_action === 'ADD' ||
+                        activity.inventory_action === 'MOVE') && (
                         <IconButton
                           size="small"
-                          aria-label={`Edit ${movement.inventory_action.toLowerCase()} for ${getProductName(movement.product_id)}`}
-                          onClick={() => handleEditClick(movement)}
+                          aria-label={`Edit ${activity.inventory_action.toLowerCase()} for ${productName}`}
+                          onClick={() => handleEditClick(activity)}
                         >
                           <EditIcon fontSize="small" />
                         </IconButton>
@@ -253,7 +165,7 @@ export default function ActivityLog() {
                   </Box>
                 );
               })}
-              {displayedMovements.length === 0 && (
+              {activities.length === 0 && (
                 <Typography variant="body2" color="text.secondary">
                   No activity yet.
                 </Typography>
@@ -279,29 +191,20 @@ export default function ActivityLog() {
         </CardContent>
       </Card>
 
-      {editingMovement && editingMovement.inventory_action === 'ADD' && editDialogProps && (
+      {editingMovement && editingMovement.inventory_action === 'ADD' && (
         <EditAddDialog
           open={!!editingMovement}
           onClose={handleEditClose}
           movement={editingMovement}
-          product={editDialogProps.product}
-          warehouse={editDialogProps.warehouse}
-          slot={editDialogProps.slot}
-          fixture={editDialogProps.fixture}
           onSuccess={handleEditSuccess}
         />
       )}
 
-      {editingMovement && editingMovement.inventory_action === 'MOVE' && editMoveDialogProps && (
+      {editingMovement && editingMovement.inventory_action === 'MOVE' && (
         <EditMoveDialog
           open={!!editingMovement}
           onClose={handleEditClose}
           movement={editingMovement}
-          warehouse={editMoveDialogProps.warehouse}
-          sourceSlot={editMoveDialogProps.sourceSlot}
-          productName={editMoveDialogProps.productName}
-          destinationSlot={editMoveDialogProps.destinationSlot}
-          destinationFixture={editMoveDialogProps.destinationFixture}
           onSuccess={handleEditSuccess}
         />
       )}
