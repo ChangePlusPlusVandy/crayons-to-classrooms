@@ -15,6 +15,11 @@ import {
   CircularProgress,
   Alert,
   Snackbar,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
 } from '@mui/material';
 import { getActivities, ActivityDisplay } from '../../api/activities';
 import { undoInventoryMovement } from '../../api/moveItem';
@@ -35,6 +40,13 @@ export default function Activities() {
     open: false,
     message: '',
     severity: 'success',
+  });
+  const [undoConfirmDialog, setUndoConfirmDialog] = useState<{
+    open: boolean;
+    activity: ActivityDisplay | null;
+  }>({
+    open: false,
+    activity: null,
   });
 
   const totalPages = Math.ceil(total / PAGE_SIZE);
@@ -57,7 +69,7 @@ export default function Activities() {
     fetchActivities();
   }, [fetchActivities]);
 
-  const handleUndo = async (activity: ActivityDisplay) => {
+  const handleUndoClick = (activity: ActivityDisplay) => {
     if (!activity.id) {
       setSnackbar({ open: true, message: 'Cannot undo: activity ID is missing', severity: 'error' });
       return;
@@ -72,6 +84,16 @@ export default function Activities() {
       });
       return;
     }
+
+    // Show confirmation dialog
+    setUndoConfirmDialog({ open: true, activity });
+  };
+
+  const handleUndoConfirm = async () => {
+    const activity = undoConfirmDialog.activity;
+    setUndoConfirmDialog({ open: false, activity: null });
+
+    if (!activity?.id) return;
 
     setUndoingId(activity.id);
     try {
@@ -92,6 +114,10 @@ export default function Activities() {
     } finally {
       setUndoingId(null);
     }
+  };
+
+  const handleUndoCancel = () => {
+    setUndoConfirmDialog({ open: false, activity: null });
   };
 
   const handleEdit = (activity: ActivityDisplay) => {
@@ -278,7 +304,7 @@ export default function Activities() {
                       <TableCell sx={activitiesStyles.tableCell} align="right">
                         <IconButton
                           sx={activitiesStyles.actionButton}
-                          onClick={() => handleUndo(activity)}
+                          onClick={() => handleUndoClick(activity)}
                           disabled={undoingId === activity.id}
                           aria-label={`Undo ${activity.inventory_action} for ${activity.product_name}`}
                         >
@@ -331,6 +357,27 @@ export default function Activities() {
           {snackbar.message}
         </Alert>
       </Snackbar>
+
+      <Dialog
+        open={undoConfirmDialog.open}
+        onClose={handleUndoCancel}
+        aria-labelledby="undo-confirm-dialog-title"
+        aria-describedby="undo-confirm-dialog-description"
+      >
+        <DialogTitle id="undo-confirm-dialog-title">Confirm Undo</DialogTitle>
+        <DialogContent>
+          <DialogContentText id="undo-confirm-dialog-description">
+            Are you sure you want to undo this {undoConfirmDialog.activity?.inventory_action} action
+            for {undoConfirmDialog.activity?.product_name || 'this item'}?
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleUndoCancel}>Cancel</Button>
+          <Button onClick={handleUndoConfirm} color="primary" autoFocus>
+            Confirm
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Container>
   );
 }

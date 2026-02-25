@@ -787,7 +787,7 @@ export const undoInventoryMovement = async (req: Request, res: Response) => {
         await client.query('ROLLBACK');
         client.release();
         client = null;
-        return res.status(400).json({ error: 'Cannot undo: items have been moved again or deleted' });
+        return res.status(400).json({ error: 'Cannot undo because item has since been moved' });
       }
 
       // Get from_location details for item_info update
@@ -810,7 +810,7 @@ export const undoInventoryMovement = async (req: Request, res: Response) => {
         await client.query('ROLLBACK');
         client.release();
         client = null;
-        return res.status(409).json({ error: 'Cannot undo: some items have been moved by another operation' });
+        return res.status(409).json({ error: 'Cannot undo because item has since been moved' });
       }
 
       // Update item_info location tracking for each unique item name
@@ -841,7 +841,7 @@ export const undoInventoryMovement = async (req: Request, res: Response) => {
         await client.query('ROLLBACK');
         client.release();
         client = null;
-        return res.status(400).json({ error: 'Cannot undo: items have been moved or deleted' });
+        return res.status(400).json({ error: 'Cannot undo because item has since been moved' });
       }
 
       const itemIds = itemsAtDestination.rows.map((row: { id: string }) => row.id);
@@ -873,7 +873,7 @@ export const undoInventoryMovement = async (req: Request, res: Response) => {
         await client.query('ROLLBACK');
         client.release();
         client = null;
-        return res.status(400).json({ error: 'Cannot undo: some items have been moved since the ADD operation' });
+        return res.status(400).json({ error: 'Cannot undo because item has since been moved' });
       }
 
       // Decrement item_info stock for each deleted item

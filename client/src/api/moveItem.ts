@@ -123,7 +123,18 @@ export async function undoInventoryMovement(movementId: string): Promise<void> {
   const response = await fetch(`${API_BASE_URL}/inventory-movement/${movementId}/undo`, {
     method: 'POST',
   });
-  if (!response.ok) throw new Error('Failed to undo movement');
+  if (!response.ok) {
+    let errorMessage = 'Failed to undo movement';
+    try {
+      const data = await response.json();
+      if (data && data.error) {
+        errorMessage = data.error;
+      }
+    } catch {
+      // If JSON parsing fails, use default message
+    }
+    throw new Error(errorMessage);
+  }
 }
 
 export async function moveItemsWithMovement(payload: {
