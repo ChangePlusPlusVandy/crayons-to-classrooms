@@ -14,11 +14,14 @@ import {
   Box,
   CircularProgress,
   Alert,
+  Snackbar,
 } from '@mui/material';
 import { getActivities, ActivityDisplay } from '../../api/activities';
 import { activitiesStyles } from './Activities.styles';
 import undoArrow from '../../assets/undo_arrow.svg';
 import modifyPen from '../../assets/modify_pen.svg';
+import { EditAddDialog } from '../../components/EditAddDialog/EditAddDialog';
+import { EditMoveDialog } from '../../components/EditMoveDialog/EditMoveDialog';
 
 const PAGE_SIZE = 10;
 
@@ -28,6 +31,8 @@ export default function Activities() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [editingMovement, setEditingMovement] = useState<ActivityDisplay | null>(null);
+  const [showSuccessAlert, setShowSuccessAlert] = useState(false);
 
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
@@ -53,8 +58,20 @@ export default function Activities() {
     console.log('Undo action for:', activity);
   };
 
-  const handleEdit = (activity: ActivityDisplay) => {
-    console.log('Edit action for:', activity);
+  const handleEditClick = (activity: ActivityDisplay) => {
+    if (activity.inventory_action === 'ADD' || activity.inventory_action === 'MOVE') {
+      setEditingMovement(activity);
+    }
+  };
+
+  const handleEditClose = () => {
+    setEditingMovement(null);
+  };
+
+  const handleEditSuccess = async () => {
+    setShowSuccessAlert(true);
+    setEditingMovement(null);
+    await fetchActivities();
   };
 
   const formatTimestamp = (timestamp: string) => {
@@ -247,18 +264,21 @@ export default function Activities() {
                             sx={activitiesStyles.actionIcon}
                           />
                         </IconButton>
-                        <IconButton
-                          sx={activitiesStyles.actionButton}
-                          onClick={() => handleEdit(activity)}
-                          aria-label={`Edit ${activity.inventory_action} for ${activity.product_name}`}
-                        >
-                          <Box
-                            component="img"
-                            src={modifyPen}
-                            alt="Edit"
-                            sx={activitiesStyles.actionIcon}
-                          />
-                        </IconButton>
+                        {(activity.inventory_action === 'ADD' ||
+                          activity.inventory_action === 'MOVE') && (
+                          <IconButton
+                            sx={activitiesStyles.actionButton}
+                            onClick={() => handleEditClick(activity)}
+                            aria-label={`Edit ${activity.inventory_action} for ${activity.product_name}`}
+                          >
+                            <Box
+                              component="img"
+                              src={modifyPen}
+                              alt="Edit"
+                              sx={activitiesStyles.actionIcon}
+                            />
+                          </IconButton>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))
@@ -270,6 +290,34 @@ export default function Activities() {
           {renderPagination()}
         </>
       )}
+      {editingMovement?.inventory_action === 'ADD' && (
+        <EditAddDialog
+          open={!!editingMovement}
+          onClose={handleEditClose}
+          movement={editingMovement}
+          onSuccess={handleEditSuccess}
+        />
+      )}
+
+      {editingMovement?.inventory_action === 'MOVE' && (
+        <EditMoveDialog
+          open={!!editingMovement}
+          onClose={handleEditClose}
+          movement={editingMovement}
+          onSuccess={handleEditSuccess}
+        />
+      )}
+
+      <Snackbar
+        open={showSuccessAlert}
+        autoHideDuration={4000}
+        onClose={() => setShowSuccessAlert(false)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert onClose={() => setShowSuccessAlert(false)} severity="success" variant="filled">
+          Edit applied successfully
+        </Alert>
+      </Snackbar>
     </Container>
   );
 }

@@ -27,6 +27,9 @@ const ACTION_COLORS: Record<string, string> = {
   DONATED: '#e91e63',
 };
 
+const PAGE_SIZE = 10;
+
+
 function formatTimestamp(dateStr: string): string {
   const date = new Date(dateStr);
   const now = new Date();
@@ -56,7 +59,7 @@ export default function ActivityLog() {
   useEffect(() => {
     async function fetchData() {
       try {
-        const data = await getActivities(1, 10);
+        const data = await getActivities(1, PAGE_SIZE);
         setActivities(data.data);
       } catch (err) {
         console.error('Failed to load activity log data:', err);
@@ -82,7 +85,7 @@ export default function ActivityLog() {
     setShowSuccessAlert(true);
     setEditingMovement(null);
     try {
-      const data = await getActivities(1, 10);
+      const data = await getActivities(1, PAGE_SIZE);
       setActivities(data.data);
     } catch (err) {
       console.error('Failed to refresh activities:', err);
@@ -216,7 +219,7 @@ export default function ActivityLog() {
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       >
         <Alert onClose={() => setShowSuccessAlert(false)} severity="success" variant="filled">
-          Movement updated successfully
+          Edit applied successfully
         </Alert>
       </Snackbar>
     </>
