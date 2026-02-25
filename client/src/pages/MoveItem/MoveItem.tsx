@@ -2,10 +2,7 @@ import { useState } from 'react';
 import { Container, Typography, Paper, Alert } from '@mui/material';
 import {
   getItemsByLocation,
-  createInventoryMovement,
-  updateItemLocation,
   moveItemsWithMovement,
-  groupItemsByLocation,
 } from '../../api/moveItem';
 import MoveItemForm, { MoveItemFormData } from '../../components/MoveItemForm/MoveItemForm';
 
