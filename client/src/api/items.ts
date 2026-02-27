@@ -1,8 +1,7 @@
 // src/api/items.ts
 import { Item, UpdateItemRequest } from '../types/Item';
 
-// const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
-const API_BASE_URL = 'http://localhost:5001/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001/api';
 
 // Get all items
 export async function getItems(): Promise<Item[]> {
