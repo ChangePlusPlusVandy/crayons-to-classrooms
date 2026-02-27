@@ -5,7 +5,6 @@ import pool from '../db.js';
 export async function getAllWarehouse(req: Request, res: Response): Promise<void> {
   try {
     const result = await pool.query('SELECT * FROM warehouse;');
-    console.log(result);
     res.json(result.rows);
   } catch (error) {
     console.error(error);

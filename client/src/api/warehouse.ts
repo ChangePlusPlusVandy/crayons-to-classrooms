@@ -10,7 +10,7 @@ export async function getWarehouses(): Promise<Warehouse[]> {
 
 // Get all warehouses by ID
 export async function getWarehouseById(id: string): Promise<Warehouse> {
-  const response = await fetch(`${API_BASE_URL}/warehouse/${id}`);
+  const response = await fetch(`${API_BASE_URL}/warehouses/${id}`);
 
   if (!response.ok) {
     throw new Error('Failed to fetch warehouse');
@@ -21,7 +21,7 @@ export async function getWarehouseById(id: string): Promise<Warehouse> {
 
 // get all warehouses by name
 export async function getWarehouseByName(name: string): Promise<Warehouse> {
-  const response = await fetch(`${API_BASE_URL}/warehouse/name/${name}`);
+  const response = await fetch(`${API_BASE_URL}/warehouses/name/${name}`);
 
   if (!response.ok) {
     throw new Error('Failed to fetch warehouse by name');
@@ -32,7 +32,7 @@ export async function getWarehouseByName(name: string): Promise<Warehouse> {
 
 // Add a warehouse
 export async function createWarehouse(data: CreateWarehouseRequest): Promise<Warehouse> {
-  const response = await fetch(`${API_BASE_URL}/warehouse/`, {
+  const response = await fetch(`${API_BASE_URL}/warehouses/`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -52,7 +52,7 @@ export async function updateWarehouse(
   id: string,
   data: UpdateWarehouseRequest
 ): Promise<Warehouse> {
-  const response = await fetch(`${API_BASE_URL}/warehouse/${id}`, {
+  const response = await fetch(`${API_BASE_URL}/warehouses/${id}`, {
     method: 'PATCH',
     headers: {
       'Content-Type': 'application/json',
@@ -69,7 +69,7 @@ export async function updateWarehouse(
 
 // delete a warehouse
 export async function deleteWarehouse(id: string): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/warehouse/${id}`, {
+  const response = await fetch(`${API_BASE_URL}/warehouses/${id}`, {
     method: 'DELETE',
   });
 

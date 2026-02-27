@@ -5,40 +5,39 @@ import {
   UpdateInventoryMovementRequest,
 } from '../types/InventoryMovement';
 
-// const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
-const API_BASE_URL = 'http://localhost:5001/api/inventory-movement';
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
 
 // Get all inventory movements
 export async function getInventoryMovements(): Promise<InventoryMovement[]> {
-  const response = await fetch(`${API_BASE_URL}/`);
+  const response = await fetch(`${API_BASE_URL}/inventory-movement`);
   if (!response.ok) throw new Error('Failed to fetch inventory movements');
   return response.json();
 }
 
 // Get inventory movement by ID
 export async function getInventoryMovementById(id: string): Promise<InventoryMovement> {
-  const response = await fetch(`${API_BASE_URL}/${id}`);
+  const response = await fetch(`${API_BASE_URL}/inventory-movement/${id}`);
   if (!response.ok) throw new Error('Failed to fetch inventory movement');
   return response.json();
 }
 
 // Get movements by action
 export async function getMovementsByAction(inventoryAction: string): Promise<InventoryMovement[]> {
-  const response = await fetch(`${API_BASE_URL}/action/${inventoryAction}`);
+  const response = await fetch(`${API_BASE_URL}/inventory-movement/action/${inventoryAction}`);
   if (!response.ok) throw new Error('Failed to fetch movements by action');
   return response.json();
 }
 
 // Get movements by item ID
 export async function getMovementsByItemId(itemId: string): Promise<InventoryMovement[]> {
-  const response = await fetch(`${API_BASE_URL}/item/${itemId}`);
+  const response = await fetch(`${API_BASE_URL}/inventory-movement/item/${itemId}`);
   if (!response.ok) throw new Error('Failed to fetch movements by item ID');
   return response.json();
 }
 
 // Get movements by product ID
 export async function getMovementsByProductId(productId: string): Promise<InventoryMovement[]> {
-  const response = await fetch(`${API_BASE_URL}/product/${productId}`);
+  const response = await fetch(`${API_BASE_URL}/inventory-movement/product/${productId}`);
   if (!response.ok) throw new Error('Failed to fetch movements by product ID');
   return response.json();
 }
@@ -47,7 +46,7 @@ export async function getMovementsByProductId(productId: string): Promise<Invent
 export async function getMovementsByStartLocationId(
   startLocationId: string
 ): Promise<InventoryMovement[]> {
-  const response = await fetch(`${API_BASE_URL}/start-location/${startLocationId}`);
+  const response = await fetch(`${API_BASE_URL}/inventory-movement/start-location/${startLocationId}`);
   if (!response.ok) throw new Error('Failed to fetch movements by start location');
   return response.json();
 }
@@ -56,7 +55,7 @@ export async function getMovementsByStartLocationId(
 export async function getMovementsByEndLocationId(
   endLocationId: string
 ): Promise<InventoryMovement[]> {
-  const response = await fetch(`${API_BASE_URL}/end-location/${endLocationId}`);
+  const response = await fetch(`${API_BASE_URL}/inventory-movement/end-location/${endLocationId}`);
   if (!response.ok) throw new Error('Failed to fetch movements by end location');
   return response.json();
 }
@@ -65,31 +64,30 @@ export async function getMovementsByEndLocationId(
 export async function getMovementsByPerformedById(
   performedById: string
 ): Promise<InventoryMovement[]> {
-  const response = await fetch(`${API_BASE_URL}/performed-by/${performedById}`);
+  const response = await fetch(`${API_BASE_URL}/inventory-movement/performed-by/${performedById}`);
   if (!response.ok) throw new Error('Failed to fetch movements by performed-by ID');
   return response.json();
 }
 
 // Get movements on and before date
 export async function getMovementsOnAndBeforeDate(date: string): Promise<InventoryMovement[]> {
-  const response = await fetch(`${API_BASE_URL}/before/${date}`);
+  const response = await fetch(`${API_BASE_URL}/inventory-movement/before/${date}`);
   if (!response.ok) throw new Error('Failed to fetch movements before date');
   return response.json();
 }
 
 // Get movements on and after date
 export async function getMovementsOnAndAfterDate(date: string): Promise<InventoryMovement[]> {
-  const response = await fetch(`${API_BASE_URL}/after/${date}`);
+  const response = await fetch(`${API_BASE_URL}/inventory-movement/after/${date}`);
   if (!response.ok) throw new Error('Failed to fetch movements after date');
   return response.json();
 }
-
 
 // Create inventory movement
 export async function createInventoryMovement(
   data: CreateInventoryMovementRequest
 ): Promise<InventoryMovement> {
-  const response = await fetch(`${API_BASE_URL}/`, {
+  const response = await fetch(`${API_BASE_URL}/inventory-movement`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -106,7 +104,7 @@ export async function updateInventoryMovement(
   id: string,
   data: UpdateInventoryMovementRequest
 ): Promise<InventoryMovement> {
-  const response = await fetch(`${API_BASE_URL}/${id}`, {
+  const response = await fetch(`${API_BASE_URL}/inventory-movement/${id}`, {
     method: 'PATCH',
     headers: {
       'Content-Type': 'application/json',
@@ -120,7 +118,7 @@ export async function updateInventoryMovement(
 
 // Delete inventory movement
 export async function deleteInventoryMovement(id: string): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/${id}`, {
+  const response = await fetch(`${API_BASE_URL}/inventory-movement/${id}`, {
     method: 'DELETE',
   });
 

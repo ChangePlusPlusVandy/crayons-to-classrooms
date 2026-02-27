@@ -1,7 +1,7 @@
 // src/api/items.ts
 import { Item, UpdateItemRequest } from '../types/Item';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001/api';
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
 
 // Get all items
 export async function getItems(): Promise<Item[]> {
@@ -40,9 +40,3 @@ export async function deleteItem(itemId: string): Promise<void> {
   if (!response.ok) throw new Error('Failed to delete item');
 }
 
-// Get all warehouses
-export async function getWarehouses(): Promise<any[]> {
-  const response = await fetch(`${API_BASE_URL}/warehouses`);
-  if (!response.ok) throw new Error('Failed to fetch warehouses');
-  return response.json();
-}

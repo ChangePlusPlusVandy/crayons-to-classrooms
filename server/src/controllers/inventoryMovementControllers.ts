@@ -419,10 +419,8 @@ export async function createInventoryMovementCore(
 
   // Normalize from_location_id: undefined → null to avoid node-postgres invalid parameter errors
   const normalizedFromLocationId = from_location_id ?? null;
-    // Normalize from_location_id: undefined → null to avoid node-postgres invalid parameter errors
-    const normalizedFromLocationId = from_location_id ?? null;
-    // Normalize to_location_id: null for DONATED and DISCARD actions (items leaving inventory)
-    const normalizedToLocationId = to_location_id ?? null;
+  // Normalize to_location_id: undefined → null to avoid node-postgres invalid parameter errors
+  const normalizedToLocationId = to_location_id ?? null;
 
   // Check if item_id, product_id, from_location_id (if provided), to_location_id, performed_by_id exist in tables (in parallel)
   const checks = [
@@ -476,7 +474,7 @@ export async function createInventoryMovementCore(
       item_id,
       product_id,
       normalizedFromLocationId,
-      to_location_id,
+      normalizedToLocationId,
       quantity,
       performed_by,
       note || null,
