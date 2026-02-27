@@ -30,3 +30,14 @@ export class UndoConflictError extends Error {
     this.name = 'UndoConflictError';
   }
 }
+
+/**
+ * Thrown when invalid data is received.
+ * The controller layer converts this to a 400 response.
+ */
+export class InvalidError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'InvalidError';
+  }
+}
