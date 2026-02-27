@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import pool from '../db.js';
 import {
   createItemSchema,
+  createItemsBulkSchema,
   updateItemSchema,
   statusQuerySchema,
   nameParamSchema,
@@ -9,10 +10,14 @@ import {
   productIdParamSchema,
   locationIdParamSchema,
   warehouseIdParamSchema,
+  itemInfoIdParamSchema,
   CreateItemInput,
+  CreateItemsBulkInput,
   UpdateItemInput,
 } from '../utils/itemsModel.js';
 import { ZodError } from 'zod';
+import { DbClient } from '../utils/dbTypes.js';
+import { ForeignKeyError } from '../utils/errors.js';
 
 /**
  * Checks if the query returned any rows.
@@ -47,34 +52,33 @@ const handleValidationError = (error: unknown, res: Response) => {
   return res.status(500).json({ error: 'Internal server error' });
 };
 
-type DbClient = {
-  query: (text: string, params?: any[]) => Promise<any>;
-};
-
-const getLocationInfo = async (locationId?: string | null) => {
+const getLocationInfo = async (locationId?: string | null, db: DbClient = pool) => {
   if (!locationId) {
-    return { fixture: null, locationCode: null };
+    return { locationCode: null };
   }
 
-  const locationResult = await pool.query(
+  const locationResult = await db.query(
     'SELECT fixture, location_code FROM storage_locations WHERE id = $1',
     [locationId]
   );
 
   if (locationResult.rows.length === 0) {
-    return { fixture: null, locationCode: null };
+    return { locationCode: null };
   }
 
   return {
-    fixture: locationResult.rows[0].fixture ?? null,
     locationCode: locationResult.rows[0].location_code ?? null,
   };
 };
 
 const syncItemInfoStock = async (
   itemName: string,
+  productId: string | undefined,
+  category: string | undefined,
+  quantity: number | undefined,
+  value: number | undefined,
   itemLimit: number | undefined,
-  lastKnownFixture: string | null | undefined,
+  fixture: string | null | undefined,
   lastKnownLocationCode: string | null | undefined,
   stockDelta: number,
   createIfMissing: boolean,
@@ -82,37 +86,52 @@ const syncItemInfoStock = async (
 ) => {
   try {
     if (!createIfMissing) {
-      await db.query(
-        'UPDATE item_info SET stock = stock + $1, last_known_fixture = COALESCE($2, last_known_fixture), last_known_location_code = COALESCE($3, last_known_location_code), time_last_updated = NOW() WHERE name = $4',
-        [stockDelta, lastKnownFixture ?? null, lastKnownLocationCode ?? null, itemName]
+      const updateResult = await db.query(
+        'UPDATE item_info SET stock = stock + $1, limbo = (stock + $1) = 0, fixture = COALESCE($2, fixture), last_known_location_code = COALESCE($3, last_known_location_code), time_last_updated = NOW() WHERE name = $4 RETURNING id',
+        [stockDelta, fixture ?? null, lastKnownLocationCode ?? null, itemName]
       );
-      return;
+      return updateResult.rows[0]?.id ?? null;
     }
 
-    await db.query(
-      `INSERT INTO item_info (name, item_limit, stock, last_known_fixture, last_known_location_code, time_last_updated, notes)
-       VALUES ($1, $2, $3, $4, $5, NOW(), $6)
+    const upsertResult = await db.query(
+      `INSERT INTO item_info (name, product_id, category, quantity, value, item_limit, stock, fixture, last_known_location_code, time_last_updated, notes)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), $10)
        ON CONFLICT (name) DO UPDATE
        SET stock = item_info.stock + EXCLUDED.stock,
+           limbo = (item_info.stock + EXCLUDED.stock) = 0,
+           product_id = COALESCE(EXCLUDED.product_id, item_info.product_id),
+           category = COALESCE(EXCLUDED.category, item_info.category),
+           quantity = COALESCE(EXCLUDED.quantity, item_info.quantity),
+           value = COALESCE(EXCLUDED.value, item_info.value),
            item_limit = COALESCE(EXCLUDED.item_limit, item_info.item_limit),
-           last_known_fixture = COALESCE(EXCLUDED.last_known_fixture, item_info.last_known_fixture),
+           fixture = COALESCE(EXCLUDED.fixture, item_info.fixture),
            last_known_location_code = COALESCE(EXCLUDED.last_known_location_code, item_info.last_known_location_code),
-           time_last_updated = NOW()`,
+           time_last_updated = NOW()
+       RETURNING id`,
       [
         itemName,
-        itemLimit ?? Number.MAX_SAFE_INTEGER,
+        productId ?? null,
+        category ?? null,
+        quantity ?? null,
+        value ?? null,
+        itemLimit ?? null,
         stockDelta,
-        lastKnownFixture ?? null,
+        fixture ?? null,
         lastKnownLocationCode ?? null,
         null,
       ]
     );
+    return upsertResult.rows[0]?.id ?? null;
   } catch (error) {
     console.error('Error syncing item info stock:', {
       itemName,
+      productId,
+      category,
+      quantity,
+      value,
       stockDelta,
       itemLimit,
-      lastKnownFixture,
+      fixture,
       lastKnownLocationCode,
       createIfMissing,
       error,
@@ -285,6 +304,32 @@ export const getItemsByWarehouseId = async (req: Request, res: Response) => {
     res.status(500).json({ error: 'Internal server error' });
   }
 };
+
+/**
+ * Retrieves all items associated with a specific item_info ID.
+ *
+ * @param {Request} req - Express request object with:
+ *   - itemInfoId: UUID of the item_info (in params)
+ * @param {Response} res - Express response object
+ * @returns {Promise<Response>} JSON array of items matching the item_info ID or error message
+ * @throws {500} Internal server error if database query fails
+ */
+export const getItemsByItemInfoId = async (req: Request, res: Response) => {
+  try {
+    const { itemInfoId } = itemInfoIdParamSchema.parse(req.params);
+    const items = await pool.query('SELECT * FROM items WHERE item_info = $1', [itemInfoId]);
+    if (!countRows(items.rows, res)) {
+      return;
+    }
+    res.json(items.rows);
+  } catch (error) {
+    if (error instanceof ZodError) {
+      return handleValidationError(error, res);
+    }
+    console.error('Error fetching items by item_info ID:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
 /**
  * Retrieves all items with a specific status.
  *
@@ -315,6 +360,93 @@ export const getItemsByStatus = async (req: Request, res: Response) => {
 };
 
 /**
+ * Core logic for creating items in the database.
+ * Validates foreign key constraints and inserts the item(s).
+ * Can be used inside a transaction by passing a PoolClient.
+ *
+ * @param data - Validated CreateItemInput data
+ * @param count - Number of identical item rows to create (default 1)
+ * @param db - Database client (pool or transaction client)
+ * @returns Array of newly created item rows
+ * @throws {ForeignKeyError} If any foreign key reference is invalid
+ */
+export async function createItemCore(
+  data: CreateItemInput,
+  count: number = 1,
+  db: DbClient = pool
+): Promise<any[]> {
+  const {
+    name,
+    product_id,
+    current_location_id,
+    created_by,
+    quantity,
+    stock,
+    status,
+    warehouse,
+    category,
+    item_limit,
+    value,
+    limbo,
+    notes,
+  } = data;
+
+  // Check if product_id, created_by, warehouse exist in tables
+  // Only check current_location_id if it's provided
+  const validationPromises = [
+    db.query('SELECT id FROM products WHERE id = $1', [product_id]),
+    db.query('SELECT id FROM users WHERE id = $1', [created_by]),
+    db.query('SELECT id FROM warehouse WHERE id = $1', [warehouse]),
+  ];
+
+  if (current_location_id) {
+    validationPromises.push(
+      db.query('SELECT id FROM storage_locations WHERE id = $1', [current_location_id])
+    );
+  }
+
+  const validationResults = await Promise.all(validationPromises);
+
+  if (validationResults[0].rows.length === 0) {
+    throw new ForeignKeyError('product_id');
+  }
+  if (validationResults[1].rows.length === 0) {
+    throw new ForeignKeyError('created_by user id');
+  }
+  if (validationResults[2].rows.length === 0) {
+    throw new ForeignKeyError('warehouse id');
+  }
+  if (current_location_id && validationResults[3]?.rows.length === 0) {
+    throw new ForeignKeyError('current_location_id');
+  }
+
+  const newItems = await db.query(
+    'INSERT INTO items (name, product_id, quantity, stock, current_location_id, status, created_by, warehouse, category, item_limit, value, limbo, notes, created_at, updated_at) SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW(), NOW() FROM generate_series(1, $14) RETURNING *',
+    [
+      name,
+      product_id,
+      quantity,
+      stock ?? null,
+      current_location_id ?? null,
+      status,
+      created_by,
+      warehouse,
+      category ?? null,
+      item_limit ?? null,
+      value,
+      limbo ?? false,
+      notes ?? null,
+      count,
+    ]
+  );
+
+  const { fixture, locationCode } = await getLocationInfo(current_location_id ?? null, db);
+  await syncItemInfoStock(name, item_limit ?? 0, fixture, locationCode, count, true, db);
+
+  return newItems.rows;
+}
+
+/**
  * Creates a new item in the database.
  * Validates foreign key constraints for product_id, current_location_id (if provided), created_by, and warehouse.
  *
@@ -323,6 +455,7 @@ export const getItemsByStatus = async (req: Request, res: Response) => {
  *   - product_id: UUID of the product (in body)
  *   - quantity: Number of items (in body)
  *   - current_location_id: UUID of the current location (in body, optional)
+ *   - fixture: Fixture string (in body, optional)
  *   - status: Current status of the item ie ('active', 'inactive', 'discontinued', 'checked out') (in body)
  *   - created_by: UUID of the user creating the item (in body)
  *   - warehouse: UUID of the warehouse (in body, required)
@@ -338,10 +471,40 @@ export const getItemsByStatus = async (req: Request, res: Response) => {
  */
 export const createItem = async (req: Request, res: Response) => {
   try {
+    const data: CreateItemInput = createItemSchema.parse(req.body);
+    const createdItems = await createItemCore(data);
+    res.status(201).json(createdItems[0]);
+  } catch (error) {
+    if (error instanceof ZodError) {
+      return handleValidationError(error, res);
+    }
+    if (error instanceof ForeignKeyError) {
+      return res.status(400).json({ error: error.message });
+    }
+    console.error('Error creating item:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+/**
+ * Creates multiple items in the database with the same data.
+ *
+ * @param {Request} req - Express request object with:
+ *   - count: Number of items to create (in body, required)
+ *   - All fields required by createItemSchema
+ * @param {Response} res - Express response object
+ * @returns {Promise<Response>} JSON array of created items or error message
+ * @throws {400} Invalid foreign key if product_id, current_location_id (if provided), created_by, or warehouse doesn't exist
+ * @throws {500} Internal server error if validation or creation fails
+ */
+export const createItemsBulk = async (req: Request, res: Response) => {
+  try {
     const {
+      count,
       name,
       product_id,
       current_location_id,
+      fixture,
       created_by,
       quantity,
       stock,
@@ -352,65 +515,138 @@ export const createItem = async (req: Request, res: Response) => {
       value,
       limbo,
       notes,
-    }: CreateItemInput = createItemSchema.parse(req.body);
+    }: CreateItemsBulkInput = createItemsBulkSchema.parse(req.body);
 
-    // Check if product_id, created_by, warehouse exist in tables
-    // Only check current_location_id if it's provided
-    const validationPromises = [
-      pool.query('SELECT id FROM products WHERE id = $1', [product_id]),
-      pool.query('SELECT id FROM users WHERE id = $1', [created_by]),
-      pool.query('SELECT id FROM warehouse WHERE id = $1', [warehouse]),
-    ];
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
 
-    if (current_location_id) {
-      validationPromises.push(
-        pool.query('SELECT id FROM storage_locations WHERE id = $1', [current_location_id])
+      const validationPromises = [
+        client.query('SELECT id FROM products WHERE id = $1', [product_id]),
+        client.query('SELECT id FROM users WHERE id = $1', [created_by]),
+        client.query('SELECT id FROM warehouse WHERE id = $1', [warehouse]),
+      ];
+
+      if (current_location_id) {
+        validationPromises.push(
+          client.query('SELECT id FROM storage_locations WHERE id = $1', [current_location_id])
+        );
+      }
+
+      const validationResults = await Promise.all(validationPromises);
+
+      if (validationResults[0].rows.length === 0) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ error: 'Invalid product_id' });
+      }
+      if (validationResults[1].rows.length === 0) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ error: 'Invalid created_by user id' });
+      }
+      if (validationResults[2].rows.length === 0) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ error: 'Invalid warehouse id' });
+      }
+      if (current_location_id && validationResults[3]?.rows.length === 0) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ error: 'Invalid current_location_id' });
+      }
+
+      const newItems = await client.query(
+        `INSERT INTO items (
+          name,
+          product_id,
+          quantity,
+          stock,
+          current_location_id,
+          status,
+          created_by,
+          warehouse,
+          category,
+          item_limit,
+          value,
+          limbo,
+          notes,
+          created_at,
+          updated_at
+        )
+        SELECT
+          $1,
+          $2,
+          $3,
+          $4,
+          $5,
+          $6,
+          $7,
+          $8,
+          $9,
+          $10,
+          $11,
+          $12,
+          $13,
+          NOW(),
+          NOW()
+        FROM generate_series(1, $14)
+        RETURNING *;`,
+        [
+          name,
+          product_id,
+          quantity,
+          stock ?? null,
+          current_location_id ?? null,
+          status,
+          created_by,
+          warehouse,
+          category ?? null,
+          item_limit ?? null,
+          value,
+          limbo ?? false,
+          notes ?? null,
+          count,
+        ]
       );
-    }
 
-    const validationResults = await Promise.all(validationPromises);
-
-    if (validationResults[0].rows.length === 0) {
-      return res.status(400).json({ error: 'Invalid product_id' });
-    }
-    if (validationResults[1].rows.length === 0) {
-      return res.status(400).json({ error: 'Invalid created_by user id' });
-    }
-    if (validationResults[2].rows.length === 0) {
-      return res.status(400).json({ error: 'Invalid warehouse id' });
-    }
-    if (current_location_id && validationResults[3]?.rows.length === 0) {
-      return res.status(400).json({ error: 'Invalid current_location_id' });
-    }
-
-    const newItem = await pool.query(
-      'INSERT INTO items (name, product_id, quantity, stock, current_location_id, status, created_by, warehouse, category, item_limit, value, limbo, notes, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW(), NOW()) RETURNING *',
-      [
+      const { locationCode } = await getLocationInfo(current_location_id ?? null, client);
+      const fixtureOverride = fixture ?? null;
+      const itemInfoId = await syncItemInfoStock(
         name,
         product_id,
+        category ?? 'UNKNOWN',
         quantity,
-        stock ?? null,
-        current_location_id ?? null,
-        status,
-        created_by,
-        warehouse,
-        category ?? null,
-        item_limit ?? null,
         value,
-        limbo ?? false,
-        notes ?? null,
-      ]
-    );
+        item_limit ?? Number.MAX_SAFE_INTEGER,
+        fixtureOverride,
+        locationCode,
+        count,
+        true,
+        client
+      );
 
-    const { fixture, locationCode } = await getLocationInfo(current_location_id ?? null);
-    await syncItemInfoStock(name, item_limit ?? 0, fixture, locationCode, 1, true);
-
-    res.status(201).json(newItem.rows[0]);
+      let responseItems = newItems.rows;
+      if (itemInfoId) {
+        const newItemIds = newItems.rows.map((row: { id: string }) => row.id);
+        await client.query(
+          'UPDATE items SET item_info = $1, updated_at = NOW() WHERE id = ANY($2::uuid[])',
+          [itemInfoId, newItemIds]
+        );
+        const updatedItems = await client.query('SELECT * FROM items WHERE id = ANY($1::uuid[])', [
+          newItemIds,
+        ]);
+        responseItems = updatedItems.rows;
+      }
+      await client.query('COMMIT');
+      return res.status(201).json(responseItems);
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
   } catch (error) {
     if (error instanceof ZodError) {
       return handleValidationError(error, res);
     }
-    console.error('Error creating item:', error);
+    console.error('Error creating items in bulk:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -418,16 +654,17 @@ export const createItem = async (req: Request, res: Response) => {
 /**
  * Updates an existing item in the database.
  * Only updates fields that are provided in the request body.
- * Allowed fields: name, product_id, quantity, current_location_id, status, warehouse, category, limit, value, limbo, notes.
+ * Allowed fields: name, product_id, quantity, current_location_id, status, warehouse, category, limit, value, limbo, notes, item_info.
  *
  * @param {Request} req - Express request object with:
  *   - id: UUID of the item to update (in params)
- *   - Updatable fields in body (name, product_id, quantity, current_location_id, status, warehouse, category, limit, value, limbo, notes)
+ *   - Updatable fields in body (name, product_id, quantity, current_location_id, status, warehouse, category, limit, value, limbo, notes, item_info)
  * @param {Response} res - Express response object
  * @returns {Promise<Response>} JSON object of the updated item or error message
  * @throws {400} Invalid id or product_id (must be valid UUIDs)
  * @throws {400} Invalid product_id if product doesn't exist in database
  * @throws {400} Invalid warehouse if warehouse doesn't exist in database
+ * @throws {400} Invalid item_info if item_info doesn't exist in database
  * @throws {400} No updatable fields provided if request body is empty or contains no allowed fields
  * @throws {404} Item not found if no item matches the provided ID
  * @throws {500} Internal server error if database query fails
@@ -470,6 +707,15 @@ export const updateItem = async (req: Request, res: Response) => {
       }
     }
 
+    if (validatedData.item_info) {
+      const itemInfoCheck = await pool.query('SELECT id FROM item_info WHERE id = $1', [
+        validatedData.item_info,
+      ]);
+      if (itemInfoCheck.rows.length === 0) {
+        return res.status(400).json({ error: 'Invalid item_info id' });
+      }
+    }
+
     // If current_location_id is being updated, verify it exists
     if (newLocationId) {
       const locationCheck = await pool.query('SELECT id FROM storage_locations WHERE id = $1', [
@@ -505,10 +751,47 @@ export const updateItem = async (req: Request, res: Response) => {
       return;
     }
 
-    const { fixture, locationCode } = await getLocationInfo(newLocationId ?? null);
+    const { locationCode } = await getLocationInfo(newLocationId ?? null);
+    const updatedItem = rows[0];
+
     if (newName !== oldName) {
-      await syncItemInfoStock(oldName, 0, undefined, undefined, -1, false);
-      await syncItemInfoStock(newName, 0, fixture, locationCode, 1, true);
+      await syncItemInfoStock(
+        oldName,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        0,
+        undefined,
+        undefined,
+        -1,
+        false
+      );
+      await syncItemInfoStock(
+        newName,
+        updatedItem.product_id,
+        updatedItem.category ?? 'UNKNOWN',
+        updatedItem.quantity,
+        updatedItem.value,
+        updatedItem.item_limit ?? undefined,
+        undefined,
+        locationCode,
+        1,
+        true
+      );
+    } else if (validatedData.current_location_id) {
+      await syncItemInfoStock(
+        newName,
+        updatedItem.product_id,
+        updatedItem.category ?? 'UNKNOWN',
+        updatedItem.quantity,
+        updatedItem.value,
+        updatedItem.item_limit ?? undefined,
+        undefined,
+        locationCode,
+        0,
+        true
+      );
     }
     return res.json(rows[0]);
   } catch (error) {
@@ -544,7 +827,19 @@ export const deleteItem = async (req: Request, res: Response) => {
       }
 
       const itemName = deletedItem.rows[0].name;
-      await syncItemInfoStock(itemName, 0, undefined, undefined, -1, false, client);
+      await syncItemInfoStock(
+        itemName,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        0,
+        undefined,
+        undefined,
+        -1,
+        false,
+        client
+      );
 
       await client.query('COMMIT');
       return res.json({ message: 'Item deleted successfully' });

@@ -16,11 +16,9 @@ import AddIcon from '@mui/icons-material/Add';
 import {
   getProducts,
   getStorageLocations,
-  createItem,
-  createInventoryMovement,
+  createItemWithMovement,
 } from '../../api/addItem';
 import { Warehouse } from '../../types/Warehouse';
-import { CreateInventoryMovementRequest } from '../../types/InventoryMovement';
 import { StorageLocation } from '../../types/StorageLocation';
 import { Product } from '../../types/Product';
 import {
@@ -158,54 +156,37 @@ export default function AddItem() {
     setSuccess('');
 
     try {
-      // Create the new items using product values
-      // Each item has stock: 1, and we create as many items as quantityToAdd
       const itemLimit = typeof selectedProduct.item_limit === 'string'
         ? parseInt(selectedProduct.item_limit, 10)
         : selectedProduct.item_limit;
 
       const quantity = quantityToAdd as number;
-      const itemPromises = [];
 
-      // Create individual item entries (one per quantity)
-      for (let i = 0; i < quantity; i++) {
-        itemPromises.push(
-          createItem({
-            name: selectedProduct.name,
-            product_id: selectedProduct.id,
-            quantity: 1,
-            stock: 1,
-            current_location_id: destinationLocation.id,
-            status: 'active',
-            created_by: 'b4974f63-ee89-42a1-bdb3-ce9df255c682', // TODO: Get user ID from auth context
-            warehouse: selectedWarehouse.id,
-            category: selectedProduct.category || undefined,
-            item_limit: itemLimit || undefined,
-            value: selectedProduct.value,
-            limbo: false,
-            notes: notes || undefined,
-          })
-        );
-      }
-
-      // Create all items
-      const newItems = await Promise.all(itemPromises);
-
-      // Create a single inventory movement with the total quantity
-      // Use the first item's ID for the movement record
-      const movementPayload: CreateInventoryMovementRequest = {
-        inventory_action: 'ADD',
-        item_id: newItems[0].id,
-        product_id: selectedProduct.id,
-        from_location_id: null,
-        to_location_id: destinationLocation.id,
-        quantity: quantity,
-        performed_by: 'b4974f63-ee89-42a1-bdb3-ce9df255c682', // TODO: Get user ID from auth context
-        note: notes || undefined,
-      };
-      console.log('DEBUG: Movement payload:', JSON.stringify(movementPayload, null, 2));
-      const movementResult = await createInventoryMovement(movementPayload);
-      console.log('DEBUG: Movement result:', JSON.stringify(movementResult, null, 2));
+      await createItemWithMovement({
+        item: {
+          name: selectedProduct.name,
+          product_id: selectedProduct.id,
+          quantity: 1,
+          stock: 1,
+          current_location_id: destinationLocation.id,
+          status: 'active',
+          created_by: 'b4974f63-ee89-42a1-bdb3-ce9df255c682', // TODO: Get user ID from auth context
+          warehouse: selectedWarehouse.id,
+          category: selectedProduct.category || undefined,
+          item_limit: itemLimit || undefined,
+          value: selectedProduct.value,
+          limbo: false,
+          notes: notes || undefined,
+        },
+        movement: {
+          inventory_action: 'ADD',
+          from_location_id: null,
+          to_location_id: destinationLocation.id,
+          quantity: quantity,
+          performed_by: 'b4974f63-ee89-42a1-bdb3-ce9df255c682', // TODO: Get user ID from auth context
+          note: notes || undefined,
+        },
+      });
 
       setSuccess(`${quantity} item${quantity > 1 ? 's' : ''} added successfully!`);
 

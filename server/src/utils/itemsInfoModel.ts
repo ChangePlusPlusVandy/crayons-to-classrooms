@@ -15,14 +15,18 @@ export const nameParamSchema = z.object({
 
 /**
  * Schema for validating item creation
- * Requires: name, item_limit, stock, last_known_location_code, time_last_updated
- * Optional: last_known_fixture, notes
+ * Requires: name, last_known_location_code, time_last_updated, stock, quantity
+ * Optional: last_known_fixture, notes, product_id, category, value, item_limit
  */
 export const createItemInfoSchema = z.object({
   name: z.string().min(1, 'Name is required').max(255, 'Name must be less than 255 characters'),
-  item_limit: z.number().int().nonnegative('Limit cannot be negative'),
+  product_id: uuidSchema.optional(),
+  category: z.string().optional(),
+  quantity: z.number().int().nonnegative('Quantity cannot be negative').optional(),
+  value: z.number().nonnegative('Value cannot be negative').optional(),
+  item_limit: z.number().int().nonnegative('Limit cannot be negative').optional(),
   stock: z.number().int().nonnegative('Stock cannot be negative'),
-  last_known_fixture: z.string().optional(),
+  fixture: z.string().optional(),
   last_known_location_code: z.string(),
   time_last_updated: z.string(),
   notes: z.string().optional(),
@@ -39,9 +43,13 @@ export const updateItemInfoSchema = z
       .min(1, 'Name is required')
       .max(255, 'Name must be less than 255 characters')
       .optional(),
+    product_id: uuidSchema.optional(),
+    category: z.string().min(1, 'Category must not be empty').optional(),
+    quantity: z.number().int().nonnegative('Quantity cannot be negative').optional(),
+    value: z.number().nonnegative('Value cannot be negative').optional(),
     item_limit: z.number().int().nonnegative('Limit cannot be negative').optional(),
     stock: z.number().int().nonnegative('Stock cannot be negative').optional(),
-    last_known_fixture: z.string().optional(),
+    fixture: z.string().optional(),
     last_known_location_code: z.string().optional(),
     time_last_updated: z.string().optional(),
     notes: z.string().optional(),
