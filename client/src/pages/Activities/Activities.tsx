@@ -26,6 +26,8 @@ import { undoInventoryMovement } from '../../api/moveItem';
 import { activitiesStyles } from './Activities.styles';
 import undoArrow from '../../assets/undo_arrow.svg';
 import modifyPen from '../../assets/modify_pen.svg';
+import { EditAddDialog } from '../../components/EditAddDialog/EditAddDialog';
+import { EditMoveDialog } from '../../components/EditMoveDialog/EditMoveDialog';
 
 const PAGE_SIZE = 10;
 
@@ -35,8 +37,14 @@ export default function Activities() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [editingMovement, setEditingMovement] = useState<ActivityDisplay | null>(null);
+  const [showSuccessAlert, setShowSuccessAlert] = useState(false);
   const [undoingId, setUndoingId] = useState<string | null>(null);
-  const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
+  const [snackbar, setSnackbar] = useState<{
+    open: boolean;
+    message: string;
+    severity: 'success' | 'error';
+  }>({
     open: false,
     message: '',
     severity: 'success',
@@ -71,7 +79,11 @@ export default function Activities() {
 
   const handleUndoClick = (activity: ActivityDisplay) => {
     if (!activity.id) {
-      setSnackbar({ open: true, message: 'Cannot undo: activity ID is missing', severity: 'error' });
+      setSnackbar({
+        open: true,
+        message: 'Cannot undo: activity ID is missing',
+        severity: 'error',
+      });
       return;
     }
 
@@ -80,7 +92,7 @@ export default function Activities() {
       setSnackbar({
         open: true,
         message: `Cannot undo ${activity.inventory_action} actions. Only MOVE and ADD can be undone.`,
-        severity: 'error'
+        severity: 'error',
       });
       return;
     }
@@ -101,7 +113,7 @@ export default function Activities() {
       setSnackbar({
         open: true,
         message: `Successfully undid ${activity.inventory_action} for ${activity.product_name || 'item'}`,
-        severity: 'success'
+        severity: 'success',
       });
       // Refresh the activities list
       fetchActivities();
@@ -109,7 +121,7 @@ export default function Activities() {
       setSnackbar({
         open: true,
         message: err instanceof Error ? err.message : 'Failed to undo movement',
-        severity: 'error'
+        severity: 'error',
       });
     } finally {
       setUndoingId(null);
@@ -120,8 +132,20 @@ export default function Activities() {
     setUndoConfirmDialog({ open: false, activity: null });
   };
 
-  const handleEdit = (activity: ActivityDisplay) => {
-    console.log('Edit action for:', activity);
+  const handleEditClick = (activity: ActivityDisplay) => {
+    if (activity.inventory_action === 'ADD' || activity.inventory_action === 'MOVE') {
+      setEditingMovement(activity);
+    }
+  };
+
+  const handleEditClose = () => {
+    setEditingMovement(null);
+  };
+
+  const handleEditSuccess = async () => {
+    setShowSuccessAlert(true);
+    setEditingMovement(null);
+    await fetchActivities();
   };
 
   const formatTimestamp = (timestamp: string) => {
@@ -319,18 +343,21 @@ export default function Activities() {
                             />
                           )}
                         </IconButton>
-                        <IconButton
-                          sx={activitiesStyles.actionButton}
-                          onClick={() => handleEdit(activity)}
-                          aria-label={`Edit ${activity.inventory_action} for ${activity.product_name}`}
-                        >
-                          <Box
-                            component="img"
-                            src={modifyPen}
-                            alt="Edit"
-                            sx={activitiesStyles.actionIcon}
-                          />
-                        </IconButton>
+                        {(activity.inventory_action === 'ADD' ||
+                          activity.inventory_action === 'MOVE') && (
+                          <IconButton
+                            sx={activitiesStyles.actionButton}
+                            onClick={() => handleEditClick(activity)}
+                            aria-label={`Edit ${activity.inventory_action} for ${activity.product_name}`}
+                          >
+                            <Box
+                              component="img"
+                              src={modifyPen}
+                              alt="Edit"
+                              sx={activitiesStyles.actionIcon}
+                            />
+                          </IconButton>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))
@@ -342,6 +369,34 @@ export default function Activities() {
           {renderPagination()}
         </>
       )}
+      {editingMovement?.inventory_action === 'ADD' && (
+        <EditAddDialog
+          open={!!editingMovement}
+          onClose={handleEditClose}
+          movement={editingMovement}
+          onSuccess={handleEditSuccess}
+        />
+      )}
+
+      {editingMovement?.inventory_action === 'MOVE' && (
+        <EditMoveDialog
+          open={!!editingMovement}
+          onClose={handleEditClose}
+          movement={editingMovement}
+          onSuccess={handleEditSuccess}
+        />
+      )}
+
+      <Snackbar
+        open={showSuccessAlert}
+        autoHideDuration={4000}
+        onClose={() => setShowSuccessAlert(false)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert onClose={() => setShowSuccessAlert(false)} severity="success" variant="filled">
+          Edit applied successfully
+        </Alert>
+      </Snackbar>
 
       <Snackbar
         open={snackbar.open}

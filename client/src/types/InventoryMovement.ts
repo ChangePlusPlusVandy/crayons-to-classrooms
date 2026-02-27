@@ -1,12 +1,16 @@
-export type InventoryMovement = {
-  id?: string;
-  inventory_action: 'ADD' | 'MOVE' | 'CHECKOUT' | 'DISCARD' | 'ADJUSTMENT';
-  item_id: string;
-  product_id: string;
-  from_location_id: string | null;
-  to_location_id: string;
-  quantity: number;
-  performed_by: string;
-  note?: string;
-  performed_at?: string;
-};
+import { z } from 'zod';
+
+export const InventoryMovementSchema = z.object({
+  id: z.string().optional(),
+  inventory_action: z.enum(['MOVE', 'ADD', 'CHECKOUT', 'DISCARD', 'ADJUSTMENT', 'DONATED']),
+  item_id: z.string(),
+  product_id: z.string(),
+  from_location_id: z.string().nullable(),
+  to_location_id: z.string().nullable(),
+  quantity: z.coerce.number(),
+  performed_by: z.string().nullable(),
+  note: z.string().nullable().optional(),
+  performed_at: z.string(),
+});
+
+export type InventoryMovement = z.infer<typeof InventoryMovementSchema>;

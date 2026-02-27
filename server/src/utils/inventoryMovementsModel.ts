@@ -98,6 +98,21 @@ export const createItemWithMovementSchema = z.object({
 });
 
 /**
+ * Schema for the edit-move endpoint request body.
+ * No item creation needed — MOVE edits relocate existing items.
+ */
+export const editMoveSchema = z.object({
+  from_location_id: uuidSchema,
+  to_location_id: uuidSchema,
+  product_id: uuidSchema,
+  quantity: z.number().int().positive('Quantity must be a positive integer'),
+  performed_by: uuidSchema,
+  note: z.string().optional(),
+});
+
+export type EditMoveInput = z.infer<typeof editMoveSchema>;
+
+/**
  * Schema for the combined move-items-with-movement request body.
  * item_ids are the existing items to relocate; movement records the action.
  */
@@ -112,4 +127,5 @@ export type CreateInventoryInput = z.infer<typeof createInventoryMovementSchema>
 export type UpdateInventoryInput = z.infer<typeof updateInventoryMovementSchema>;
 export type InventoryStatusType = z.infer<typeof actionQuerySchema>;
 export type CreateItemWithMovementInput = z.infer<typeof createItemWithMovementSchema>;
+export type MovementIdParamType = z.infer<typeof movementIdParamSchema>;
 export type MoveItemsWithMovementInput = z.infer<typeof moveItemsWithMovementSchema>;

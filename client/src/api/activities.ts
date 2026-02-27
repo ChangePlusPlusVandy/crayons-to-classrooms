@@ -1,18 +1,22 @@
-import { InventoryMovement } from '../types/InventoryMovement';
+import { z } from 'zod';
+import { InventoryMovementSchema } from '../types/InventoryMovement';
 
-export interface ActivityDisplay extends InventoryMovement {
-  product_name: string | null;
-  from_location_name: string | null;
-  to_location_name: string | null;
-  user_name: string | null;
-}
+export const ActivityDisplaySchema = InventoryMovementSchema.extend({
+  product_name: z.string().nullable(),
+  from_location_name: z.string().nullable(),
+  to_location_name: z.string().nullable(),
+  user_name: z.string().nullable(),
+});
 
-export interface PaginatedActivities {
-  data: ActivityDisplay[];
-  total: number;
-  page: number;
-  limit: number;
-}
+export const PaginatedActivitiesSchema = z.object({
+  data: z.array(ActivityDisplaySchema),
+  total: z.number(),
+  page: z.number(),
+  limit: z.number(),
+});
+
+export type ActivityDisplay = z.infer<typeof ActivityDisplaySchema>;
+export type PaginatedActivities = z.infer<typeof PaginatedActivitiesSchema>;
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
 
@@ -24,5 +28,5 @@ export async function getActivities(
     `${API_BASE_URL}/inventory-movement/detailed?page=${page}&limit=${limit}`
   );
   if (!response.ok) throw new Error('Failed to fetch activities');
-  return response.json();
+  return PaginatedActivitiesSchema.parse(await response.json());
 }

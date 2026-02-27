@@ -22,5 +22,6 @@ export type ItemGroup = {
   current_location_id: string;
   warehouse: string;
   name: string;
+  product_id: string;
   quantity: number; // This is the number of item rows where all the other fields match (same name and location)
 };
