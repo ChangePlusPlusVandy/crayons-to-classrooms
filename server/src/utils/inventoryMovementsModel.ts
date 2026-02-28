@@ -82,7 +82,7 @@ export const movementFieldsSchema = z.object({
   inventory_action: ActionParamSchema,
   from_location_id: uuidSchema.nullable().optional(),
   to_location_id: uuidSchema,
-  quantity: z.number().int().positive('Quantity must be a nonnegative integer'),
+  quantity: z.number().int().positive('Quantity must be a positive integer'),
   performed_by: uuidSchema,
   note: z.string().optional(),
 });
