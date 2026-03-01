@@ -3,28 +3,30 @@ import { StorageLocation } from '../types/StorageLocation';
 import { Item, ItemGroup } from '../types/Item';
 import { InventoryMovement, InventoryMovementSchema } from '../types/InventoryMovement';
 
+import { authFetch } from './authFetch';
+
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
 
 export async function getWarehouses(): Promise<Warehouse[]> {
-  const response = await fetch(`${API_BASE_URL}/warehouses`);
+  const response = await authFetch(`${API_BASE_URL}/warehouses`);
   if (!response.ok) throw new Error('Failed to fetch warehouses');
   return response.json();
 }
 
 export async function getStorageLocations(): Promise<StorageLocation[]> {
-  const response = await fetch(`${API_BASE_URL}/storage-locations`);
+  const response = await authFetch(`${API_BASE_URL}/storage-locations`);
   if (!response.ok) throw new Error('Failed to fetch storage locations');
   return response.json();
 }
 
 export async function getStorageLocationByCode(locationCode: string): Promise<StorageLocation> {
-  const response = await fetch(`${API_BASE_URL}/storage-locations/locationCode/${locationCode}`);
+  const response = await authFetch(`${API_BASE_URL}/storage-locations/locationCode/${locationCode}`);
   if (!response.ok) throw new Error('Failed to fetch storage location');
   return response.json();
 }
 
 export async function getItemsByLocation(locationId: string): Promise<Item[]> {
-  const response = await fetch(`${API_BASE_URL}/items/location/${locationId}`);
+  const response = await authFetch(`${API_BASE_URL}/items/location/${locationId}`);
   if (!response.ok) {
     if (response.status === 404) {
       return [];
@@ -37,7 +39,7 @@ export async function getItemsByLocation(locationId: string): Promise<Item[]> {
 export async function createInventoryMovement(
   movement: Omit<InventoryMovement, 'id' | 'performed_at'>
 ): Promise<InventoryMovement> {
-  const response = await fetch(`${API_BASE_URL}/inventory-movement`, {
+  const response = await authFetch(`${API_BASE_URL}/inventory-movement`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -63,7 +65,7 @@ export async function createItem(itemData: {
   limbo?: boolean;
   notes?: string;
 }): Promise<Item> {
-  const response = await fetch(`${API_BASE_URL}/items`, {
+  const response = await authFetch(`${API_BASE_URL}/items`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -75,7 +77,7 @@ export async function createItem(itemData: {
 }
 
 export async function updateItemQuantity(itemId: string, newQuantity: number): Promise<Item> {
-  const response = await fetch(`${API_BASE_URL}/items/${itemId}`, {
+  const response = await authFetch(`${API_BASE_URL}/items/${itemId}`, {
     method: 'PATCH',
     headers: {
       'Content-Type': 'application/json',
@@ -87,7 +89,7 @@ export async function updateItemQuantity(itemId: string, newQuantity: number): P
 }
 
 export async function updateItemLocation(itemId: string, locationId: string): Promise<Item> {
-  const response = await fetch(`${API_BASE_URL}/items/${itemId}`, {
+  const response = await authFetch(`${API_BASE_URL}/items/${itemId}`, {
     method: 'PATCH',
     headers: {
       'Content-Type': 'application/json',
@@ -122,7 +124,7 @@ export function groupItemsByLocation(items: Item[]): ItemGroup[] {
 }
 
 export async function undoInventoryMovement(movementId: string): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/inventory-movement/${movementId}/undo`, {
+  const response = await authFetch(`${API_BASE_URL}/inventory-movement/${movementId}/undo`, {
     method: 'POST',
   });
   if (!response.ok) {
@@ -150,7 +152,7 @@ export async function moveItemsWithMovement(payload: {
     note?: string;
   };
 }): Promise<{ updatedCount: number; movement: InventoryMovement }> {
-  const response = await fetch(`${API_BASE_URL}/inventory-movement/with-move`, {
+  const response = await authFetch(`${API_BASE_URL}/inventory-movement/with-move`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

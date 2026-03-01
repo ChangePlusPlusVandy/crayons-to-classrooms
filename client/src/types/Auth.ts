@@ -1,0 +1,1 @@
+export type InviteResponse = {message: string} | {error: string}

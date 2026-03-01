@@ -2,6 +2,8 @@ import { Item } from '../types/Item';
 import { InventoryMovement, InventoryMovementSchema } from '../types/InventoryMovement';
 import { Product } from '../types/Product';
 
+import { authFetch } from './authFetch';
+
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
 
 export interface EditAddMovementParams {
@@ -45,7 +47,7 @@ export async function editAddMovementTransaction(
     };
   }
 ): Promise<{ items: Item[]; movement: InventoryMovement }> {
-  const response = await fetch(`${API_BASE_URL}/inventory-movement/${movementId}/edit-add`, {
+  const response = await authFetch(`${API_BASE_URL}/inventory-movement/${movementId}/edit-add`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
@@ -70,7 +72,7 @@ export async function editMoveMovementTransaction(
     note?: string;
   }
 ): Promise<{ movement: InventoryMovement }> {
-  const response = await fetch(`${API_BASE_URL}/inventory-movement/${movementId}/edit-move`, {
+  const response = await authFetch(`${API_BASE_URL}/inventory-movement/${movementId}/edit-move`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),

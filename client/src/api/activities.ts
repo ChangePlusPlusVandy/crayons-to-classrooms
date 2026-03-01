@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { InventoryMovementSchema } from '../types/InventoryMovement';
+import { authFetch } from './authFetch';
 
 export const ActivityDisplaySchema = InventoryMovementSchema.extend({
   product_name: z.string().nullable(),
@@ -24,7 +25,7 @@ export async function getActivities(
   page: number = 1,
   limit: number = 10
 ): Promise<PaginatedActivities> {
-  const response = await fetch(
+  const response = await authFetch(
     `${API_BASE_URL}/inventory-movement/detailed?page=${page}&limit=${limit}`
   );
   if (!response.ok) throw new Error('Failed to fetch activities');

@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import { z, ZodError } from 'zod';
 import { supabaseAdmin } from '../supabase.js';
 
-const INVITE_REDIRECT_URL = 'http://localhost:3000/set-password';
+const INVITE_REDIRECT_URL = process.env.INVITE_REDIRECT_URL ?? 'http://localhost:3000/set-password';
 
 /**
  * Handles Zod validation errors and sends appropriate error response
