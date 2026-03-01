@@ -27,7 +27,7 @@ export type ItemGroup = {
 
 export interface UpdateItemRequest {
   quantity?: number;
-  status?: 'active' | 'inactive' | 'discontinued' | 'checked_out' | 'donated' | 'defective';
+  status?: 'active' | 'inactive' | 'discontinued' | 'checked_out';
   current_location_id?: string | null;
   warehouse?: string | null;
   limbo?: boolean;

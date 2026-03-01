@@ -31,8 +31,8 @@ export default function RemoveItemPage() {
   const [items, setItems] = useState<Item[]>([]);
   const [selectedWarehouse, setSelectedWarehouse] = useState<Warehouse | null>(null);
   // 'slot' and 'product' modes are not yet implemented — scoped to future sprints
-  const removeByOptions: Array<'item'> = ['item'];
-  const [removeBy, setRemoveBy] = useState<'item'>('item');
+  const removeByOptions: Array<'item' | 'product'> = ['item'];
+  const [removeBy, setRemoveBy] = useState<'item' | 'product'>('item');
   const [selectedGroup, setSelectedGroup] = useState<ItemGroupWithLocation | null>(null);
   const productOptions: string[] = ['Product A', 'Product B', 'Product C']; // hardcoded for now will change in later sprints
   const [selectedProduct, setSelectedProduct] = useState('');
@@ -84,7 +84,7 @@ export default function RemoveItemPage() {
 
     try {
       const isFullRemoval = quantityToRemove === selectedGroup.items.length;
-      const newStatus = removalAction === 'DONATED' ? 'donated' : 'defective';
+      const newStatus = 'inactive';
       const itemsToRemove = selectedGroup.items.slice(0, quantityToRemove);
       const representative = selectedGroup.items[0];
 

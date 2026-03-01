@@ -422,21 +422,12 @@ export async function createInventoryMovementCore(
   // Normalize to_location_id: undefined → null to avoid node-postgres invalid parameter errors
   const normalizedToLocationId = to_location_id ?? null;
 
-  // Check if item_id, product_id, from_location_id (if provided), to_location_id, performed_by_id exist in tables (in parallel)
-  const checks = [
+  // Check required foreign keys in parallel
+  const [itemCheck, productCheck, userCheck] = await Promise.all([
     db.query('SELECT id FROM items WHERE id = $1', [item_id]),
     db.query('SELECT id FROM products WHERE id = $1', [product_id]),
-    db.query('SELECT id FROM storage_locations WHERE id = $1', [to_location_id]),
     db.query('SELECT id FROM users WHERE id = $1', [performed_by]),
-  ];
-
-  // Only check from_location_id if it's provided (it's optional for ADD actions)
-  if (normalizedFromLocationId) {
-    checks.push(db.query('SELECT id FROM storage_locations WHERE id = $1', [normalizedFromLocationId]));
-  }
-
-  const [itemCheck, productCheck, toLocationCheck, userCheck, fromLocationCheck] =
-    await Promise.all(checks);
+  ]);
 
   if (itemCheck.rows.length === 0) {
     throw new ForeignKeyError('item_id');
@@ -444,14 +435,25 @@ export async function createInventoryMovementCore(
   if (productCheck.rows.length === 0) {
     throw new ForeignKeyError('product_id');
   }
-  if (toLocationCheck.rows.length === 0) {
-    throw new ForeignKeyError('to_location_id');
-  }
   if (userCheck.rows.length === 0) {
     throw new ForeignKeyError('performed_by user id');
   }
+
+  // Check optional location foreign keys with fixed indices to avoid index-shift bugs
+  const [fromLocationCheck, toLocationCheck] = await Promise.all([
+    normalizedFromLocationId
+      ? db.query('SELECT id FROM storage_locations WHERE id = $1', [normalizedFromLocationId])
+      : Promise.resolve(null),
+    normalizedToLocationId
+      ? db.query('SELECT id FROM storage_locations WHERE id = $1', [normalizedToLocationId])
+      : Promise.resolve(null),
+  ]);
+
   if (normalizedFromLocationId && fromLocationCheck && fromLocationCheck.rows.length === 0) {
     throw new ForeignKeyError('from_location_id');
+  }
+  if (normalizedToLocationId && toLocationCheck && toLocationCheck.rows.length === 0) {
+    throw new ForeignKeyError('to_location_id');
   }
 
   const newInventoryAction = await db.query(
