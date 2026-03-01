@@ -19,6 +19,7 @@ import {
   Analytics as AnalyticsIcon,
   Settings as SettingsIcon,
   Logout as LogoutIcon,
+  PeopleAlt as PeopleAltIcon,
 } from '@mui/icons-material';
 import { sidebarStyles, drawerWidth } from './Sidebar.styles';
 import { useAuth } from '../../context/AuthContext';
@@ -34,6 +35,7 @@ const menuItems = [
   { text: 'Activity Log', icon: <TimelineIcon />, path: '/activity-log' },
   { text: 'Limbo Items', icon: <WarningIcon />, path: '/limbo-items' },
   { text: 'Analytics', icon: <AnalyticsIcon />, path: '/analytics' },
+  { text: 'Users', icon: <PeopleAltIcon />, path: '/users' },
   { text: 'Settings', icon: <SettingsIcon />, path: '/settings' },
 ];
 

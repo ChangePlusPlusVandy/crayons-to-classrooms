@@ -7,6 +7,7 @@ import MoveItem from './pages/MoveItem/MoveItem';
 import AddItem from './pages/AddItem/AddItem';
 import Login from './pages/Login/Login';
 import SetPassword from './pages/SetPassword/SetPassword';
+import Users from './pages/Users/Users';
 import './App.css';
 
 function App() {
@@ -39,6 +40,7 @@ function App() {
                     path="/analytics"
                     element={<div style={{ padding: '2rem' }}>Analytics Page (Coming Soon)</div>}
                   />
+                  <Route path="/users" element={<Users />} />
                   <Route
                     path="/settings"
                     element={<div style={{ padding: '2rem' }}>Settings Page (Coming Soon)</div>}

@@ -28,6 +28,27 @@ const inviteUserSchema = z.object({
   email: z.email(),
 });
 
+export async function listUsers(_req: Request, res: Response): Promise<Response> {
+  const { data, error } = await supabaseAdmin.auth.admin.listUsers();
+  if (error) return res.status(500).json({ error: error.message });
+  const users = data.users.map(({ id, email, created_at, last_sign_in_at }) => ({
+    id,
+    email,
+    created_at,
+    last_sign_in_at,
+  }));
+  return res.json(users);
+}
+
+export async function removeUser(req: Request, res: Response): Promise<Response> {
+  if (req.params.id === req.user?.id) {
+    return res.status(400).json({ error: 'You cannot remove your own account' });
+  }
+  const { error } = await supabaseAdmin.auth.admin.deleteUser(req.params.id);
+  if (error) return res.status(500).json({ error: error.message });
+  return res.status(204).send();
+}
+
 export async function inviteUser(req: Request, res: Response): Promise<Response> {
   try {
     const { email } = inviteUserSchema.parse(req.body);
