@@ -648,7 +648,7 @@ export const createItemWithMovement = async (req: Request, res: Response) => {
 
     // Always set fixture to null for ADD operations
     await client.query(
-      'UPDATE item_info SET fixture = NULL WHERE name = $1',
+      'UPDATE item_info SET fixture = NULL, time_last_updated = NOW() WHERE name = $1',
       [createdItems[0].name]
     );
 
