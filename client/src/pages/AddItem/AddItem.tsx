@@ -13,6 +13,7 @@ import {
   FormControl,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
+import CloseIcon from '@mui/icons-material/Close';
 import {
   getProducts,
   getStorageLocations,
@@ -30,7 +31,6 @@ import {
 } from './AddItem.styles';
 import { WarehouseSelector } from '../../components/WarehouseSelector/WarehouseSelector';
 import { SlotSelector } from '../../components/SlotSelector/SlotSelector';
-import { FixtureSelector } from '../../components/FixtureSelector/FixtureSelector';
 
 export default function AddItem() {
   // Data states
@@ -41,9 +41,17 @@ export default function AddItem() {
   const [selectedWarehouse, setSelectedWarehouse] = useState<Warehouse | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
-  const [selectedFixture, setSelectedFixture] = useState<string | null>(null);
   const [quantityToAdd, setQuantityToAdd] = useState<number | ''>('');
   const [notes, setNotes] = useState('');
+
+  // New item creation states
+  const [isCreatingNewItem, setIsCreatingNewItem] = useState(false);
+  const [newItemName, setNewItemName] = useState('');
+  const [newCategory, setNewCategory] = useState('');
+  const [newSubcategory, setNewSubcategory] = useState('');
+  const [newLimit, setNewLimit] = useState<number | ''>('');
+  const [newValue, setNewValue] = useState<number | ''>('');
+  const [newPackSize, setNewPackSize] = useState<number | ''>('');
 
   // UI states
   const [loading, setLoading] = useState(true);
@@ -115,18 +123,14 @@ export default function AddItem() {
       !!selectedWarehouse &&
       !!selectedProduct &&
       !!selectedSlot &&
-      !!selectedFixture &&
       isQuantityValid()
     );
   };
 
   const handleSubmit = async () => {
-    // Find the destination location based on slot and fixture
+    // Find the destination location based on slot (fixture is always null for ADD)
     const destinationLocation = warehouseLocations.find((loc) => {
-      if (selectedFixture === 'None') {
-        return loc.slot === selectedSlot && (!loc.fixture || loc.fixture.trim() === '');
-      }
-      return loc.slot === selectedSlot && loc.fixture === selectedFixture;
+      return loc.slot === selectedSlot && (!loc.fixture || loc.fixture.trim() === '');
     });
 
     // Validation
@@ -138,8 +142,8 @@ export default function AddItem() {
       setError('Please select an item name.');
       return;
     }
-    if (!selectedSlot || !selectedFixture) {
-      setError('Please select a slot and fixture.');
+    if (!selectedSlot) {
+      setError('Please select a slot.');
       return;
     }
     if (!destinationLocation) {
@@ -193,7 +197,6 @@ export default function AddItem() {
       // Reset form (keep warehouse selected for convenience)
       setSelectedProduct(null);
       setSelectedSlot(null);
-      setSelectedFixture(null);
       setQuantityToAdd('');
       setNotes('');
     } catch (err) {
@@ -253,7 +256,6 @@ export default function AddItem() {
               setSelectedWarehouse(newWarehouse);
               // Cascade reset location fields
               setSelectedSlot(null);
-              setSelectedFixture(null);
               setError('');
             }}
             label="Warehouse"
@@ -263,62 +265,187 @@ export default function AddItem() {
 
           {/* Item Name (Product) Selection */}
           <FormControl fullWidth>
-            <AddItemFormLabel htmlFor="item-name-select">Item Name</AddItemFormLabel>
-            <Autocomplete
-              id="item-name-select"
-              options={products}
-              getOptionLabel={(option) => option.name || 'Unknown Product'}
-              filterOptions={(options, state) => {
-                const searchTerm = state.inputValue.toLowerCase().trim();
-                if (!searchTerm) return options;
-                return options.filter((product) =>
-                  product.name?.toLowerCase().includes(searchTerm)
-                );
-              }}
-              renderOption={(props, option, state) => {
-                const { key, ...otherProps } = props;
-                const searchTerm = state.inputValue;
-
-                return (
-                  <li key={key} {...otherProps}>
-                    <ProductOptionContainer>
-                      <ProductNameText>
-                        {highlightText(option.name || 'Unknown', searchTerm)}
-                      </ProductNameText>
-                      <ProductDetailsText>
-                        {option.category} | Value: ${option.value}
-                      </ProductDetailsText>
-                    </ProductOptionContainer>
-                  </li>
-                );
-              }}
-              value={selectedProduct}
-              onChange={(_, newValue) => {
-                setSelectedProduct(newValue);
-                setError('');
-              }}
-              renderInput={(params) => (
-                <TextField {...params} placeholder="Search for an item name" />
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <AddItemFormLabel htmlFor="item-name-select">Item Name</AddItemFormLabel>
+              {isCreatingNewItem && (
+                <Button
+                  size="small"
+                  startIcon={<CloseIcon />}
+                  sx={{ textTransform: 'none', color: 'text.secondary' }}
+                  onClick={() => {
+                    setIsCreatingNewItem(false);
+                    setNewItemName('');
+                    setNewCategory('');
+                    setNewSubcategory('');
+                    setNewLimit('');
+                    setNewValue('');
+                    setNewPackSize('');
+                  }}
+                >
+                  Cancel
+                </Button>
               )}
-              noOptionsText="No matching products found"
-            />
-            <Button
-              startIcon={<AddIcon />}
-              sx={{
-                justifyContent: 'flex-start',
-                textTransform: 'none',
-                color: 'primary.main',
-                marginTop: 0,
-                '&:hover': {
-                  backgroundColor: 'transparent',
-                },
-              }}
-              onClick={() => {
-                // TODO: Add new item name functionality
-              }}
-            >
-              New Item Name
-            </Button>
+            </Box>
+
+            {!isCreatingNewItem ? (
+              <>
+                <Autocomplete
+                  id="item-name-select"
+                  options={products}
+                  getOptionLabel={(option) => option.name || 'Unknown Product'}
+                  filterOptions={(options, state) => {
+                    const searchTerm = state.inputValue.toLowerCase().trim();
+                    if (!searchTerm) return options;
+                    return options.filter((product) =>
+                      product.name?.toLowerCase().includes(searchTerm)
+                    );
+                  }}
+                  renderOption={(props, option, state) => {
+                    const { key, ...otherProps } = props;
+                    const searchTerm = state.inputValue;
+
+                    return (
+                      <li key={key} {...otherProps}>
+                        <ProductOptionContainer>
+                          <ProductNameText>
+                            {highlightText(option.name || 'Unknown', searchTerm)}
+                          </ProductNameText>
+                          <ProductDetailsText>
+                            {option.category} | Value: ${option.value}
+                          </ProductDetailsText>
+                        </ProductOptionContainer>
+                      </li>
+                    );
+                  }}
+                  value={selectedProduct}
+                  onChange={(_, newValue) => {
+                    setSelectedProduct(newValue);
+                    setError('');
+                  }}
+                  renderInput={(params) => (
+                    <TextField {...params} placeholder="Search for an item name" />
+                  )}
+                  noOptionsText="No matching products found"
+                />
+                <Button
+                  startIcon={<AddIcon />}
+                  sx={{
+                    justifyContent: 'flex-start',
+                    textTransform: 'none',
+                    color: 'primary.main',
+                    marginTop: 0,
+                    '&:hover': {
+                      backgroundColor: 'transparent',
+                    },
+                  }}
+                  onClick={() => {
+                    setIsCreatingNewItem(true);
+                    setSelectedProduct(null);
+                  }}
+                >
+                  New Item Name
+                </Button>
+              </>
+            ) : (
+              <Stack spacing={2}>
+                <TextField
+                  fullWidth
+                  required
+                  value={newItemName}
+                  onChange={(e) => setNewItemName(e.target.value)}
+                  placeholder="Enter new item name"
+                />
+
+                <Box>
+                  <AddItemFormLabel>Category</AddItemFormLabel>
+                  <TextField
+                    fullWidth
+                    value={newCategory}
+                    onChange={(e) => setNewCategory(e.target.value)}
+                    placeholder="Enter category"
+                  />
+                  <Button
+                    startIcon={<AddIcon />}
+                    sx={{
+                      justifyContent: 'flex-start',
+                      textTransform: 'none',
+                      color: 'primary.main',
+                      marginTop: 0,
+                      '&:hover': { backgroundColor: 'transparent' },
+                    }}
+                  >
+                    New Category
+                  </Button>
+                </Box>
+
+                <Box>
+                  <AddItemFormLabel>Subcategory</AddItemFormLabel>
+                  <TextField
+                    fullWidth
+                    value={newSubcategory}
+                    onChange={(e) => setNewSubcategory(e.target.value)}
+                    placeholder="Enter subcategory"
+                  />
+                  <Button
+                    startIcon={<AddIcon />}
+                    sx={{
+                      justifyContent: 'flex-start',
+                      textTransform: 'none',
+                      color: 'primary.main',
+                      marginTop: 0,
+                      '&:hover': { backgroundColor: 'transparent' },
+                    }}
+                  >
+                    New Subcategory
+                  </Button>
+                </Box>
+
+                <Box>
+                  <AddItemFormLabel>Limit</AddItemFormLabel>
+                  <TextField
+                    fullWidth
+                    type="number"
+                    value={newLimit}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value, 10);
+                      setNewLimit(isNaN(val) ? '' : val);
+                    }}
+                    placeholder="Enter limit"
+                    slotProps={{ htmlInput: { min: 0, step: 1 } }}
+                  />
+                </Box>
+
+                <Box>
+                  <AddItemFormLabel>Value</AddItemFormLabel>
+                  <TextField
+                    fullWidth
+                    type="number"
+                    value={newValue}
+                    onChange={(e) => {
+                      const val = parseFloat(e.target.value);
+                      setNewValue(isNaN(val) ? '' : val);
+                    }}
+                    placeholder="Enter value"
+                    slotProps={{ htmlInput: { min: 0, step: 0.01 } }}
+                  />
+                </Box>
+
+                <Box>
+                  <AddItemFormLabel>Pack Size</AddItemFormLabel>
+                  <TextField
+                    fullWidth
+                    type="number"
+                    value={newPackSize}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value, 10);
+                      setNewPackSize(isNaN(val) ? '' : val);
+                    }}
+                    placeholder="Enter pack size"
+                    slotProps={{ htmlInput: { min: 1, step: 1 } }}
+                  />
+                </Box>
+              </Stack>
+            )}
           </FormControl>
 
           {/* Slot Selection */}
@@ -326,25 +453,10 @@ export default function AddItem() {
             value={selectedSlot}
             onChange={(newSlot) => {
               setSelectedSlot(newSlot);
-              // Cascade: clear fixture when slot changes
-              setSelectedFixture(null);
               setError('');
             }}
             warehouse={selectedWarehouse}
             storageLocations={storageLocations}
-          />
-
-          {/* Fixture Selection */}
-          <FixtureSelector
-            value={selectedFixture}
-            onChange={(newFixture) => {
-              setSelectedFixture(newFixture);
-              setError('');
-            }}
-            slot={selectedSlot}
-            warehouse={selectedWarehouse}
-            storageLocations={storageLocations}
-            nullFixtureLabel="None"
           />
 
           {/* Quantity to Add */}
@@ -396,11 +508,17 @@ export default function AddItem() {
                 setSelectedWarehouse(null);
                 setSelectedProduct(null);
                 setSelectedSlot(null);
-                setSelectedFixture(null);
                 setQuantityToAdd('');
                 setNotes('');
                 setError('');
                 setSuccess('');
+                setIsCreatingNewItem(false);
+                setNewItemName('');
+                setNewCategory('');
+                setNewSubcategory('');
+                setNewLimit('');
+                setNewValue('');
+                setNewPackSize('');
               }}
             >
               Cancel

@@ -646,6 +646,12 @@ export const createItemWithMovement = async (req: Request, res: Response) => {
       throw new Error('No items were created');
     }
 
+    // Always set fixture to null for ADD operations
+    await client.query(
+      'UPDATE item_info SET fixture = NULL WHERE name = $1',
+      [createdItems[0].name]
+    );
+
     const fullMovementData: CreateInventoryInput = {
       inventory_action: movementData.inventory_action,
       item_id: createdItems[0].id,

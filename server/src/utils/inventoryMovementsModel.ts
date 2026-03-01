@@ -46,7 +46,7 @@ export const createInventoryMovementSchema = z.object({
   product_id: uuidSchema,
   from_location_id: uuidSchema.nullable().optional(),
   to_location_id: uuidSchema,
-  quantity: z.number().int().positive('Quantity must be a positive integer'),
+
   performed_by: uuidSchema,
   note: z.string().optional(),
 });
