@@ -16,6 +16,10 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     return res.status(401).json({ error: 'Invalid or expired token' });
   }
 
+  if (data.user.banned_until && new Date(data.user.banned_until) > new Date()) {
+    return res.status(401).json({ error: 'Account has been disabled' });
+  }
+
   req.user = data.user;
   next();
 }

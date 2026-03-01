@@ -126,7 +126,7 @@ export default function Users() {
         <DialogTitle>Remove admin?</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            <strong>{confirmDelete?.email}</strong> will lose access to the app immediately.
+            <strong>{confirmDelete?.email}</strong> will be removed and logged out immediately. Their data will be preserved.
           </DialogContentText>
         </DialogContent>
         <DialogActions>
