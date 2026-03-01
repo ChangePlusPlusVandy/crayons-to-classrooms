@@ -21,7 +21,7 @@ import { getAllStorageLocations } from '../../api/storageLocation';
 import { useMemo } from 'react';
 
 type ItemGroupWithLocation = {
-  items: Item[];        // all DB rows for this name+location group
+  items: Item[]; // all DB rows for this name+location group
   name: string;
   locationCode: string;
   locationId: string;
@@ -29,6 +29,7 @@ type ItemGroupWithLocation = {
 
 export default function RemoveItemPage() {
   const [items, setItems] = useState<Item[]>([]);
+  const [formKey, setFormKey] = useState(0);
   const [selectedWarehouse, setSelectedWarehouse] = useState<Warehouse | null>(null);
   // 'slot' and 'product' modes are not yet implemented — scoped to future sprints
   const removeByOptions: Array<'item' | 'product'> = ['item'];
@@ -51,6 +52,16 @@ export default function RemoveItemPage() {
   const [success, setSuccess] = useState('');
   const [groupOptions, setGroupOptions] = useState<ItemGroupWithLocation[]>([]);
 
+  const selectedGroupLive = useMemo(() => {
+    if (!selectedGroup) return null;
+    return (
+      groupOptions.find(
+        (group) =>
+          group.name === selectedGroup.name && group.locationId === selectedGroup.locationId
+      ) ?? null
+    );
+  }, [groupOptions, selectedGroup]);
+
   // Load items
   useEffect(() => {
     async function loadData() {
@@ -68,12 +79,12 @@ export default function RemoveItemPage() {
 
   // Remove item handler (donate or delete/defective)
   const handleRemoveItem = async () => {
-    if (!selectedGroup || quantityToRemove === null || quantityToRemove <= 0) {
+    if (!selectedGroupLive || quantityToRemove === null || quantityToRemove <= 0) {
       setError('Please select an item and quantity to remove.');
       return;
     }
 
-    if (quantityToRemove > selectedGroup.items.length) {
+    if (quantityToRemove > selectedGroupLive.items.length) {
       setError('Quantity to remove exceeds available stock.');
       return;
     }
@@ -83,10 +94,10 @@ export default function RemoveItemPage() {
     setLoading(true);
 
     try {
-      const isFullRemoval = quantityToRemove === selectedGroup.items.length;
+      const isFullRemoval = quantityToRemove === selectedGroupLive.items.length;
       const newStatus = 'inactive';
-      const itemsToRemove = selectedGroup.items.slice(0, quantityToRemove);
-      const representative = selectedGroup.items[0];
+      const itemsToRemove = selectedGroupLive.items.slice(0, quantityToRemove);
+      const representative = selectedGroupLive.items[0];
 
       if (isFullRemoval) {
         // Full removal: update status and nullify location fields on all items in group
@@ -126,17 +137,16 @@ export default function RemoveItemPage() {
       const refreshedItems = await getItems();
       setItems(refreshedItems);
 
-      // Reset form
+      // Keep selection when possible so available count updates in-place
       setSelectedGroup(null);
-      setQuantityToRemove(0);
+      setQuantityToRemove(null);
       setRemovalAction('DONATED');
+      setSelectedProduct('');
       setNotes('');
 
       const actionLabel = removalAction === 'DONATED' ? 'donated' : 'marked as defective';
       setSuccess(
-        isFullRemoval
-          ? `Item fully ${actionLabel}.`
-          : `${quantityToRemove} item(s) ${actionLabel}.`
+        isFullRemoval ? `Item fully ${actionLabel}.` : `${quantityToRemove} item(s) ${actionLabel}.`
       );
     } catch (err) {
       console.error(err);
@@ -149,7 +159,12 @@ export default function RemoveItemPage() {
   // Items in currently selected warehouse
   const itemsInSelectedWarehouse = useMemo(() => {
     if (!selectedWarehouse) return [];
-    return items.filter((item) => item.warehouse === selectedWarehouse.id);
+    return items.filter(
+      (item) =>
+        item.warehouse === selectedWarehouse.id &&
+        item.status === 'active' &&
+        Boolean(item.current_location_id)
+    );
   }, [items, selectedWarehouse]);
 
   useEffect(() => {
@@ -203,7 +218,7 @@ export default function RemoveItemPage() {
       )}
 
       {!loading && (
-        <RemoveItemCard>
+        <RemoveItemCard key={formKey}>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
             {error && <Alert severity="error">{error}</Alert>}
             {success && <Alert severity="success">{success}</Alert>}
@@ -213,7 +228,7 @@ export default function RemoveItemPage() {
               onChange={(newWarehouse) => {
                 setSelectedWarehouse(newWarehouse);
                 setSelectedGroup(null);
-                setQuantityToRemove(0);
+                setQuantityToRemove(null);
                 setError('');
               }}
               label="Warehouse"
@@ -239,10 +254,15 @@ export default function RemoveItemPage() {
             </FormControl>
             {/* Removal Action */}
             <FormControl>
-              <RemoveItemFormLabel htmlFor="removal-action-select">Removal Action</RemoveItemFormLabel>
+              <RemoveItemFormLabel htmlFor="removal-action-select">
+                Removal Action
+              </RemoveItemFormLabel>
               <Autocomplete
                 options={removalActionOptions}
-                value={removalActionOptions.find((o) => o.value === removalAction) ?? removalActionOptions[0]}
+                value={
+                  removalActionOptions.find((o) => o.value === removalAction) ??
+                  removalActionOptions[0]
+                }
                 onChange={(_, newValue) => {
                   if (newValue) {
                     setRemovalAction(newValue.value);
@@ -263,9 +283,11 @@ export default function RemoveItemPage() {
                 <RemoveItemFormLabel>Item Name</RemoveItemFormLabel>
                 <Autocomplete
                   options={groupOptions}
-                  value={selectedGroup}
+                  value={selectedGroupLive}
                   onChange={(_, newValue) => setSelectedGroup(newValue)}
-                  isOptionEqualToValue={(a, b) => a.name === b.name && a.locationId === b.locationId}
+                  isOptionEqualToValue={(a, b) =>
+                    a.name === b.name && a.locationId === b.locationId
+                  }
                   getOptionLabel={(option) => option.name}
                   renderOption={(props, option) => (
                     <li {...props} key={`${option.name}|${option.locationId}`}>
@@ -311,7 +333,7 @@ export default function RemoveItemPage() {
                 type="number"
                 value={quantityToRemove ?? ''}
                 onChange={(e) => {
-                  if (!selectedGroup) return;
+                  if (!selectedGroupLive) return;
 
                   const raw = e.target.value;
 
@@ -321,14 +343,16 @@ export default function RemoveItemPage() {
                   }
 
                   const val = Number(raw);
-                  setQuantityToRemove(Math.min(Math.max(val, 0), selectedGroup.items.length));
+                  setQuantityToRemove(Math.min(Math.max(val, 0), selectedGroupLive.items.length));
                 }}
                 fullWidth
-                inputProps={{ min: 0, max: selectedGroup?.items.length ?? 0 }}
+                inputProps={{ min: 0, max: selectedGroupLive?.items.length ?? 0 }}
                 helperText={
-                  selectedGroup ? `Available: ${selectedGroup.items.length}` : 'Select an item first'
+                  selectedGroupLive
+                    ? `Available: ${selectedGroupLive.items.length}`
+                    : 'Select an item first'
                 }
-                disabled={!selectedGroup}
+                disabled={!selectedGroupLive}
               />
             </FormControl>
             {/* Notes */}
@@ -346,9 +370,13 @@ export default function RemoveItemPage() {
                 variant="outlined"
                 onClick={() => {
                   setSelectedGroup(null);
-                  setQuantityToRemove(0);
+                  setQuantityToRemove(null);
                   setRemovalAction('DONATED');
+                  setSelectedProduct('');
                   setNotes('');
+                  setError('');
+                  setSuccess('');
+                  setFormKey((k) => k + 1);
                 }}
               >
                 Cancel
