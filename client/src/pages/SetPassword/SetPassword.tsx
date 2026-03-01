@@ -36,7 +36,13 @@ export default function SetPassword() {
     if (error) {
       setError(error.message);
     } else {
-      navigate('/dashboard', { replace: true });
+      navigate('/dashboard', {
+        replace: true,
+        state: {
+          message: isReset ? 'Password reset successfully.' : 'Password set. Welcome to Crayons to Classrooms!',
+          alertType: 'success',
+        },
+      });
     }
   };
 
