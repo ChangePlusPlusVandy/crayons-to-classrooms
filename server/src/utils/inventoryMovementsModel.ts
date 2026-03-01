@@ -58,7 +58,7 @@ export const updateInventoryMovementSchema = z
     product_id: uuidSchema.optional(),
     from_location_id: uuidSchema.nullable().optional(),
     to_location_id: uuidSchema.optional(),
-    quantity: z.number().int().nonnegative('Quantity must be a nonnegative integer').optional(),
+    quantity: z.number().int().positive('Quantity must be a positive integer').optional(),
     performed_by: uuidSchema.optional(),
     performed_at: z.coerce.date().optional(),
     note: z.string().optional(),
