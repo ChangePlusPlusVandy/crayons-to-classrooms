@@ -426,8 +426,9 @@ export async function createInventoryMovementCore(
 
   // Normalize from_location_id: undefined → null to avoid node-postgres invalid parameter errors
   const normalizedFromLocationId = from_location_id ?? null;
+  // Normalize to_location_id: undefined → null to avoid node-postgres invalid parameter errors
+  const normalizedToLocationId = to_location_id ?? null;
 
-  // Check if item_id, product_id, from_location_id (if provided), to_location_id, performed_by_id exist in tables (in parallel)
   const checks = [
     db.query('SELECT id FROM items WHERE id = $1', [item_id]),
     db.query('SELECT id FROM products WHERE id = $1', [product_id]),
@@ -451,14 +452,15 @@ export async function createInventoryMovementCore(
   if (productCheck.rows.length === 0) {
     throw new ForeignKeyError('product_id');
   }
-  if (toLocationCheck.rows.length === 0) {
-    throw new ForeignKeyError('to_location_id');
-  }
   if (userCheck.rows.length === 0) {
     throw new ForeignKeyError('performed_by user id');
   }
+
   if (normalizedFromLocationId && fromLocationCheck && fromLocationCheck.rows.length === 0) {
     throw new ForeignKeyError('from_location_id');
+  }
+  if (normalizedToLocationId && toLocationCheck && toLocationCheck.rows.length === 0) {
+    throw new ForeignKeyError('to_location_id');
   }
 
   const newInventoryAction = await db.query(
@@ -481,7 +483,7 @@ export async function createInventoryMovementCore(
       item_id,
       product_id,
       normalizedFromLocationId,
-      to_location_id,
+      normalizedToLocationId,
       quantity,
       performed_by,
       note || null,

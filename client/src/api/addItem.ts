@@ -7,6 +7,17 @@ import { InventoryMovement, InventoryMovementSchema } from '../types/InventoryMo
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
 
+const CreateInventoryMovementRequestSchema = InventoryMovementSchema.omit({
+  id: true,
+  performed_at: true,
+}).extend({
+  performed_by: z.string(),
+  from_location_id: z.string().nullable().optional(),
+  to_location_id: z.string().nullable().optional(),
+});
+
+type CreateInventoryMovementRequest = z.input<typeof CreateInventoryMovementRequestSchema>;
+
 export async function getProducts(): Promise<Product[]> {
   const response = await fetch(`${API_BASE_URL}/products`);
   if (!response.ok) throw new Error('Failed to fetch products');
@@ -77,14 +88,15 @@ export async function createItem(itemData: {
 }
 
 export async function createInventoryMovement(
-  movement: Omit<InventoryMovement, 'id' | 'performed_at'>
+  movement: CreateInventoryMovementRequest
 ): Promise<InventoryMovement> {
+  const payload = CreateInventoryMovementRequestSchema.parse(movement);
   const response = await fetch(`${API_BASE_URL}/inventory-movement`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify(movement),
+    body: JSON.stringify(payload),
   });
   if (!response.ok) throw new Error('Failed to create inventory movement');
   const data = await response.json();

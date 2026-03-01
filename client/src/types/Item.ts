@@ -3,7 +3,7 @@ export type Item = {
   product_id: string;
   quantity: number;
   current_location_id: string;
-  status: 'active' | 'inactive' | 'discontinued' | 'checked_out';
+  status: 'active' | 'inactive' | 'discontinued' | 'checked_out' | 'donated' | 'defective';
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -25,3 +25,12 @@ export type ItemGroup = {
   product_id: string;
   quantity: number; // This is the number of item rows where all the other fields match (same name and location)
 };
+
+export interface UpdateItemRequest {
+  quantity?: number;
+  status?: 'active' | 'inactive' | 'discontinued' | 'checked_out';
+  current_location_id?: string | null;
+  warehouse?: string | null;
+  limbo?: boolean;
+  notes?: string;
+}
