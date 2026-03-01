@@ -1,11 +1,30 @@
 // src/api/inventoryMovement.ts
-import {
-  InventoryMovement,
-  CreateInventoryMovementRequest,
-  UpdateInventoryMovementRequest,
-} from '../types/InventoryMovement';
+import { z } from 'zod';
+import { InventoryMovement, InventoryMovementSchema } from '../types/InventoryMovement';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
+
+const CreateInventoryMovementRequestSchema = InventoryMovementSchema.omit({
+  id: true,
+  performed_at: true,
+}).extend({
+  performed_by: z.string(),
+  from_location_id: z.string().nullable().optional(),
+  to_location_id: z.string().nullable().optional(),
+});
+
+const UpdateInventoryMovementRequestSchema = InventoryMovementSchema.omit({
+  id: true,
+})
+  .partial()
+  .extend({
+    performed_by: z.string().nullable().optional(),
+    from_location_id: z.string().nullable().optional(),
+    to_location_id: z.string().nullable().optional(),
+  });
+
+type CreateInventoryMovementRequest = z.input<typeof CreateInventoryMovementRequestSchema>;
+type UpdateInventoryMovementRequest = z.input<typeof UpdateInventoryMovementRequestSchema>;
 
 // Get all inventory movements
 export async function getInventoryMovements(): Promise<InventoryMovement[]> {
@@ -46,7 +65,9 @@ export async function getMovementsByProductId(productId: string): Promise<Invent
 export async function getMovementsByStartLocationId(
   startLocationId: string
 ): Promise<InventoryMovement[]> {
-  const response = await fetch(`${API_BASE_URL}/inventory-movement/start-location/${startLocationId}`);
+  const response = await fetch(
+    `${API_BASE_URL}/inventory-movement/start-location/${startLocationId}`
+  );
   if (!response.ok) throw new Error('Failed to fetch movements by start location');
   return response.json();
 }
@@ -87,16 +108,18 @@ export async function getMovementsOnAndAfterDate(date: string): Promise<Inventor
 export async function createInventoryMovement(
   data: CreateInventoryMovementRequest
 ): Promise<InventoryMovement> {
+  const payload = CreateInventoryMovementRequestSchema.parse(data);
   const response = await fetch(`${API_BASE_URL}/inventory-movement`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify(data),
+    body: JSON.stringify(payload),
   });
 
   if (!response.ok) throw new Error('Failed to create inventory movement');
-  return response.json();
+  const responseData = await response.json();
+  return InventoryMovementSchema.parse(responseData);
 }
 
 // Update inventory movement
@@ -104,16 +127,18 @@ export async function updateInventoryMovement(
   id: string,
   data: UpdateInventoryMovementRequest
 ): Promise<InventoryMovement> {
+  const payload = UpdateInventoryMovementRequestSchema.parse(data);
   const response = await fetch(`${API_BASE_URL}/inventory-movement/${id}`, {
     method: 'PATCH',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify(data),
+    body: JSON.stringify(payload),
   });
 
   if (!response.ok) throw new Error('Failed to update inventory movement');
-  return response.json();
+  const responseData = await response.json();
+  return InventoryMovementSchema.parse(responseData);
 }
 
 // Delete inventory movement

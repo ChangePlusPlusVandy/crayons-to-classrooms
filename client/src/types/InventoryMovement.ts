@@ -1,37 +1,16 @@
-export type InventoryAction = 'ADD' | 'MOVE' | 'CHECKOUT' | 'DISCARD' | 'ADJUSTMENT' | 'DONATED';
+import { z } from 'zod';
 
-export interface InventoryMovement {
-  id: string;
-  inventory_action: InventoryAction;
-  item_id: string;
-  product_id: string;
-  from_location_id: string | null;
-  to_location_id: string | null;
-  quantity: number;
-  performed_by: string;
-  performed_at: string; // ISO timestamp from Postgres
-  note: string | null;
-}
+export const InventoryMovementSchema = z.object({
+  id: z.string(),
+  inventory_action: z.enum(['MOVE', 'ADD', 'CHECKOUT', 'DISCARD', 'ADJUSTMENT', 'DONATED']),
+  item_id: z.string(),
+  product_id: z.string(),
+  from_location_id: z.string().nullable(),
+  to_location_id: z.string().nullable(),
+  quantity: z.coerce.number().int().positive(),
+  performed_by: z.string().nullable(),
+  note: z.string().nullable().optional(),
+  performed_at: z.string(),
+});
 
-export interface CreateInventoryMovementRequest {
-  inventory_action: InventoryAction;
-  item_id: string;
-  product_id: string;
-  from_location_id: string | null;
-  to_location_id: string | null;
-  quantity: number;
-  performed_by: string;
-  note?: string;
-}
-
-export interface UpdateInventoryMovementRequest {
-  inventory_action?: InventoryAction;
-  item_id?: string;
-  product_id?: string;
-  from_location_id?: string | null;
-  to_location_id?: string | null;
-  quantity?: number;
-  performed_by?: string;
-  performed_at?: string;
-  note?: string | null;
-}
+export type InventoryMovement = z.infer<typeof InventoryMovementSchema>;

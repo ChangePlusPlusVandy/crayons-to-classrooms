@@ -10,7 +10,6 @@ import {
   getItemsByWarehouseId,
   getItemsByItemInfoId,
   getItemsByStatus,
-  createItemsBulk,
 } from '../controllers/itemController.js';
 import express from 'express';
 
@@ -32,8 +31,6 @@ router.get('/item-info/:itemInfoId', getItemsByItemInfoId);
 router.get('/', getItems);
 // create a new item
 router.post('/', createItem);
-// create multiple items
-router.post('/bulk', createItemsBulk);
 // get item by ID
 router.get('/:id', getItemById);
 // update an existing item

@@ -33,9 +33,7 @@ export function SlotSelector({
 }: SlotSelectorProps) {
   // Filter locations by warehouse
   const warehouseLocations = useMemo(() => {
-    return warehouse
-      ? storageLocations.filter((loc) => loc.warehouse_id === warehouse.id)
-      : [];
+    return warehouse ? storageLocations.filter((loc) => loc.warehouse_id === warehouse.id) : [];
   }, [warehouse, storageLocations]);
 
   // Get deduplicated slots for selected warehouse
@@ -67,10 +65,7 @@ export function SlotSelector({
         onChange={(_, newValue) => onChange(newValue)}
         disabled={isDisabled}
         renderInput={(params) => (
-          <TextField
-            {...params}
-            placeholder={isDisabled ? disabledPlaceholder : placeholder}
-          />
+          <TextField {...params} placeholder={isDisabled ? disabledPlaceholder : placeholder} />
         )}
         noOptionsText="No slots available"
       />

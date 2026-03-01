@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import pool from '../db.js';
 import {
   movementIdParamSchema,
+  MovementIdParamType,
   createInventoryMovementSchema,
   updateInventoryMovementSchema,
   itemIdParamSchema,
@@ -13,13 +14,19 @@ import {
   CreateInventoryInput,
   UpdateInventoryInput,
   actionQuerySchema,
+  editMoveSchema,
   createItemWithMovementSchema,
   moveItemsWithMovementSchema,
 } from '../utils/inventoryMovementsModel.js';
 import { ZodError } from 'zod';
 import { DbClient } from '../utils/dbTypes.js';
-import { ForeignKeyError } from '../utils/errors.js';
-import { createItemCore } from './itemController.js';
+import {
+  ForeignKeyError,
+  InvalidError,
+  NotFoundError,
+  UndoConflictError,
+} from '../utils/errors.js';
+import { createItemCore, syncItemInfoStock } from './itemController.js';
 
 /**
  * Checks if the query returned any rows.
@@ -422,12 +429,22 @@ export async function createInventoryMovementCore(
   // Normalize to_location_id: undefined → null to avoid node-postgres invalid parameter errors
   const normalizedToLocationId = to_location_id ?? null;
 
-  // Check required foreign keys in parallel
-  const [itemCheck, productCheck, userCheck] = await Promise.all([
+  const checks = [
     db.query('SELECT id FROM items WHERE id = $1', [item_id]),
     db.query('SELECT id FROM products WHERE id = $1', [product_id]),
+    db.query('SELECT id FROM storage_locations WHERE id = $1', [to_location_id]),
     db.query('SELECT id FROM users WHERE id = $1', [performed_by]),
-  ]);
+  ];
+
+  // Only check from_location_id if it's provided (it's optional for ADD actions)
+  if (normalizedFromLocationId) {
+    checks.push(
+      db.query('SELECT id FROM storage_locations WHERE id = $1', [normalizedFromLocationId])
+    );
+  }
+
+  const [itemCheck, productCheck, toLocationCheck, userCheck, fromLocationCheck] =
+    await Promise.all(checks);
 
   if (itemCheck.rows.length === 0) {
     throw new ForeignKeyError('item_id');
@@ -438,16 +455,6 @@ export async function createInventoryMovementCore(
   if (userCheck.rows.length === 0) {
     throw new ForeignKeyError('performed_by user id');
   }
-
-  // Check optional location foreign keys with fixed indices to avoid index-shift bugs
-  const [fromLocationCheck, toLocationCheck] = await Promise.all([
-    normalizedFromLocationId
-      ? db.query('SELECT id FROM storage_locations WHERE id = $1', [normalizedFromLocationId])
-      : Promise.resolve(null),
-    normalizedToLocationId
-      ? db.query('SELECT id FROM storage_locations WHERE id = $1', [normalizedToLocationId])
-      : Promise.resolve(null),
-  ]);
 
   if (normalizedFromLocationId && fromLocationCheck && fromLocationCheck.rows.length === 0) {
     throw new ForeignKeyError('from_location_id');
@@ -753,94 +760,317 @@ export const moveItemsWithMovement = async (req: Request, res: Response) => {
     client.release();
   }
 };
+export const editInventoryMovementAdd = async (req: Request, res: Response) => {
+  const client = await pool.connect();
+  try {
+    const { id } = movementIdParamSchema.parse(req.params);
+    const { item: itemData, movement: movementData } = createItemWithMovementSchema.parse(req.body);
+
+    await client.query('BEGIN');
+
+    // Validation
+    const original = await client.query(
+      'SELECT inventory_action FROM "inventory movement" WHERE id = $1',
+      [id]
+    );
+    if (original.rows.length === 0) {
+      throw new NotFoundError('Inventory movement not found');
+    }
+    if (original.rows[0].inventory_action !== 'ADD') {
+      throw new InvalidError('Can only edit ADD type movements with this endpoint');
+    }
+
+    await undoInventoryMovementCore({ id }, client);
+
+    const createdItems = await createItemCore(itemData, movementData.quantity, client);
+
+    const fullMovementData: CreateInventoryInput = {
+      inventory_action: movementData.inventory_action,
+      item_id: createdItems[0].id,
+      product_id: createdItems[0].product_id,
+      from_location_id: movementData.from_location_id,
+      to_location_id: movementData.to_location_id,
+      quantity: movementData.quantity,
+      performed_by: movementData.performed_by,
+      note: movementData.note,
+    };
+    const createdMovement = await createInventoryMovementCore(fullMovementData, client);
+
+    await client.query('COMMIT');
+
+    res.status(201).json({ items: createdItems, movement: createdMovement });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    if (error instanceof ZodError) {
+      return handleValidationError(error, res);
+    }
+    if (error instanceof ForeignKeyError) {
+      return res.status(400).json({ error: error.message });
+    }
+    if (error instanceof NotFoundError) {
+      return res.status(404).json({ error: error.message });
+    }
+    if (error instanceof UndoConflictError) {
+      return res.status(400).json({ error: error.message });
+    }
+    if (error instanceof InvalidError) {
+      return res.status(400).json({ error: error.message });
+    }
+    console.error('Error editing ADD inventory movement:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  } finally {
+    client.release();
+  }
+};
+
+export const editInventoryMovementMove = async (req: Request, res: Response) => {
+  const client = await pool.connect();
+  try {
+    const { id } = movementIdParamSchema.parse(req.params);
+    const moveData = editMoveSchema.parse(req.body);
+
+    await client.query('BEGIN');
+
+    // Validation
+    const original = await client.query(
+      'SELECT inventory_action FROM "inventory movement" WHERE id = $1',
+      [id]
+    );
+    if (original.rows.length === 0) {
+      throw new NotFoundError('Inventory movement not found');
+    }
+    if (original.rows[0].inventory_action !== 'MOVE') {
+      throw new InvalidError('Can only edit MOVE type movements with this endpoint');
+    }
+
+    // Undo the original MOVE (reverses item locations, deletes movement record)
+    await undoInventoryMovementCore({ id }, client);
+
+    // Find items at the new source location matching product_id (LIFO order)
+    const itemsAtSource = await client.query(
+      'SELECT id FROM items WHERE product_id = $1 AND current_location_id = $2 ORDER BY created_at DESC LIMIT $3',
+      [moveData.product_id, moveData.from_location_id, moveData.quantity]
+    );
+
+    if (itemsAtSource.rows.length < moveData.quantity) {
+      throw new UndoConflictError(
+        `Not enough items at source location: found ${itemsAtSource.rows.length}, need ${moveData.quantity}`
+      );
+    }
+
+    // Move each item to the new destination
+    const itemIds: string[] = itemsAtSource.rows.map((row: { id: string }) => row.id);
+    await client.query('UPDATE items SET current_location_id = $1 WHERE id = ANY($2::uuid[])', [
+      moveData.to_location_id,
+      itemIds,
+    ]);
+
+    // Create new MOVE movement record
+    const representativeItemId = itemIds[0];
+    const fullMovementData: CreateInventoryInput = {
+      inventory_action: 'MOVE',
+      item_id: representativeItemId,
+      product_id: moveData.product_id,
+      from_location_id: moveData.from_location_id,
+      to_location_id: moveData.to_location_id,
+      quantity: moveData.quantity,
+      performed_by: moveData.performed_by,
+      note: moveData.note,
+    };
+    const createdMovement = await createInventoryMovementCore(fullMovementData, client);
+
+    await client.query('COMMIT');
+
+    res.status(201).json({ movement: createdMovement });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    if (error instanceof ZodError) {
+      return handleValidationError(error, res);
+    }
+    if (error instanceof ForeignKeyError) {
+      return res.status(400).json({ error: error.message });
+    }
+    if (error instanceof NotFoundError) {
+      return res.status(404).json({ error: error.message });
+    }
+    if (error instanceof UndoConflictError) {
+      return res.status(400).json({ error: error.message });
+    }
+    if (error instanceof InvalidError) {
+      return res.status(400).json({ error: error.message });
+    }
+    console.error('Error editing MOVE inventory movement:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  } finally {
+    client.release();
+  }
+};
+
+export const undoInventoryMovementCore = async (
+  { id }: MovementIdParamType,
+  db: DbClient = pool
+) => {
+  const result = await db.query('SELECT * FROM "inventory movement" WHERE id = $1', [id]);
+  if (result.rows.length === 0) {
+    throw new NotFoundError('Inventory movement not found');
+  }
+
+  const inventoryMovement = result.rows[0];
+
+  if (inventoryMovement.inventory_action === 'MOVE') {
+    // Validate that both from and to locations exist before undoing MOVE
+    if (!inventoryMovement.from_location_id || !inventoryMovement.to_location_id) {
+      throw new UndoConflictError(
+        'Cannot undo: movement has null from_location_id or to_location_id'
+      );
+    }
+
+    // Get items at destination with their names for item_info sync
+    const itemsAtDestination = await db.query(
+      'SELECT id, name FROM items WHERE product_id = $1 AND current_location_id = $2 LIMIT $3',
+      [inventoryMovement.product_id, inventoryMovement.to_location_id, inventoryMovement.quantity]
+    );
+
+    if (itemsAtDestination.rows.length < inventoryMovement.quantity) {
+      throw new UndoConflictError('Cannot undo because item has since been moved');
+    }
+
+    // Get from_location details for item_info update
+    const fromLocationResult = await db.query(
+      'SELECT location_code, fixture FROM storage_locations WHERE id = $1',
+      [inventoryMovement.from_location_id]
+    );
+    const fromLocation = fromLocationResult.rows[0];
+
+    const itemIds = itemsAtDestination.rows.map((row: { id: string }) => row.id);
+
+    // Update items, verifying they're still at the expected location (prevents race conditions)
+    const updateResult = await db.query(
+      'UPDATE items SET current_location_id = $1, updated_at = NOW() WHERE id = ANY($2::uuid[]) AND current_location_id = $3',
+      [inventoryMovement.from_location_id, itemIds, inventoryMovement.to_location_id]
+    );
+
+    // Verify all items were updated (all-or-nothing)
+    if (updateResult.rowCount !== itemIds.length) {
+      throw new UndoConflictError('Cannot undo because item has since been moved');
+    }
+
+    // Update item_info location tracking for each unique item name
+    const uniqueItemNames = [
+      ...new Set(itemsAtDestination.rows.map((row: { name: string }) => row.name)),
+    ];
+    for (const itemName of uniqueItemNames) {
+      await syncItemInfoStock(
+        itemName,
+        undefined, // productId - don't update
+        undefined, // category - don't update
+        undefined, // quantity - don't update
+        undefined, // value - don't update
+        undefined, // itemLimit - don't update
+        fromLocation?.fixture ?? null,
+        fromLocation?.location_code ?? null,
+        0, // stockDelta - no change to stock count for MOVE
+        false, // createIfMissing - don't create new item_info
+        db
+      );
+    }
+
+    // Delete movement record for MOVE
+    await db.query('DELETE FROM "inventory movement" WHERE id = $1', [id]);
+  } else if (inventoryMovement.inventory_action === 'ADD') {
+    // Get items at destination with their names for item_info sync
+    const itemsAtDestination = await db.query(
+      'SELECT id, name FROM items WHERE product_id = $1 AND current_location_id = $2 LIMIT $3',
+      [inventoryMovement.product_id, inventoryMovement.to_location_id, inventoryMovement.quantity]
+    );
+
+    if (itemsAtDestination.rows.length < inventoryMovement.quantity) {
+      throw new UndoConflictError('Cannot undo because item has since been moved');
+    }
+
+    const itemIds = itemsAtDestination.rows.map((row: { id: string }) => row.id);
+
+    // Check if any items are referenced by other movements (can't be deleted)
+    const referencedItems = await db.query(
+      'SELECT DISTINCT item_id FROM "inventory movement" WHERE item_id = ANY($1::uuid[]) AND id != $2',
+      [itemIds, id]
+    );
+
+    if (referencedItems.rows.length > 0) {
+      throw new UndoConflictError('Cannot undo: some items have subsequent movements');
+    }
+
+    // Delete movement record FIRST to avoid foreign key constraint
+    await db.query('DELETE FROM "inventory movement" WHERE id = $1', [id]);
+
+    // Delete items - constrain by current_location_id to avoid deleting items that moved
+    const deleteResult = await db.query(
+      'DELETE FROM items WHERE id = ANY($1::uuid[]) AND current_location_id = $2 RETURNING name',
+      [itemIds, inventoryMovement.to_location_id]
+    );
+
+    // Verify all items were deleted (all-or-nothing)
+    if (deleteResult.rowCount !== itemIds.length) {
+      throw new UndoConflictError('Cannot undo because item has since been moved');
+    }
+
+    // Decrement item_info stock for each deleted item
+    const deletedCountsByName: Record<string, number> = {};
+    for (const row of deleteResult.rows) {
+      const name = (row as { name: string }).name;
+      deletedCountsByName[name] = (deletedCountsByName[name] || 0) + 1;
+    }
+
+    for (const [itemName, deletedCount] of Object.entries(deletedCountsByName)) {
+      await syncItemInfoStock(
+        itemName,
+        undefined, // productId - don't update
+        undefined, // category - don't update
+        undefined, // quantity - don't update
+        undefined, // value - don't update
+        undefined, // itemLimit - don't update
+        null, // fixture - don't update
+        null, // locationCode - don't update
+        -deletedCount, // stockDelta - decrement by number of deleted items
+        false, // createIfMissing - don't create new item_info
+        db
+      );
+    }
+  } else {
+    throw new UndoConflictError(
+      'Undo operation is only supported for MOVE and ADD inventory actions'
+    );
+  }
+};
 
 export const undoInventoryMovement = async (req: Request, res: Response) => {
-  let client: DbClient | null = null;
+  const client = await pool.connect();
   try {
     const { id } = movementIdParamSchema.parse(req.params);
 
-    client = await pool.connect();
     await client.query('BEGIN');
-
-    const result = await client.query('SELECT * FROM "inventory movement" WHERE id = $1', [id]);
-    if (result.rows.length === 0) {
-      await client.query('ROLLBACK');
-      client.release();
-      client = null;
-      return res.status(404).json({ error: "Inventory movement not found" });
-    }
-
-    const inventoryMovement = result.rows[0];
-
-    if (inventoryMovement.inventory_action === 'MOVE') {
-      const itemsAtDestination = await client.query(
-        'SELECT id FROM items WHERE product_id = $1 AND current_location_id = $2 LIMIT $3',
-        [inventoryMovement.product_id, inventoryMovement.to_location_id, inventoryMovement.quantity]
-      );
-
-      if (itemsAtDestination.rows.length < inventoryMovement.quantity) {
-        await client.query('ROLLBACK');
-        client.release();
-        client = null;
-        return res.status(400).json({ error: "Cannot undo: items have been moved again or deleted" });
-      }
-
-      const itemIds = itemsAtDestination.rows.map(row => row.id);
-      await client.query(
-        'UPDATE items SET current_location_id = $1 WHERE id = ANY($2::int[])',
-        [inventoryMovement.from_location_id, itemIds]
-      );
-    } else if (inventoryMovement.inventory_action === 'ADD') {
-      const itemsAtDestination = await client.query(
-        'SELECT id FROM items WHERE product_id = $1 AND current_location_id = $2 LIMIT $3',
-        [inventoryMovement.product_id, inventoryMovement.to_location_id, inventoryMovement.quantity]
-      );
-
-      if (itemsAtDestination.rows.length < inventoryMovement.quantity) {
-        await client.query('ROLLBACK');
-        client.release();
-        client = null;
-        return res.status(400).json({ error: "Cannot undo: items have been moved or deleted" });
-      }
-
-      // Delete movement record FIRST to avoid foreign key constraint
-      await client.query('DELETE FROM "inventory movement" WHERE id = $1', [id]);
-
-      const itemIds = itemsAtDestination.rows.map(row => row.id);
-      // Delete items only if not referenced by other movements
-      await client.query(
-        'DELETE FROM items WHERE id = ANY($1::int[]) AND NOT EXISTS (SELECT 1 FROM "inventory movement" m WHERE m.item_id = items.id)',
-        [itemIds]
-      );
-    } else {
-      // For other action types, just delete the movement record
-      await client.query('DELETE FROM "inventory movement" WHERE id = $1', [id]);
-    }
-
-    // Delete movement record for MOVE (already handled for ADD above)
-    if (inventoryMovement.inventory_action === 'MOVE') {
-      await client.query('DELETE FROM "inventory movement" WHERE id = $1', [id]);
-    }
-
+    await undoInventoryMovementCore({ id }, client);
     await client.query('COMMIT');
-    client.release();
-    client = null;
 
     res.json({ message: 'Inventory movement undone successfully' });
   } catch (error) {
-    if (client) {
-      try {
-        await client.query('ROLLBACK');
-      } catch (rollbackError) {
-        console.error('Error rolling back transaction in undoInventoryMovement:', rollbackError);
-      }
-      client.release();
-      client = null;
+    try {
+      await client.query('ROLLBACK');
+    } catch (rollbackError) {
+      console.error('Error rolling back transaction in undoInventoryMovement:', rollbackError);
     }
     if (error instanceof ZodError) {
       return handleValidationError(error, res);
     }
+    if (error instanceof NotFoundError) {
+      return res.status(404).json({ error: error.message });
+    }
+    if (error instanceof UndoConflictError) {
+      return res.status(400).json({ error: error.message });
+    }
     console.error('Error undoing inventory movement:', error);
     res.status(500).json({ error: 'Internal server error' });
+  } finally {
+    client.release();
   }
-}
+};

@@ -14,11 +14,20 @@ import {
   Box,
   CircularProgress,
   Alert,
+  Snackbar,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
 } from '@mui/material';
 import { getActivities, ActivityDisplay } from '../../api/activities';
+import { undoInventoryMovement } from '../../api/moveItem';
 import { activitiesStyles } from './Activities.styles';
 import undoArrow from '../../assets/undo_arrow.svg';
 import modifyPen from '../../assets/modify_pen.svg';
+import { EditAddDialog } from '../../components/EditAddDialog/EditAddDialog';
+import { EditMoveDialog } from '../../components/EditMoveDialog/EditMoveDialog';
 
 const PAGE_SIZE = 10;
 
@@ -28,6 +37,25 @@ export default function Activities() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [editingMovement, setEditingMovement] = useState<ActivityDisplay | null>(null);
+  const [showSuccessAlert, setShowSuccessAlert] = useState(false);
+  const [undoingId, setUndoingId] = useState<string | null>(null);
+  const [snackbar, setSnackbar] = useState<{
+    open: boolean;
+    message: string;
+    severity: 'success' | 'error';
+  }>({
+    open: false,
+    message: '',
+    severity: 'success',
+  });
+  const [undoConfirmDialog, setUndoConfirmDialog] = useState<{
+    open: boolean;
+    activity: ActivityDisplay | null;
+  }>({
+    open: false,
+    activity: null,
+  });
 
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
@@ -49,12 +77,75 @@ export default function Activities() {
     fetchActivities();
   }, [fetchActivities]);
 
-  const handleUndo = (activity: ActivityDisplay) => {
-    console.log('Undo action for:', activity);
+  const handleUndoClick = (activity: ActivityDisplay) => {
+    if (!activity.id) {
+      setSnackbar({
+        open: true,
+        message: 'Cannot undo: activity ID is missing',
+        severity: 'error',
+      });
+      return;
+    }
+
+    // Only MOVE and ADD can be undone
+    if (activity.inventory_action !== 'MOVE' && activity.inventory_action !== 'ADD') {
+      setSnackbar({
+        open: true,
+        message: `Cannot undo ${activity.inventory_action} actions. Only MOVE and ADD can be undone.`,
+        severity: 'error',
+      });
+      return;
+    }
+
+    // Show confirmation dialog
+    setUndoConfirmDialog({ open: true, activity });
   };
 
-  const handleEdit = (activity: ActivityDisplay) => {
-    console.log('Edit action for:', activity);
+  const handleUndoConfirm = async () => {
+    const activity = undoConfirmDialog.activity;
+    setUndoConfirmDialog({ open: false, activity: null });
+
+    if (!activity?.id) return;
+
+    setUndoingId(activity.id);
+    try {
+      await undoInventoryMovement(activity.id);
+      setSnackbar({
+        open: true,
+        message: `Successfully undid ${activity.inventory_action} for ${activity.product_name || 'item'}`,
+        severity: 'success',
+      });
+      // Refresh the activities list
+      fetchActivities();
+    } catch (err) {
+      setSnackbar({
+        open: true,
+        message: err instanceof Error ? err.message : 'Failed to undo movement',
+        severity: 'error',
+      });
+    } finally {
+      setUndoingId(null);
+    }
+  };
+
+  const handleUndoCancel = () => {
+    setUndoConfirmDialog({ open: false, activity: null });
+  };
+
+  const handleEditClick = (activity: ActivityDisplay) => {
+    if (activity.inventory_action === 'ADD' || activity.inventory_action === 'MOVE') {
+      setEditingMovement(activity);
+    }
+  };
+
+  const handleEditClose = () => {
+    setEditingMovement(null);
+  };
+
+  const handleEditSuccess = async () => {
+    setShowSuccessAlert(true);
+    setEditingMovement(null);
+    await fetchActivities();
   };
 
   const formatTimestamp = (timestamp: string) => {
@@ -237,28 +328,36 @@ export default function Activities() {
                       <TableCell sx={activitiesStyles.tableCell} align="right">
                         <IconButton
                           sx={activitiesStyles.actionButton}
-                          onClick={() => handleUndo(activity)}
+                          onClick={() => handleUndoClick(activity)}
+                          disabled={undoingId === activity.id}
                           aria-label={`Undo ${activity.inventory_action} for ${activity.product_name}`}
                         >
-                          <Box
-                            component="img"
-                            src={undoArrow}
-                            alt="Undo"
-                            sx={activitiesStyles.actionIcon}
-                          />
+                          {undoingId === activity.id ? (
+                            <CircularProgress size={20} />
+                          ) : (
+                            <Box
+                              component="img"
+                              src={undoArrow}
+                              alt="Undo"
+                              sx={activitiesStyles.actionIcon}
+                            />
+                          )}
                         </IconButton>
-                        <IconButton
-                          sx={activitiesStyles.actionButton}
-                          onClick={() => handleEdit(activity)}
-                          aria-label={`Edit ${activity.inventory_action} for ${activity.product_name}`}
-                        >
-                          <Box
-                            component="img"
-                            src={modifyPen}
-                            alt="Edit"
-                            sx={activitiesStyles.actionIcon}
-                          />
-                        </IconButton>
+                        {(activity.inventory_action === 'ADD' ||
+                          activity.inventory_action === 'MOVE') && (
+                          <IconButton
+                            sx={activitiesStyles.actionButton}
+                            onClick={() => handleEditClick(activity)}
+                            aria-label={`Edit ${activity.inventory_action} for ${activity.product_name}`}
+                          >
+                            <Box
+                              component="img"
+                              src={modifyPen}
+                              alt="Edit"
+                              sx={activitiesStyles.actionIcon}
+                            />
+                          </IconButton>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))
@@ -270,6 +369,70 @@ export default function Activities() {
           {renderPagination()}
         </>
       )}
+      {editingMovement?.inventory_action === 'ADD' && (
+        <EditAddDialog
+          open={!!editingMovement}
+          onClose={handleEditClose}
+          movement={editingMovement}
+          onSuccess={handleEditSuccess}
+        />
+      )}
+
+      {editingMovement?.inventory_action === 'MOVE' && (
+        <EditMoveDialog
+          open={!!editingMovement}
+          onClose={handleEditClose}
+          movement={editingMovement}
+          onSuccess={handleEditSuccess}
+        />
+      )}
+
+      <Snackbar
+        open={showSuccessAlert}
+        autoHideDuration={4000}
+        onClose={() => setShowSuccessAlert(false)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert onClose={() => setShowSuccessAlert(false)} severity="success" variant="filled">
+          Edit applied successfully
+        </Alert>
+      </Snackbar>
+
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={4000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert
+          onClose={() => setSnackbar({ ...snackbar, open: false })}
+          severity={snackbar.severity}
+          sx={{ width: '100%' }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
+
+      <Dialog
+        open={undoConfirmDialog.open}
+        onClose={handleUndoCancel}
+        aria-labelledby="undo-confirm-dialog-title"
+        aria-describedby="undo-confirm-dialog-description"
+      >
+        <DialogTitle id="undo-confirm-dialog-title">Confirm Undo</DialogTitle>
+        <DialogContent>
+          <DialogContentText id="undo-confirm-dialog-description">
+            Are you sure you want to undo this {undoConfirmDialog.activity?.inventory_action} action
+            for {undoConfirmDialog.activity?.product_name || 'this item'}?
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleUndoCancel}>Cancel</Button>
+          <Button onClick={handleUndoConfirm} color="primary" autoFocus>
+            Confirm
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Container>
   );
 }
