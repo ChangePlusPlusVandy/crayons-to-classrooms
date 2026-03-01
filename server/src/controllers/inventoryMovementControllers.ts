@@ -20,7 +20,12 @@ import {
 } from '../utils/inventoryMovementsModel.js';
 import { ZodError } from 'zod';
 import { DbClient } from '../utils/dbTypes.js';
-import { ForeignKeyError, NotFoundError, UndoConflictError } from '../utils/errors.js';
+import {
+  ForeignKeyError,
+  InvalidError,
+  NotFoundError,
+  UndoConflictError,
+} from '../utils/errors.js';
 import { createItemCore, syncItemInfoStock } from './itemController.js';
 
 /**
@@ -759,6 +764,8 @@ export const editInventoryMovementAdd = async (req: Request, res: Response) => {
     const { id } = movementIdParamSchema.parse(req.params);
     const { item: itemData, movement: movementData } = createItemWithMovementSchema.parse(req.body);
 
+    await client.query('BEGIN');
+
     // Validation
     const original = await client.query(
       'SELECT inventory_action FROM "inventory movement" WHERE id = $1',
@@ -768,10 +775,8 @@ export const editInventoryMovementAdd = async (req: Request, res: Response) => {
       throw new NotFoundError('Inventory movement not found');
     }
     if (original.rows[0].inventory_action !== 'ADD') {
-      return res.status(400).json({ error: 'Can only edit ADD type movements with this endpoint' });
+      throw new InvalidError('Can only edit ADD type movements with this endpoint');
     }
-
-    await client.query('BEGIN');
 
     await undoInventoryMovementCore({ id }, client);
 
@@ -806,6 +811,9 @@ export const editInventoryMovementAdd = async (req: Request, res: Response) => {
     if (error instanceof UndoConflictError) {
       return res.status(400).json({ error: error.message });
     }
+    if (error instanceof InvalidError) {
+      return res.status(400).json({ error: error.message });
+    }
     console.error('Error editing ADD inventory movement:', error);
     res.status(500).json({ error: 'Internal server error' });
   } finally {
@@ -819,6 +827,8 @@ export const editInventoryMovementMove = async (req: Request, res: Response) => 
     const { id } = movementIdParamSchema.parse(req.params);
     const moveData = editMoveSchema.parse(req.body);
 
+    await client.query('BEGIN');
+
     // Validation
     const original = await client.query(
       'SELECT inventory_action FROM "inventory movement" WHERE id = $1',
@@ -828,12 +838,8 @@ export const editInventoryMovementMove = async (req: Request, res: Response) => 
       throw new NotFoundError('Inventory movement not found');
     }
     if (original.rows[0].inventory_action !== 'MOVE') {
-      return res
-        .status(400)
-        .json({ error: 'Can only edit MOVE type movements with this endpoint' });
+      throw new InvalidError('Can only edit MOVE type movements with this endpoint');
     }
-
-    await client.query('BEGIN');
 
     // Undo the original MOVE (reverses item locations, deletes movement record)
     await undoInventoryMovementCore({ id }, client);
@@ -852,12 +858,10 @@ export const editInventoryMovementMove = async (req: Request, res: Response) => 
 
     // Move each item to the new destination
     const itemIds: string[] = itemsAtSource.rows.map((row: { id: string }) => row.id);
-    for (const itemId of itemIds) {
-      await client.query('UPDATE items SET current_location_id = $1 WHERE id = $2', [
-        moveData.to_location_id,
-        itemId,
-      ]);
-    }
+    await client.query('UPDATE items SET current_location_id = $1 WHERE id = ANY($2::uuid[])', [
+      moveData.to_location_id,
+      itemIds,
+    ]);
 
     // Create new MOVE movement record
     const representativeItemId = itemIds[0];
@@ -888,6 +892,9 @@ export const editInventoryMovementMove = async (req: Request, res: Response) => 
       return res.status(404).json({ error: error.message });
     }
     if (error instanceof UndoConflictError) {
+      return res.status(400).json({ error: error.message });
+    }
+    if (error instanceof InvalidError) {
       return res.status(400).json({ error: error.message });
     }
     console.error('Error editing MOVE inventory movement:', error);
