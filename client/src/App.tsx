@@ -4,6 +4,7 @@ import Dashboard from './pages/Dashboard/Dashboard';
 import Activities from './pages/Activities/Activities';
 import MoveItem from './pages/MoveItem/MoveItem';
 import AddItem from './pages/AddItem/AddItem';
+import RemoveItemPage from './pages/TestPage/RemoveItemPage';
 import './App.css';
 
 function App() {
@@ -15,6 +16,7 @@ function App() {
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/add-item" element={<AddItem />} />
           <Route path="/move-item" element={<MoveItem />} />
+          <Route path="/remove-item" element={<RemoveItemPage />} />
           {/* Placeholder routes - these don't have to work yet */}
           <Route
             path="/inventory"

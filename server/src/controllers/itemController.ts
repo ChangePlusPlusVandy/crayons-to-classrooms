@@ -2,7 +2,6 @@ import { Request, Response } from 'express';
 import pool from '../db.js';
 import {
   createItemSchema,
-  createItemsBulkSchema,
   updateItemSchema,
   statusQuerySchema,
   nameParamSchema,
@@ -12,7 +11,6 @@ import {
   warehouseIdParamSchema,
   itemInfoIdParamSchema,
   CreateItemInput,
-  CreateItemsBulkInput,
   UpdateItemInput,
 } from '../utils/itemsModel.js';
 import { ZodError } from 'zod';
@@ -71,7 +69,7 @@ const getLocationInfo = async (locationId?: string | null, db: DbClient = pool) 
   };
 };
 
-const syncItemInfoStock = async (
+export const syncItemInfoStock = async (
   itemName: string,
   productId: string | undefined,
   category: string | undefined,
@@ -379,6 +377,7 @@ export async function createItemCore(
     name,
     product_id,
     current_location_id,
+    fixture,
     created_by,
     quantity,
     stock,
@@ -440,8 +439,31 @@ export async function createItemCore(
     ]
   );
 
-  const { fixture, locationCode } = await getLocationInfo(current_location_id ?? null, db);
-  await syncItemInfoStock(name, item_limit ?? 0, fixture, locationCode, count, true, db);
+  const { locationCode } = await getLocationInfo(current_location_id ?? null, db);
+  const fixtureOverride = fixture ?? null;
+  const itemInfoId = await syncItemInfoStock(
+    name,
+    product_id,
+    category ?? 'UNKNOWN',
+    quantity,
+    value,
+    item_limit ?? 0,
+    fixtureOverride,
+    locationCode,
+    count,
+    true,
+    db
+  );
+  let createdItem = newItems.rows[0];
+  if (itemInfoId) {
+    const updatedItem = await pool.query(
+      'UPDATE items SET item_info = $1, updated_at = NOW() WHERE id = $2 RETURNING *',
+      [itemInfoId, createdItem.id]
+    );
+    if (updatedItem.rows[0]) {
+      createdItem = updatedItem.rows[0];
+    }
+  }
 
   return newItems.rows;
 }
@@ -487,171 +509,6 @@ export const createItem = async (req: Request, res: Response) => {
 };
 
 /**
- * Creates multiple items in the database with the same data.
- *
- * @param {Request} req - Express request object with:
- *   - count: Number of items to create (in body, required)
- *   - All fields required by createItemSchema
- * @param {Response} res - Express response object
- * @returns {Promise<Response>} JSON array of created items or error message
- * @throws {400} Invalid foreign key if product_id, current_location_id (if provided), created_by, or warehouse doesn't exist
- * @throws {500} Internal server error if validation or creation fails
- */
-export const createItemsBulk = async (req: Request, res: Response) => {
-  try {
-    const {
-      count,
-      name,
-      product_id,
-      current_location_id,
-      fixture,
-      created_by,
-      quantity,
-      stock,
-      status,
-      warehouse,
-      category,
-      item_limit,
-      value,
-      limbo,
-      notes,
-    }: CreateItemsBulkInput = createItemsBulkSchema.parse(req.body);
-
-    const client = await pool.connect();
-    try {
-      await client.query('BEGIN');
-
-      const validationPromises = [
-        client.query('SELECT id FROM products WHERE id = $1', [product_id]),
-        client.query('SELECT id FROM users WHERE id = $1', [created_by]),
-        client.query('SELECT id FROM warehouse WHERE id = $1', [warehouse]),
-      ];
-
-      if (current_location_id) {
-        validationPromises.push(
-          client.query('SELECT id FROM storage_locations WHERE id = $1', [current_location_id])
-        );
-      }
-
-      const validationResults = await Promise.all(validationPromises);
-
-      if (validationResults[0].rows.length === 0) {
-        await client.query('ROLLBACK');
-        return res.status(400).json({ error: 'Invalid product_id' });
-      }
-      if (validationResults[1].rows.length === 0) {
-        await client.query('ROLLBACK');
-        return res.status(400).json({ error: 'Invalid created_by user id' });
-      }
-      if (validationResults[2].rows.length === 0) {
-        await client.query('ROLLBACK');
-        return res.status(400).json({ error: 'Invalid warehouse id' });
-      }
-      if (current_location_id && validationResults[3]?.rows.length === 0) {
-        await client.query('ROLLBACK');
-        return res.status(400).json({ error: 'Invalid current_location_id' });
-      }
-
-      const newItems = await client.query(
-        `INSERT INTO items (
-          name,
-          product_id,
-          quantity,
-          stock,
-          current_location_id,
-          status,
-          created_by,
-          warehouse,
-          category,
-          item_limit,
-          value,
-          limbo,
-          notes,
-          created_at,
-          updated_at
-        )
-        SELECT
-          $1,
-          $2,
-          $3,
-          $4,
-          $5,
-          $6,
-          $7,
-          $8,
-          $9,
-          $10,
-          $11,
-          $12,
-          $13,
-          NOW(),
-          NOW()
-        FROM generate_series(1, $14)
-        RETURNING *;`,
-        [
-          name,
-          product_id,
-          quantity,
-          stock ?? null,
-          current_location_id ?? null,
-          status,
-          created_by,
-          warehouse,
-          category ?? null,
-          item_limit ?? null,
-          value,
-          limbo ?? false,
-          notes ?? null,
-          count,
-        ]
-      );
-
-      const { locationCode } = await getLocationInfo(current_location_id ?? null, client);
-      const fixtureOverride = fixture ?? null;
-      const itemInfoId = await syncItemInfoStock(
-        name,
-        product_id,
-        category ?? 'UNKNOWN',
-        quantity,
-        value,
-        item_limit ?? Number.MAX_SAFE_INTEGER,
-        fixtureOverride,
-        locationCode,
-        count,
-        true,
-        client
-      );
-
-      let responseItems = newItems.rows;
-      if (itemInfoId) {
-        const newItemIds = newItems.rows.map((row: { id: string }) => row.id);
-        await client.query(
-          'UPDATE items SET item_info = $1, updated_at = NOW() WHERE id = ANY($2::uuid[])',
-          [itemInfoId, newItemIds]
-        );
-        const updatedItems = await client.query('SELECT * FROM items WHERE id = ANY($1::uuid[])', [
-          newItemIds,
-        ]);
-        responseItems = updatedItems.rows;
-      }
-      await client.query('COMMIT');
-      return res.status(201).json(responseItems);
-    } catch (error) {
-      await client.query('ROLLBACK');
-      throw error;
-    } finally {
-      client.release();
-    }
-  } catch (error) {
-    if (error instanceof ZodError) {
-      return handleValidationError(error, res);
-    }
-    console.error('Error creating items in bulk:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-};
-
-/**
  * Updates an existing item in the database.
  * Only updates fields that are provided in the request body.
  * Allowed fields: name, product_id, quantity, current_location_id, status, warehouse, category, limit, value, limbo, notes, item_info.
@@ -684,7 +541,8 @@ export const updateItem = async (req: Request, res: Response) => {
     const oldName = currentItem.rows[0].name as string;
     const newName = validatedData.name ?? oldName;
     const oldLocationId = currentItem.rows[0].current_location_id as string | null;
-    const newLocationId = validatedData.current_location_id ?? oldLocationId;
+    // Use 'in' check to distinguish between undefined (not provided) and null (explicitly set to null)
+    const newLocationId = 'current_location_id' in validatedData ? validatedData.current_location_id ?? null : oldLocationId;
 
     // If product_id is being updated, verify it exists
     if (validatedData.product_id) {
@@ -696,7 +554,7 @@ export const updateItem = async (req: Request, res: Response) => {
       }
     }
 
-    // If warehouse is being updated, verify it exists
+    // If warehouse is being updated to a non-null value, verify it exists
     if (validatedData.warehouse) {
       const warehouseCheck = await pool.query('SELECT id FROM warehouse WHERE id = $1', [
         validatedData.warehouse,

@@ -1,230 +1,60 @@
-import { useEffect, useState, useMemo } from 'react';
-import {
-  Container,
-  Typography,
-  Box,
-  TextField,
-  Button,
-  CircularProgress,
-  Alert,
-  Autocomplete,
-  Paper,
-  Stack,
-  FormControl,
-} from '@mui/material';
-import AddIcon from '@mui/icons-material/Add';
-import CloseIcon from '@mui/icons-material/Close';
-import {
-  getProducts,
-  getStorageLocations,
-  createItemWithMovement,
-} from '../../api/addItem';
-import { Warehouse } from '../../types/Warehouse';
-import { StorageLocation } from '../../types/StorageLocation';
-import { Product } from '../../types/Product';
-import {
-  AddItemFormLabel,
-  ProductOptionContainer,
-  ProductNameText,
-  ProductDetailsText,
-  HighlightedText,
-} from './AddItem.styles';
-import { WarehouseSelector } from '../../components/WarehouseSelector/WarehouseSelector';
-import { SlotSelector } from '../../components/SlotSelector/SlotSelector';
+import { useState } from 'react';
+import { Container, Typography, Paper, Alert } from '@mui/material';
+import { createItemWithMovement } from '../../api/addItem';
+import AddItemForm, { AddItemFormData } from '../../components/AddItemForm/AddItemForm';
 
 export default function AddItem() {
-  // Data states
-  const [products, setProducts] = useState<Product[]>([]);
-  const [storageLocations, setStorageLocations] = useState<StorageLocation[]>([]);
-
-  // Form states
-  const [selectedWarehouse, setSelectedWarehouse] = useState<Warehouse | null>(null);
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
-  const [quantityToAdd, setQuantityToAdd] = useState<number | ''>('');
-  const [notes, setNotes] = useState('');
-
-  // New item creation states
-  const [isCreatingNewItem, setIsCreatingNewItem] = useState(false);
-  const [newItemName, setNewItemName] = useState('');
-  const [newCategory, setNewCategory] = useState('');
-  const [newSubcategory, setNewSubcategory] = useState('');
-  const [newLimit, setNewLimit] = useState<number | ''>('');
-  const [newValue, setNewValue] = useState<number | ''>('');
-  const [newPackSize, setNewPackSize] = useState<number | ''>('');
-
-  // UI states
-  const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [formKey, setFormKey] = useState(0);
 
-  // Fetch initial data on mount
-  useEffect(() => {
-    async function fetchInitialData() {
-      try {
-        const [productsData, locationsData] = await Promise.all([
-          getProducts(),
-          getStorageLocations(),
-        ]);
-        setProducts(productsData);
-        setStorageLocations(locationsData);
-      } catch (err) {
-        setError('Failed to load initial data. Please refresh the page.');
-      } finally {
-        setLoading(false);
-      }
-    }
+  const handleSubmit = async (data: AddItemFormData) => {
+    const { warehouse, product, destinationLocationId, quantity, notes } = data;
 
-    fetchInitialData();
-  }, []);
-
-  // Compute warehouseLocations for form submission
-  const warehouseLocations = useMemo(() => {
-    return selectedWarehouse
-      ? storageLocations.filter((loc) => loc.warehouse_id === selectedWarehouse.id)
-      : [];
-  }, [selectedWarehouse, storageLocations]);
-
-  // Helper to highlight matching text in search results
-  const highlightText = (text: string, searchTerm: string): React.ReactNode => {
-    if (!searchTerm.trim()) {
-      return text;
-    }
-
-    const lowerText = text.toLowerCase();
-    const lowerSearch = searchTerm.toLowerCase().trim();
-    const index = lowerText.indexOf(lowerSearch);
-
-    if (index === -1) {
-      return text;
-    }
-
-    const before = text.slice(0, index);
-    const match = text.slice(index, index + lowerSearch.length);
-    const after = text.slice(index + lowerSearch.length);
-
-    return (
-      <>
-        {before}
-        <HighlightedText>{match}</HighlightedText>
-        {after}
-      </>
-    );
-  };
-
-  // Validation helpers
-  const isQuantityValid = (): boolean => {
-    return typeof quantityToAdd === 'number' && quantityToAdd >= 1;
-  };
-
-  const isFormValid = (): boolean => {
-    return (
-      !!selectedWarehouse &&
-      !!selectedProduct &&
-      !!selectedSlot &&
-      isQuantityValid()
-    );
-  };
-
-  const handleSubmit = async () => {
-    // Find the destination location based on slot (fixture is always null for ADD)
-    const destinationLocation = warehouseLocations.find((loc) => {
-      return loc.slot === selectedSlot && (!loc.fixture || loc.fixture.trim() === '');
-    });
-
-    // Validation
-    if (!selectedWarehouse) {
-      setError('Please select a warehouse.');
-      return;
-    }
-    if (!selectedProduct) {
-      setError('Please select an item name.');
-      return;
-    }
-    if (!selectedSlot) {
-      setError('Please select a slot.');
-      return;
-    }
-    if (!destinationLocation) {
-      setError('Invalid destination location.');
-      return;
-    }
-    if (!isQuantityValid()) {
-      setError('Please enter a valid quantity to add (at least 1).');
-      return;
-    }
-
-    setSubmitting(true);
     setError('');
     setSuccess('');
 
+    const itemLimit =
+      typeof product.item_limit === 'string'
+        ? parseInt(product.item_limit, 10)
+        : product.item_limit;
+
     try {
-      const itemLimit = typeof selectedProduct.item_limit === 'string'
-        ? parseInt(selectedProduct.item_limit, 10)
-        : selectedProduct.item_limit;
-
-      const quantity = quantityToAdd as number;
-
       await createItemWithMovement({
         item: {
-          name: selectedProduct.name,
-          product_id: selectedProduct.id,
+          name: product.name,
+          product_id: product.id,
           quantity: 1,
           stock: 1,
-          current_location_id: destinationLocation.id,
+          current_location_id: destinationLocationId,
           status: 'active',
           created_by: 'b4974f63-ee89-42a1-bdb3-ce9df255c682', // TODO: Get user ID from auth context
-          warehouse: selectedWarehouse.id,
-          category: selectedProduct.category || undefined,
+          warehouse: warehouse.id,
+          category: product.category || undefined,
           item_limit: itemLimit || undefined,
-          value: selectedProduct.value,
+          value: product.value,
           limbo: false,
           notes: notes || undefined,
         },
         movement: {
           inventory_action: 'ADD',
           from_location_id: null,
-          to_location_id: destinationLocation.id,
+          to_location_id: destinationLocationId,
           quantity: quantity,
           performed_by: 'b4974f63-ee89-42a1-bdb3-ce9df255c682', // TODO: Get user ID from auth context
           note: notes || undefined,
         },
       });
-
       setSuccess(`${quantity} item${quantity > 1 ? 's' : ''} added successfully!`);
-
-      // Reset form (keep warehouse selected for convenience)
-      setSelectedProduct(null);
-      setSelectedSlot(null);
-      setQuantityToAdd('');
-      setNotes('');
     } catch (err) {
-      console.error('Error adding item:', err);
-      setError('Failed to add item. Please try again.');
-    } finally {
-      setSubmitting(false);
+      const message = err instanceof Error ? err.message : 'Failed to add item. Please try again.';
+      setError(message);
     }
   };
-
-  if (loading) {
-    return (
-      <Container maxWidth="md" sx={{ py: 4 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
-          <CircularProgress />
-        </Box>
-      </Container>
-    );
-  }
 
   return (
     <Container maxWidth="md" sx={{ py: 4 }}>
       <Paper
-        component="form"
-        onSubmit={(e) => {
-          e.preventDefault();
-          handleSubmit();
-        }}
         sx={{
           p: { xs: 3, md: 4 },
           borderRadius: 2,
@@ -236,303 +66,27 @@ export default function AddItem() {
         <Typography variant="h4" sx={{ mb: 3, textAlign: 'left' }}>
           Add Item
         </Typography>
-        <Stack spacing={3}>
-          {error && (
-            <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
-              {error}
-            </Alert>
-          )}
-
-          {success && (
-            <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess('')}>
-              {success}
-            </Alert>
-          )}
-
-          {/* Warehouse Selection */}
-          <WarehouseSelector
-            value={selectedWarehouse}
-            onChange={(newWarehouse) => {
-              setSelectedWarehouse(newWarehouse);
-              // Cascade reset location fields
-              setSelectedSlot(null);
-              setError('');
-            }}
-            label="Warehouse"
-            placeholder="Select warehouse"
-            fullWidth
-          />
-
-          {/* Item Name (Product) Selection */}
-          <FormControl fullWidth>
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <AddItemFormLabel htmlFor="item-name-select">Item Name</AddItemFormLabel>
-              {isCreatingNewItem && (
-                <Button
-                  size="small"
-                  startIcon={<CloseIcon />}
-                  sx={{ textTransform: 'none', color: 'text.secondary' }}
-                  onClick={() => {
-                    setIsCreatingNewItem(false);
-                    setNewItemName('');
-                    setNewCategory('');
-                    setNewSubcategory('');
-                    setNewLimit('');
-                    setNewValue('');
-                    setNewPackSize('');
-                  }}
-                >
-                  Cancel
-                </Button>
-              )}
-            </Box>
-
-            {!isCreatingNewItem ? (
-              <>
-                <Autocomplete
-                  id="item-name-select"
-                  options={products}
-                  getOptionLabel={(option) => option.name || 'Unknown Product'}
-                  filterOptions={(options, state) => {
-                    const searchTerm = state.inputValue.toLowerCase().trim();
-                    if (!searchTerm) return options;
-                    return options.filter((product) =>
-                      product.name?.toLowerCase().includes(searchTerm)
-                    );
-                  }}
-                  renderOption={(props, option, state) => {
-                    const { key, ...otherProps } = props;
-                    const searchTerm = state.inputValue;
-
-                    return (
-                      <li key={key} {...otherProps}>
-                        <ProductOptionContainer>
-                          <ProductNameText>
-                            {highlightText(option.name || 'Unknown', searchTerm)}
-                          </ProductNameText>
-                          <ProductDetailsText>
-                            {option.category} | Value: ${option.value}
-                          </ProductDetailsText>
-                        </ProductOptionContainer>
-                      </li>
-                    );
-                  }}
-                  value={selectedProduct}
-                  onChange={(_, newValue) => {
-                    setSelectedProduct(newValue);
-                    setError('');
-                  }}
-                  renderInput={(params) => (
-                    <TextField {...params} placeholder="Search for an item name" />
-                  )}
-                  noOptionsText="No matching products found"
-                />
-                <Button
-                  startIcon={<AddIcon />}
-                  sx={{
-                    justifyContent: 'flex-start',
-                    textTransform: 'none',
-                    color: 'primary.main',
-                    marginTop: 0,
-                    '&:hover': {
-                      backgroundColor: 'transparent',
-                    },
-                  }}
-                  onClick={() => {
-                    setIsCreatingNewItem(true);
-                    setSelectedProduct(null);
-                  }}
-                >
-                  New Item Name
-                </Button>
-              </>
-            ) : (
-              <Stack spacing={2}>
-                <TextField
-                  fullWidth
-                  required
-                  value={newItemName}
-                  onChange={(e) => setNewItemName(e.target.value)}
-                  placeholder="Enter new item name"
-                />
-
-                <Box>
-                  <AddItemFormLabel>Category</AddItemFormLabel>
-                  <TextField
-                    fullWidth
-                    value={newCategory}
-                    onChange={(e) => setNewCategory(e.target.value)}
-                    placeholder="Enter category"
-                  />
-                  <Button
-                    startIcon={<AddIcon />}
-                    sx={{
-                      justifyContent: 'flex-start',
-                      textTransform: 'none',
-                      color: 'primary.main',
-                      marginTop: 0,
-                      '&:hover': { backgroundColor: 'transparent' },
-                    }}
-                  >
-                    New Category
-                  </Button>
-                </Box>
-
-                <Box>
-                  <AddItemFormLabel>Subcategory</AddItemFormLabel>
-                  <TextField
-                    fullWidth
-                    value={newSubcategory}
-                    onChange={(e) => setNewSubcategory(e.target.value)}
-                    placeholder="Enter subcategory"
-                  />
-                  <Button
-                    startIcon={<AddIcon />}
-                    sx={{
-                      justifyContent: 'flex-start',
-                      textTransform: 'none',
-                      color: 'primary.main',
-                      marginTop: 0,
-                      '&:hover': { backgroundColor: 'transparent' },
-                    }}
-                  >
-                    New Subcategory
-                  </Button>
-                </Box>
-
-                <Box>
-                  <AddItemFormLabel>Limit</AddItemFormLabel>
-                  <TextField
-                    fullWidth
-                    type="number"
-                    value={newLimit}
-                    onChange={(e) => {
-                      const val = parseInt(e.target.value, 10);
-                      setNewLimit(isNaN(val) ? '' : val);
-                    }}
-                    placeholder="Enter limit"
-                    slotProps={{ htmlInput: { min: 0, step: 1 } }}
-                  />
-                </Box>
-
-                <Box>
-                  <AddItemFormLabel>Value</AddItemFormLabel>
-                  <TextField
-                    fullWidth
-                    type="number"
-                    value={newValue}
-                    onChange={(e) => {
-                      const val = parseFloat(e.target.value);
-                      setNewValue(isNaN(val) ? '' : val);
-                    }}
-                    placeholder="Enter value"
-                    slotProps={{ htmlInput: { min: 0, step: 0.01 } }}
-                  />
-                </Box>
-
-                <Box>
-                  <AddItemFormLabel>Pack Size</AddItemFormLabel>
-                  <TextField
-                    fullWidth
-                    type="number"
-                    value={newPackSize}
-                    onChange={(e) => {
-                      const val = parseInt(e.target.value, 10);
-                      setNewPackSize(isNaN(val) ? '' : val);
-                    }}
-                    placeholder="Enter pack size"
-                    slotProps={{ htmlInput: { min: 1, step: 1 } }}
-                  />
-                </Box>
-              </Stack>
-            )}
-          </FormControl>
-
-          {/* Slot Selection */}
-          <SlotSelector
-            value={selectedSlot}
-            onChange={(newSlot) => {
-              setSelectedSlot(newSlot);
-              setError('');
-            }}
-            warehouse={selectedWarehouse}
-            storageLocations={storageLocations}
-          />
-
-          {/* Quantity to Add */}
-          <FormControl fullWidth>
-            <AddItemFormLabel htmlFor="quantity-input">Quantity to Add</AddItemFormLabel>
-            <TextField
-              id="quantity-input"
-              type="number"
-              fullWidth
-              value={quantityToAdd}
-              onChange={(e) => {
-                const val = parseInt(e.target.value, 10);
-                setQuantityToAdd(isNaN(val) ? '' : val);
-              }}
-              placeholder="Enter quantity to add"
-              error={quantityToAdd !== '' && !isQuantityValid()}
-              helperText={
-                quantityToAdd !== '' && !isQuantityValid() ? 'Quantity must be at least 1' : ''
-              }
-              slotProps={{
-                htmlInput: {
-                  min: 1,
-                  step: 1,
-                },
-              }}
-            />
-          </FormControl>
-
-          {/* Notes */}
-          <FormControl fullWidth>
-            <AddItemFormLabel htmlFor="notes-input">Notes</AddItemFormLabel>
-            <TextField
-              id="notes-input"
-              fullWidth
-              multiline
-              rows={3}
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Enter notes"
-            />
-          </FormControl>
-
-          {/* Action Buttons */}
-          <Box sx={{ display: 'flex', gap: 2, mt: 3 }}>
-            <Button
-              variant="outlined"
-              fullWidth
-              onClick={() => {
-                setSelectedWarehouse(null);
-                setSelectedProduct(null);
-                setSelectedSlot(null);
-                setQuantityToAdd('');
-                setNotes('');
-                setError('');
-                setSuccess('');
-                setIsCreatingNewItem(false);
-                setNewItemName('');
-                setNewCategory('');
-                setNewSubcategory('');
-                setNewLimit('');
-                setNewValue('');
-                setNewPackSize('');
-              }}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="contained"
-              fullWidth
-              type="submit"
-              disabled={submitting || !isFormValid()}
-            >
-              {submitting ? <CircularProgress size={24} /> : 'Add Item'}
-            </Button>
-          </Box>
-        </Stack>
+        {error && (
+          <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
+            {error}
+          </Alert>
+        )}
+        {success && (
+          <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess('')}>
+            {success}
+          </Alert>
+        )}
+        <AddItemForm
+          key={formKey}
+          onSubmit={handleSubmit}
+          onCancel={() => {
+            // Remount to clear form
+            setFormKey((k) => k + 1);
+            setError('');
+            setSuccess('');
+          }}
+          submitLabel="Add Item"
+        />
       </Paper>
     </Container>
   );

@@ -37,9 +37,7 @@ export function FixtureSelector({
 }: FixtureSelectorProps) {
   // Filter locations by warehouse
   const warehouseLocations = useMemo(() => {
-    return warehouse
-      ? storageLocations.filter((loc) => loc.warehouse_id === warehouse.id)
-      : [];
+    return warehouse ? storageLocations.filter((loc) => loc.warehouse_id === warehouse.id) : [];
   }, [warehouse, storageLocations]);
 
   // Get fixtures for selected slot
@@ -91,10 +89,7 @@ export function FixtureSelector({
         onChange={(_, newValue) => onChange(newValue)}
         disabled={isDisabled}
         renderInput={(params) => (
-          <TextField
-            {...params}
-            placeholder={isDisabled ? disabledPlaceholder : placeholder}
-          />
+          <TextField {...params} placeholder={isDisabled ? disabledPlaceholder : placeholder} />
         )}
         noOptionsText="No fixtures available"
       />

@@ -8,3 +8,36 @@ export class ForeignKeyError extends Error {
     this.name = 'ForeignKeyError';
   }
 }
+
+/**
+ * Thrown when a requested resource does not exist.
+ * The controller layer converts this to a 404 response.
+ */
+export class NotFoundError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'NotFoundError';
+  }
+}
+
+/**
+ * Thrown when an undo operation cannot be completed due to conflicting state.
+ * The controller layer converts this to a 400 response.
+ */
+export class UndoConflictError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'UndoConflictError';
+  }
+}
+
+/**
+ * Thrown when invalid data is received.
+ * The controller layer converts this to a 400 response.
+ */
+export class InvalidError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'InvalidError';
+  }
+}

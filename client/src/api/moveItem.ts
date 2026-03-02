@@ -1,7 +1,7 @@
 import { Warehouse } from '../types/Warehouse';
 import { StorageLocation } from '../types/StorageLocation';
 import { Item, ItemGroup } from '../types/Item';
-import { InventoryMovement } from '../types/InventoryMovement';
+import { InventoryMovement, InventoryMovementSchema } from '../types/InventoryMovement';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
 
@@ -35,7 +35,7 @@ export async function getItemsByLocation(locationId: string): Promise<Item[]> {
 }
 
 export async function createInventoryMovement(
-  movement: InventoryMovement
+  movement: Omit<InventoryMovement, 'id' | 'performed_at'>
 ): Promise<InventoryMovement> {
   const response = await fetch(`${API_BASE_URL}/inventory-movement`, {
     method: 'POST',
@@ -45,7 +45,8 @@ export async function createInventoryMovement(
     body: JSON.stringify(movement),
   });
   if (!response.ok) throw new Error('Failed to create inventory movement');
-  return response.json();
+  const data = await response.json();
+  return InventoryMovementSchema.parse(data);
 }
 
 export async function createItem(itemData: {
@@ -101,7 +102,7 @@ export function groupItemsByLocation(items: Item[]): ItemGroup[] {
   const groupMap = new Map<string, ItemGroup>();
 
   items.forEach((item) => {
-    const key = `${item.warehouse}|${item.current_location_id}|${item.name}`;
+    const key = `${item.warehouse}|${item.current_location_id}|${item.product_id}`;
 
     if (groupMap.has(key)) {
       const group = groupMap.get(key)!;
@@ -111,12 +112,31 @@ export function groupItemsByLocation(items: Item[]): ItemGroup[] {
         current_location_id: item.current_location_id,
         warehouse: item.warehouse,
         name: item.name ?? 'Unknown',
+        product_id: item.product_id,
         quantity: 1,
       });
     }
   });
 
   return Array.from(groupMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+}
+
+export async function undoInventoryMovement(movementId: string): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/inventory-movement/${movementId}/undo`, {
+    method: 'POST',
+  });
+  if (!response.ok) {
+    let errorMessage = 'Failed to undo movement';
+    try {
+      const data = await response.json();
+      if (data && data.error) {
+        errorMessage = data.error;
+      }
+    } catch {
+      // If JSON parsing fails, use default message
+    }
+    throw new Error(errorMessage);
+  }
 }
 
 export async function moveItemsWithMovement(payload: {

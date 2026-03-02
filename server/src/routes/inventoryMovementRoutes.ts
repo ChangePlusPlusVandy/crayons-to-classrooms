@@ -16,12 +16,14 @@ import {
   moveItemsWithMovement,
   updateInventoryMovement,
   deleteInventoryMovement,
+  undoInventoryMovement,
+  editInventoryMovementAdd,
+  editInventoryMovementMove,
 } from '../controllers/inventoryMovementControllers.js';
 
 const router = express.Router();
 router.get('/', getAllInventoryMovements); // GET /api/inventory-movement
 router.get('/detailed', getAllMovementsDetailed); // GET /api/inventory-movement/detailed?page=1&limit=10
-router.get('/:id', getMovementById); // GET /api/inventory-movement/:id
 router.get('/action/:inventory_action', getMovementsByAction); // GET /api/inventory-movement/action/:inventory_action
 router.get('/item/:item_id', getMovementsByItemId); // GET /api/inventory-movement/item/:item_id
 router.get('/product/:product_id', getMovementsByProductId); // GET /api/inventory-movement/product/:product_id
@@ -33,7 +35,12 @@ router.get('/after/:date', getMovementsOnAndAfterDate); // GET /api/inventory-mo
 router.post('/', createInventoryMovement); // POST /api/inventory-movement
 router.post('/with-item', createItemWithMovement); // POST /api/inventory-movement/with-item
 router.post('/with-move', moveItemsWithMovement); // POST /api/inventory-movement/with-move
+router.post('/:id/undo', undoInventoryMovement); // POST /api/inventory-movement/:id/undo (must be before /:id routes)
+router.get('/:id', getMovementById); // GET /api/inventory-movement/:id
 router.patch('/:id', updateInventoryMovement); // PATCH /api/inventory-movement/:id
 router.delete('/:id', deleteInventoryMovement); // DELETE /api/inventory-movement/:id
+router.post('/:id/undo', undoInventoryMovement); // POST /api/inventory-movement/:id/undo
+router.post('/:id/edit-add', editInventoryMovementAdd); // POST /api/inventory-movement/:id/edit-add
+router.post('/:id/edit-move', editInventoryMovementMove); // POST /api/inventory-movement/:id/edit-move
 
 export default router;
