@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
-import { Box, Button, TextField, Typography, Alert, Paper } from '@mui/material';
+import { Box, Button, TextField, Typography, Alert } from '@mui/material';
+import { AuthCard } from './Login.styles';
 import { supabase } from '../../supabaseClient';
 import { useAuth } from '../../context/AuthContext';
 
@@ -61,10 +62,10 @@ export default function Login() {
       justifyContent="center"
       alignItems="center"
       minHeight="100vh"
-      sx={{ bgcolor: '#f5f5f5' }}
+      sx={{ bgcolor: 'background.default' }}
     >
-      <Paper elevation={3} sx={{ p: 4, width: '100%', maxWidth: 400 }}>
-        <Typography variant="h5" fontWeight={700} mb={1} textAlign="center">
+      <AuthCard elevation={3}>
+        <Typography variant="h5" fontWeight="bold" mb={1} textAlign="center">
           Crayons to Classrooms
         </Typography>
 
@@ -154,7 +155,7 @@ export default function Login() {
             </Box>
           </>
         )}
-      </Paper>
+      </AuthCard>
     </Box>
   );
 }

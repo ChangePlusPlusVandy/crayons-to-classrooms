@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Box, Button, TextField, Typography, Alert, Paper } from '@mui/material';
+import { Box, Button, TextField, Typography, Alert } from '@mui/material';
+import { AuthCard } from '../Login/Login.styles';
 import { supabase } from '../../supabaseClient';
 
 export default function SetPassword() {
@@ -52,10 +53,10 @@ export default function SetPassword() {
       justifyContent="center"
       alignItems="center"
       minHeight="100vh"
-      sx={{ bgcolor: '#f5f5f5' }}
+      sx={{ bgcolor: 'background.default' }}
     >
-      <Paper elevation={3} sx={{ p: 4, width: '100%', maxWidth: 400 }}>
-        <Typography variant="h5" fontWeight={700} mb={1} textAlign="center">
+      <AuthCard elevation={3}>
+        <Typography variant="h5" fontWeight="bold" mb={1} textAlign="center">
           {isReset ? 'Reset Your Password' : 'Set Your Password'}
         </Typography>
         <Typography variant="body2" color="text.secondary" mb={3} textAlign="center">
@@ -91,7 +92,7 @@ export default function SetPassword() {
             </Button>
           </form>
         )}
-      </Paper>
+      </AuthCard>
     </Box>
   );
 }
