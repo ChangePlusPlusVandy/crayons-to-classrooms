@@ -29,6 +29,6 @@ export async function inviteAdmin(email: string): Promise<InviteResponse> {
   const data = await response.json();
 
   if (!response.ok) throw new Error(data?.error ?? 'Failed to invite user');
-  
+
   return data;
 }

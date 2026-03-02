@@ -20,7 +20,9 @@ export async function getStorageLocations(): Promise<StorageLocation[]> {
 }
 
 export async function getStorageLocationByCode(locationCode: string): Promise<StorageLocation> {
-  const response = await authFetch(`${API_BASE_URL}/storage-locations/locationCode/${locationCode}`);
+  const response = await authFetch(
+    `${API_BASE_URL}/storage-locations/locationCode/${locationCode}`
+  );
   if (!response.ok) throw new Error('Failed to fetch storage location');
   return response.json();
 }

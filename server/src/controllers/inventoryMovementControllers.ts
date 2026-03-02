@@ -436,8 +436,7 @@ export async function createInventoryMovementCore(
     );
   }
 
-  const [itemCheck, productCheck, toLocationCheck, fromLocationCheck] =
-    await Promise.all(checks);
+  const [itemCheck, productCheck, toLocationCheck, fromLocationCheck] = await Promise.all(checks);
 
   if (itemCheck.rows.length === 0) {
     throw new ForeignKeyError('item_id');

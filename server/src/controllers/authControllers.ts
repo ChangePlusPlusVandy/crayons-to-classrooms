@@ -50,7 +50,7 @@ export async function removeUser(req: Request, res: Response): Promise<Response>
   const { error } = await supabaseAdmin.auth.admin.updateUserById(req.params.id, {
     ban_duration: '876600h', // ~100 years (permanent ban)
   });
-  
+
   await supabaseAdmin.auth.admin.signOut(req.params.id); // End current sessions
 
   if (error) return res.status(500).json({ error: error.message });
@@ -85,7 +85,9 @@ export async function inviteUser(req: Request, res: Response): Promise<Response>
       });
       if (resetError) return res.status(500).json({ error: resetError.message });
 
-      return res.json({ message: `Access restored for ${email}. A password reset email has been sent.` });
+      return res.json({
+        message: `Access restored for ${email}. A password reset email has been sent.`,
+      });
     }
 
     const { error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {

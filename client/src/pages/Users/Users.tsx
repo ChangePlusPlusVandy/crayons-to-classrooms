@@ -36,7 +36,7 @@ export default function Users() {
     setLoading(true);
     setError(null);
     try {
-      console.log('fetching users again')
+      console.log('fetching users again');
       setUsers(await getUsers());
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load users');
@@ -45,7 +45,9 @@ export default function Users() {
     }
   }, []);
 
-  useEffect(() => { fetchUsers(); }, [fetchUsers]);
+  useEffect(() => {
+    fetchUsers();
+  }, [fetchUsers]);
 
   const handleRemove = async (id: string) => {
     setConfirmDelete(null);
@@ -90,34 +92,38 @@ export default function Users() {
           </Box>
         ) : (
           <List disablePadding>
-            {[...users].sort((a, b) => (a.id === user?.id ? -1 : b.id === user?.id ? 1 : 0)).map((adminUser, index) => (
-              <React.Fragment key={adminUser.id}>
-                {index > 0 && <Divider />}
-                <ListItem
-                  secondaryAction={
-                    adminUser.id !== user?.id ? (
-                      <IconButton
-                        edge="end"
-                        aria-label={`Remove ${adminUser.email}`}
-                        onClick={() => setConfirmDelete(adminUser)}
-                        disabled={removing.has(adminUser.id)}
-                        size="small"
-                        sx={{
-                          '&:hover': { color: 'error.main' },
-                        }}
-                      >
-                        <CloseIcon fontSize="small" />
-                      </IconButton>
-                    ) : null
-                  }
-                >
-                  <ListItemText
-                    primary={adminUser.id === user?.id ? `${adminUser.email} (you)` : adminUser.email}
-                    secondary={`Joined ${new Date(adminUser.created_at).toLocaleDateString()}`}
-                  />
-                </ListItem>
-              </React.Fragment>
-            ))}
+            {[...users]
+              .sort((a, b) => (a.id === user?.id ? -1 : b.id === user?.id ? 1 : 0))
+              .map((adminUser, index) => (
+                <React.Fragment key={adminUser.id}>
+                  {index > 0 && <Divider />}
+                  <ListItem
+                    secondaryAction={
+                      adminUser.id !== user?.id ? (
+                        <IconButton
+                          edge="end"
+                          aria-label={`Remove ${adminUser.email}`}
+                          onClick={() => setConfirmDelete(adminUser)}
+                          disabled={removing.has(adminUser.id)}
+                          size="small"
+                          sx={{
+                            '&:hover': { color: 'error.main' },
+                          }}
+                        >
+                          <CloseIcon fontSize="small" />
+                        </IconButton>
+                      ) : null
+                    }
+                  >
+                    <ListItemText
+                      primary={
+                        adminUser.id === user?.id ? `${adminUser.email} (you)` : adminUser.email
+                      }
+                      secondary={`Joined ${new Date(adminUser.created_at).toLocaleDateString()}`}
+                    />
+                  </ListItem>
+                </React.Fragment>
+              ))}
           </List>
         )}
       </Paper>
@@ -126,7 +132,8 @@ export default function Users() {
         <DialogTitle>Remove admin?</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            <strong>{confirmDelete?.email}</strong> will be removed and logged out immediately. Their data will be preserved.
+            <strong>{confirmDelete?.email}</strong> will be removed and logged out immediately.
+            Their data will be preserved.
           </DialogContentText>
         </DialogContent>
         <DialogActions>

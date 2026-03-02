@@ -101,13 +101,7 @@ export default function Login() {
                 {error}
               </Alert>
             )}
-            <Button
-              type="submit"
-              variant="contained"
-              fullWidth
-              disabled={loading}
-              sx={{ mt: 2 }}
-            >
+            <Button type="submit" variant="contained" fullWidth disabled={loading} sx={{ mt: 2 }}>
               {loading ? 'Signing in…' : 'Sign In'}
             </Button>
           </form>

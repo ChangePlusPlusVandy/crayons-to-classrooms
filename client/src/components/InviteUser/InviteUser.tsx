@@ -29,7 +29,10 @@ export default function InviteUser({ onInviteSuccess }: { onInviteSuccess?: () =
     setLoading(true);
     try {
       const result = await inviteAdmin(email);
-      setStatus({ type: 'success', message: 'message' in result ? result.message : `Invite sent to ${email}` });
+      setStatus({
+        type: 'success',
+        message: 'message' in result ? result.message : `Invite sent to ${email}`,
+      });
       setEmail('');
       onInviteSuccess?.();
     } catch (err) {

@@ -21,7 +21,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const init = async () => {
-      const { data: { session: existing } } = await supabase.auth.getSession();
+      const {
+        data: { session: existing },
+      } = await supabase.auth.getSession();
 
       if (!existing && IS_DEV_AUTOLOGIN) {
         const { data, error } = await supabase.auth.signInWithPassword({
@@ -32,7 +34,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           console.error('[DEV] Auto-login failed:', error.message);
         } else {
           setSession(data.session);
-          console.log(`DEV: AUTOMATICALLY LOGGED IN AS ${data.user.email}`)
+          console.log(`DEV: AUTOMATICALLY LOGGED IN AS ${data.user.email}`);
         }
       } else {
         setSession(existing);
@@ -43,7 +45,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     init();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
     });
 
