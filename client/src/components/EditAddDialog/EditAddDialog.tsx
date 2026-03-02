@@ -30,7 +30,6 @@ export function EditAddDialog({ open, onClose, movement, onSuccess }: EditAddDia
   const [product, setProduct] = useState<Product | null>(null);
   const [warehouse, setWarehouse] = useState<Warehouse | null>(null);
   const [slot, setSlot] = useState('');
-  const [fixture, setFixture] = useState('');
 
   useEffect(() => {
     if (!open) return;
@@ -47,7 +46,6 @@ export function EditAddDialog({ open, onClose, movement, onSuccess }: EditAddDia
         setProduct(prod);
         setWarehouse(wh);
         setSlot(location.slot);
-        setFixture(location.fixture || 'None');
       } catch {
         setFetchError('Failed to load movement details');
       } finally {
@@ -128,7 +126,6 @@ export function EditAddDialog({ open, onClose, movement, onSuccess }: EditAddDia
               initialWarehouse={warehouse}
               initialProduct={product}
               initialSlot={slot}
-              initialFixture={fixture}
               initialQuantity={movement.quantity}
               initialNotes={movement.note || ''}
               onSubmit={handleSubmit}
