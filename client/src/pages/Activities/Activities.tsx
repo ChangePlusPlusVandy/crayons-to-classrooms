@@ -317,7 +317,7 @@ export default function Activities() {
                         })()}
                       </TableCell>
                       <TableCell sx={activitiesStyles.tableCell}>
-                        {activity.user_name || 'Unknown User'}
+                        {activity.user_email || 'Unknown User'}
                       </TableCell>
                       <TableCell sx={activitiesStyles.tableCell}>
                         {activity.product_name || 'Unknown Item'}

@@ -390,11 +390,10 @@ export async function createItemCore(
     notes,
   } = data;
 
-  // Check if product_id, created_by, warehouse exist in tables
+  // Check if product_id, warehouse exist in tables
   // Only check current_location_id if it's provided
   const validationPromises = [
     db.query('SELECT id FROM products WHERE id = $1', [product_id]),
-    db.query('SELECT id FROM users WHERE id = $1', [created_by]),
     db.query('SELECT id FROM warehouse WHERE id = $1', [warehouse]),
   ];
 
@@ -410,12 +409,9 @@ export async function createItemCore(
     throw new ForeignKeyError('product_id');
   }
   if (validationResults[1].rows.length === 0) {
-    throw new ForeignKeyError('created_by user id');
-  }
-  if (validationResults[2].rows.length === 0) {
     throw new ForeignKeyError('warehouse id');
   }
-  if (current_location_id && validationResults[3]?.rows.length === 0) {
+  if (current_location_id && validationResults[2]?.rows.length === 0) {
     throw new ForeignKeyError('current_location_id');
   }
 

@@ -92,12 +92,12 @@ export async function getAllMovementsDetailed(req: Request, res: Response): Prom
           p.name AS product_name,
           from_loc.location_code AS from_location_name,
           to_loc.location_code AS to_location_name,
-          u.name AS user_name
+          u.email AS user_email
         FROM "inventory movement" im
         LEFT JOIN products p ON im.product_id = p.id
         LEFT JOIN storage_locations from_loc ON im.from_location_id = from_loc.id
         LEFT JOIN storage_locations to_loc ON im.to_location_id = to_loc.id
-        LEFT JOIN users u ON im.performed_by = u.id
+        LEFT JOIN auth.users u ON im.performed_by = u.id
         ORDER BY im.performed_at DESC NULLS LAST
         LIMIT $1 OFFSET $2`,
         [limit, offset]
@@ -422,12 +422,11 @@ export async function createInventoryMovementCore(
   // Normalize from_location_id: undefined → null to avoid node-postgres invalid parameter errors
   const normalizedFromLocationId = from_location_id ?? null;
 
-  // Check if item_id, product_id, from_location_id (if provided), to_location_id, performed_by_id exist in tables (in parallel)
+  // Check if item_id, product_id, from_location_id (if provided), to_location_id exist in tables (in parallel)
   const checks = [
     db.query('SELECT id FROM items WHERE id = $1', [item_id]),
     db.query('SELECT id FROM products WHERE id = $1', [product_id]),
     db.query('SELECT id FROM storage_locations WHERE id = $1', [to_location_id]),
-    db.query('SELECT id FROM users WHERE id = $1', [performed_by]),
   ];
 
   // Only check from_location_id if it's provided (it's optional for ADD actions)
@@ -437,7 +436,7 @@ export async function createInventoryMovementCore(
     );
   }
 
-  const [itemCheck, productCheck, toLocationCheck, userCheck, fromLocationCheck] =
+  const [itemCheck, productCheck, toLocationCheck, fromLocationCheck] =
     await Promise.all(checks);
 
   if (itemCheck.rows.length === 0) {
@@ -448,9 +447,6 @@ export async function createInventoryMovementCore(
   }
   if (toLocationCheck.rows.length === 0) {
     throw new ForeignKeyError('to_location_id');
-  }
-  if (userCheck.rows.length === 0) {
-    throw new ForeignKeyError('performed_by user id');
   }
   if (normalizedFromLocationId && fromLocationCheck && fromLocationCheck.rows.length === 0) {
     throw new ForeignKeyError('from_location_id');
