@@ -6,6 +6,7 @@ export const ActivityDisplaySchema = InventoryMovementSchema.extend({
   product_name: z.string().nullable(),
   from_location_name: z.string().nullable(),
   to_location_name: z.string().nullable(),
+  user_name: z.string().nullable(),
   user_email: z.string().nullable(),
 });
 
