@@ -144,7 +144,7 @@ export default function RemoveItemForm({
     };
 
     buildGroupOptions();
-  }, [itemsInSelectedWarehouse, selectedWarehouse, initialSourceLocation, initialProductId]);
+  }, [itemsInSelectedWarehouse, selectedWarehouse, initialSourceLocation, initialProductId, initialGroup]);
 
   const handleSubmit = async () => {
     if (!selectedGroup || quantityToRemove === null || quantityToRemove <= 0) return;
