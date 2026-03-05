@@ -118,7 +118,7 @@ export default function RemoveItemPage() {
         from_location_id: representative.current_location_id,
         to_location_id: null,
         quantity: quantityToRemove,
-        performed_by: 'b4974f63-ee89-42a1-bdb3-ce9df255c682', // Hardcoded user ID (matches Add/Move pages)
+        performed_by: '3c53c4e6-dc90-4db4-b75b-a793fa454631', // Hardcoded user ID (matches Add/Move pages)
         note: notes || undefined,
       });
 

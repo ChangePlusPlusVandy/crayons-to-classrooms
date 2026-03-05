@@ -39,7 +39,7 @@ export default function MoveItem() {
           from_location_id: sourceSlot.id,
           to_location_id: destinationLocationId,
           quantity,
-          performed_by: 'b4974f63-ee89-42a1-bdb3-ce9df255c682', // TODO: Get user ID
+          performed_by: '3c53c4e6-dc90-4db4-b75b-a793fa454631', // TODO: Get user ID
           note: notes || undefined,
         },
       });

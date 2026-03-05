@@ -105,7 +105,7 @@ export function EditMoveDialog({ open, onClose, movement, onSuccess }: EditMoveD
         to_location_id: data.destinationLocationId,
         product_id: data.itemGroup.product_id,
         quantity: data.quantity,
-        performed_by: 'b4974f63-ee89-42a1-bdb3-ce9df255c682', // TODO: Get user ID from auth context
+        performed_by: '3c53c4e6-dc90-4db4-b75b-a793fa454631', // TODO: Get user ID from auth context
         note: data.notes || undefined,
       });
 

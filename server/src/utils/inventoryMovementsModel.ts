@@ -113,6 +113,21 @@ export const editMoveSchema = z.object({
 export type EditMoveInput = z.infer<typeof editMoveSchema>;
 
 /**
+ * Schema for the edit-remove endpoint request body.
+ * No item creation needed — REMOVE edits update item status and location atomically.
+ */
+export const editRemoveSchema = z.object({
+  inventory_action: z.enum(['DONATED', 'DISCARD']),
+  from_location_id: uuidSchema,
+  product_id: uuidSchema,
+  quantity: z.number().int().positive('Quantity must be a positive integer'),
+  performed_by: uuidSchema,
+  note: z.string().optional(),
+});
+
+export type EditRemoveInput = z.infer<typeof editRemoveSchema>;
+
+/**
  * Schema for the combined move-items-with-movement request body.
  * item_ids are the existing items to relocate; movement records the action.
  */

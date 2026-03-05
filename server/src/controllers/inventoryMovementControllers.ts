@@ -15,6 +15,7 @@ import {
   UpdateInventoryInput,
   actionQuerySchema,
   editMoveSchema,
+  editRemoveSchema,
   createItemWithMovementSchema,
   moveItemsWithMovementSchema,
 } from '../utils/inventoryMovementsModel.js';
@@ -900,6 +901,117 @@ export const editInventoryMovementMove = async (req: Request, res: Response) => 
       return res.status(400).json({ error: error.message });
     }
     console.error('Error editing MOVE inventory movement:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  } finally {
+    client.release();
+  }
+};
+
+export const editInventoryMovementRemove = async (req: Request, res: Response) => {
+  const client = await pool.connect();
+  try {
+    const { id } = movementIdParamSchema.parse(req.params);
+    const removeData = editRemoveSchema.parse(req.body);
+
+    await client.query('BEGIN');
+
+    // Validate original movement exists and is a remove action
+    const original = await client.query('SELECT * FROM "inventory movement" WHERE id = $1', [id]);
+    if (original.rows.length === 0) {
+      throw new NotFoundError('Inventory movement not found');
+    }
+    if (!['DONATED', 'DISCARD'].includes(original.rows[0].inventory_action)) {
+      throw new InvalidError('Can only edit DONATED or DISCARD type movements with this endpoint');
+    }
+
+    const originalMovement = original.rows[0];
+
+    // Undo original removal: find inactive items with matching product_id, restore them to active
+    const itemsToRestore = await client.query(
+      `SELECT id FROM items WHERE product_id = $1 AND status = 'inactive' ORDER BY updated_at DESC LIMIT $2`,
+      [originalMovement.product_id, originalMovement.quantity]
+    );
+
+    if (itemsToRestore.rows.length < originalMovement.quantity) {
+      throw new UndoConflictError('Cannot undo: not enough inactive items found to restore');
+    }
+
+    const restoreIds: string[] = itemsToRestore.rows.map((row: { id: string }) => row.id);
+    await client.query(
+      `UPDATE items SET status = 'active', current_location_id = $1, updated_at = NOW() WHERE id = ANY($2::uuid[])`,
+      [originalMovement.from_location_id, restoreIds]
+    );
+
+    // Delete original movement record
+    await client.query('DELETE FROM "inventory movement" WHERE id = $1', [id]);
+
+    // Find active items at new source location matching product_id (LIFO order)
+    const itemsAtSource = await client.query(
+      `SELECT id FROM items WHERE product_id = $1 AND current_location_id = $2 AND status = 'active' ORDER BY created_at DESC LIMIT $3`,
+      [removeData.product_id, removeData.from_location_id, removeData.quantity]
+    );
+
+    if (itemsAtSource.rows.length < removeData.quantity) {
+      throw new UndoConflictError(
+        `Not enough items at source location: found ${itemsAtSource.rows.length}, need ${removeData.quantity}`
+      );
+    }
+
+    const newRemoveIds: string[] = itemsAtSource.rows.map((row: { id: string }) => row.id);
+
+    // Determine if this is a full removal (removes all active items of this product at the location)
+    const totalAtLocation = await client.query(
+      `SELECT COUNT(*) FROM items WHERE product_id = $1 AND current_location_id = $2 AND status = 'active'`,
+      [removeData.product_id, removeData.from_location_id]
+    );
+    const isFullRemoval = parseInt(totalAtLocation.rows[0].count, 10) === removeData.quantity;
+
+    if (isFullRemoval) {
+      await client.query(
+        `UPDATE items SET status = 'inactive', current_location_id = NULL, warehouse = NULL, updated_at = NOW() WHERE id = ANY($1::uuid[])`,
+        [newRemoveIds]
+      );
+    } else {
+      await client.query(
+        `UPDATE items SET status = 'inactive', updated_at = NOW() WHERE id = ANY($1::uuid[])`,
+        [newRemoveIds]
+      );
+    }
+
+    // Create new movement record
+    const fullMovementData: CreateInventoryInput = {
+      inventory_action: removeData.inventory_action,
+      item_id: newRemoveIds[0],
+      product_id: removeData.product_id,
+      from_location_id: removeData.from_location_id,
+      to_location_id: null,
+      quantity: removeData.quantity,
+      performed_by: removeData.performed_by,
+      note: removeData.note,
+    };
+    const createdMovement = await createInventoryMovementCore(fullMovementData, client);
+
+    await client.query('COMMIT');
+
+    res.status(201).json({ movement: createdMovement });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    if (error instanceof ZodError) {
+      return handleValidationError(error, res);
+    }
+    if (error instanceof ForeignKeyError) {
+      return res.status(400).json({ error: error.message });
+    }
+    if (error instanceof NotFoundError) {
+      return res.status(404).json({ error: error.message });
+    }
+    if (error instanceof UndoConflictError) {
+      return res.status(400).json({ error: error.message });
+    }
+    if (error instanceof InvalidError) {
+      return res.status(400).json({ error: error.message });
+    }
+    console.error('Error editing REMOVE inventory movement:', error);
     res.status(500).json({ error: 'Internal server error' });
   } finally {
     client.release();

@@ -28,7 +28,7 @@ export default function AddItem() {
           stock: 1,
           current_location_id: destinationLocationId,
           status: 'active',
-          created_by: 'b4974f63-ee89-42a1-bdb3-ce9df255c682', // TODO: Get user ID from auth context
+          created_by: '3c53c4e6-dc90-4db4-b75b-a793fa454631', // TODO: Get user ID from auth context
           warehouse: warehouse.id,
           category: product.category || undefined,
           item_limit: itemLimit || undefined,
@@ -41,7 +41,7 @@ export default function AddItem() {
           from_location_id: null,
           to_location_id: destinationLocationId,
           quantity: quantity,
-          performed_by: 'b4974f63-ee89-42a1-bdb3-ce9df255c682', // TODO: Get user ID from auth context
+          performed_by: '3c53c4e6-dc90-4db4-b75b-a793fa454631', // TODO: Get user ID from auth context
           note: notes || undefined,
         },
       });
