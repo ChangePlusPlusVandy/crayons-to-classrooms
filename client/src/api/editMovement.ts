@@ -52,7 +52,10 @@ export async function editAddMovementTransaction(
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   });
-  if (!response.ok) throw new Error('Failed to edit movement');
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error ?? 'Failed to edit movement');
+  }
   const data = await response.json();
   return { ...data, movement: InventoryMovementSchema.parse(data.movement) };
 }
@@ -77,7 +80,10 @@ export async function editMoveMovementTransaction(
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   });
-  if (!response.ok) throw new Error('Failed to edit movement');
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error ?? 'Failed to edit movement');
+  }
   const data = await response.json();
   return { movement: InventoryMovementSchema.parse(data.movement) };
 }

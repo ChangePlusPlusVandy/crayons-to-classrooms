@@ -537,7 +537,8 @@ export const updateItem = async (req: Request, res: Response) => {
     const oldName = currentItem.rows[0].name as string;
     const newName = validatedData.name ?? oldName;
     const oldLocationId = currentItem.rows[0].current_location_id as string | null;
-    const newLocationId = validatedData.current_location_id ?? oldLocationId;
+    // Use 'in' check to distinguish between undefined (not provided) and null (explicitly set to null)
+    const newLocationId = 'current_location_id' in validatedData ? validatedData.current_location_id ?? null : oldLocationId;
 
     // If product_id is being updated, verify it exists
     if (validatedData.product_id) {
@@ -549,7 +550,7 @@ export const updateItem = async (req: Request, res: Response) => {
       }
     }
 
-    // If warehouse is being updated, verify it exists
+    // If warehouse is being updated to a non-null value, verify it exists
     if (validatedData.warehouse) {
       const warehouseCheck = await pool.query('SELECT id FROM warehouse WHERE id = $1', [
         validatedData.warehouse,

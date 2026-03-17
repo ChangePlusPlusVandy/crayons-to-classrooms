@@ -8,6 +8,7 @@ import AddItem from './pages/AddItem/AddItem';
 import Login from './pages/Login/Login';
 import SetPassword from './pages/SetPassword/SetPassword';
 import Users from './pages/Users/Users';
+import RemoveItemPage from './pages/TestPage/RemoveItemPage';
 import './App.css';
 
 function App() {
@@ -26,6 +27,8 @@ function App() {
                   <Route path="/dashboard" element={<Dashboard />} />
                   <Route path="/add-item" element={<AddItem />} />
                   <Route path="/move-item" element={<MoveItem />} />
+                  <Route path="/remove-item" element={<RemoveItemPage />} />
+                  <Route path="/users" element={<Users />} />
                   {/* Placeholder routes - these don't have to work yet */}
                   <Route
                     path="/inventory"
@@ -40,7 +43,6 @@ function App() {
                     path="/analytics"
                     element={<div style={{ padding: '2rem' }}>Analytics Page (Coming Soon)</div>}
                   />
-                  <Route path="/users" element={<Users />} />
                   <Route
                     path="/settings"
                     element={<div style={{ padding: '2rem' }}>Settings Page (Coming Soon)</div>}

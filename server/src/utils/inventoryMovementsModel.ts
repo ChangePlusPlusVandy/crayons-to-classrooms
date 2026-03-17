@@ -33,7 +33,7 @@ export const performedDateParamSchema = z.object({
 });
 
 // Validates action types for inventory movements
-export const ActionParamSchema = z.enum(['ADD', 'MOVE', 'CHECKOUT', 'DISCARD', 'ADJUSTMENT']);
+export const ActionParamSchema = z.enum(['ADD', 'MOVE', 'CHECKOUT', 'DISCARD', 'ADJUSTMENT', 'DONATED']);
 
 /**
  * Schema for inventory creation
@@ -45,7 +45,7 @@ export const createInventoryMovementSchema = z.object({
   item_id: uuidSchema,
   product_id: uuidSchema,
   from_location_id: uuidSchema.nullable().optional(),
-  to_location_id: uuidSchema,
+  to_location_id: uuidSchema.nullable().optional(),
   quantity: z.number().int().positive('Quantity must be a positive integer'),
   performed_by: uuidSchema,
   note: z.string().optional(),
@@ -58,7 +58,7 @@ export const updateInventoryMovementSchema = z
     product_id: uuidSchema.optional(),
     from_location_id: uuidSchema.nullable().optional(),
     to_location_id: uuidSchema.optional(),
-    quantity: z.number().int().nonnegative('Quantity must be a nonnegative integer').optional(),
+    quantity: z.number().int().positive('Quantity must be a positive integer').optional(),
     performed_by: uuidSchema.optional(),
     performed_at: z.coerce.date().optional(),
     note: z.string().optional(),
@@ -82,7 +82,7 @@ export const movementFieldsSchema = z.object({
   inventory_action: ActionParamSchema,
   from_location_id: uuidSchema.nullable().optional(),
   to_location_id: uuidSchema,
-  quantity: z.number().int().nonnegative('Quantity must be a nonnegative integer'),
+  quantity: z.number().int().positive('Quantity must be a positive integer'),
   performed_by: uuidSchema,
   note: z.string().optional(),
 });
