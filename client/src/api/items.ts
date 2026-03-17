@@ -39,4 +39,3 @@ export async function deleteItem(itemId: string): Promise<void> {
 
   if (!response.ok) throw new Error('Failed to delete item');
 }
-

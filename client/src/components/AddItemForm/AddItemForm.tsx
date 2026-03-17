@@ -130,19 +130,12 @@ export default function AddItemForm({
   };
 
   const isFormValid = (): boolean => {
-    return (
-      !!selectedWarehouse &&
-      !!selectedProduct &&
-      !!selectedSlot &&
-      isQuantityValid()
-    );
+    return !!selectedWarehouse && !!selectedProduct && !!selectedSlot && isQuantityValid();
   };
 
   const handleSubmit = async () => {
     // Find the destination location based on slot (first matching location)
-    const destinationLocation = warehouseLocations.find(
-      (loc) => loc.slot === selectedSlot
-    );
+    const destinationLocation = warehouseLocations.find((loc) => loc.slot === selectedSlot);
 
     // Validation
     if (!selectedWarehouse) {

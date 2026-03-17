@@ -538,7 +538,10 @@ export const updateItem = async (req: Request, res: Response) => {
     const newName = validatedData.name ?? oldName;
     const oldLocationId = currentItem.rows[0].current_location_id as string | null;
     // Use 'in' check to distinguish between undefined (not provided) and null (explicitly set to null)
-    const newLocationId = 'current_location_id' in validatedData ? validatedData.current_location_id ?? null : oldLocationId;
+    const newLocationId =
+      'current_location_id' in validatedData
+        ? (validatedData.current_location_id ?? null)
+        : oldLocationId;
 
     // If product_id is being updated, verify it exists
     if (validatedData.product_id) {
