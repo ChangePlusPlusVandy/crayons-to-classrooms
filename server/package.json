@@ -15,6 +15,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@supabase/supabase-js": "^2.98.0",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "eslint-define-config": "^2.1.0",

@@ -32,7 +32,14 @@ export const itemInfoIdParamSchema = z.object({
 /**
  * Valid status values for items
  */
-export const ItemStatus = z.enum(['active', 'inactive', 'discontinued', 'checked_out', 'donated', 'defective']);
+export const ItemStatus = z.enum([
+  'active',
+  'inactive',
+  'discontinued',
+  'checked_out',
+  'donated',
+  'defective',
+]);
 
 /**
  * Schema for validating item creation
