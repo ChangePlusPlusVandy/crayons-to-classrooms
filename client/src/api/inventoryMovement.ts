@@ -77,7 +77,9 @@ export async function getMovementsByStartLocationId(
 export async function getMovementsByEndLocationId(
   endLocationId: string
 ): Promise<InventoryMovement[]> {
-  const response = await authFetch(`${API_BASE_URL}/inventory-movement/end-location/${endLocationId}`);
+  const response = await authFetch(
+    `${API_BASE_URL}/inventory-movement/end-location/${endLocationId}`
+  );
   if (!response.ok) throw new Error('Failed to authFetch movements by end location');
   return response.json();
 }
@@ -86,7 +88,9 @@ export async function getMovementsByEndLocationId(
 export async function getMovementsByPerformedById(
   performedById: string
 ): Promise<InventoryMovement[]> {
-  const response = await authFetch(`${API_BASE_URL}/inventory-movement/performed-by/${performedById}`);
+  const response = await authFetch(
+    `${API_BASE_URL}/inventory-movement/performed-by/${performedById}`
+  );
   if (!response.ok) throw new Error('Failed to authFetch movements by performed-by ID');
   return response.json();
 }

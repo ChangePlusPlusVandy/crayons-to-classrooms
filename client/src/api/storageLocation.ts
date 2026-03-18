@@ -22,7 +22,9 @@ export async function getStorageLocationById(id: string): Promise<StorageLocatio
 export async function getStorageLocationByLocationCode(
   locationCode: string
 ): Promise<StorageLocation> {
-  const response = await authFetch(`${API_BASE_URL}/storage-locations/locationCode/${locationCode}`);
+  const response = await authFetch(
+    `${API_BASE_URL}/storage-locations/locationCode/${locationCode}`
+  );
   if (!response.ok) throw new Error('Failed to authFetch storage location by location code');
   return response.json();
 }
