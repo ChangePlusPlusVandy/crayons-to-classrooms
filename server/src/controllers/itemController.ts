@@ -76,6 +76,7 @@ export const syncItemInfoStock = async (
   quantity: number | undefined,
   value: number | undefined,
   itemLimit: number | undefined,
+  limbo: boolean | undefined,
   fixture: string | null | undefined,
   lastKnownLocationCode: string | null | undefined,
   stockDelta: number,
@@ -85,23 +86,23 @@ export const syncItemInfoStock = async (
   try {
     if (!createIfMissing) {
       const updateResult = await db.query(
-        'UPDATE item_info SET stock = stock + $1, limbo = (stock + $1) = 0, fixture = COALESCE($2, fixture), last_known_location_code = COALESCE($3, last_known_location_code), time_last_updated = NOW() WHERE name = $4 RETURNING id',
+        'UPDATE item_info SET stock = stock + $1, fixture = COALESCE($2, fixture), last_known_location_code = COALESCE($3, last_known_location_code), time_last_updated = NOW() WHERE name = $4 RETURNING id',
         [stockDelta, fixture ?? null, lastKnownLocationCode ?? null, itemName]
       );
       return updateResult.rows[0]?.id ?? null;
     }
 
     const upsertResult = await db.query(
-      `INSERT INTO item_info (name, product_id, category, quantity, value, item_limit, stock, fixture, last_known_location_code, time_last_updated, notes)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), $10)
+      `INSERT INTO item_info (name, product_id, category, quantity, value, item_limit, limbo, stock, fixture, last_known_location_code, time_last_updated, notes)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), $11)
        ON CONFLICT (name) DO UPDATE
        SET stock = item_info.stock + EXCLUDED.stock,
-           limbo = (item_info.stock + EXCLUDED.stock) = 0,
            product_id = COALESCE(EXCLUDED.product_id, item_info.product_id),
            category = COALESCE(EXCLUDED.category, item_info.category),
            quantity = COALESCE(EXCLUDED.quantity, item_info.quantity),
            value = COALESCE(EXCLUDED.value, item_info.value),
            item_limit = COALESCE(EXCLUDED.item_limit, item_info.item_limit),
+           limbo = COALESCE(EXCLUDED.limbo, item_info.limbo),
            fixture = COALESCE(EXCLUDED.fixture, item_info.fixture),
            last_known_location_code = COALESCE(EXCLUDED.last_known_location_code, item_info.last_known_location_code),
            time_last_updated = NOW()
@@ -113,6 +114,7 @@ export const syncItemInfoStock = async (
         quantity ?? null,
         value ?? null,
         itemLimit ?? null,
+        limbo ?? false,
         stockDelta,
         fixture ?? null,
         lastKnownLocationCode ?? null,
@@ -432,8 +434,8 @@ export async function createItemCore(
       warehouse,
       category ?? null,
       item_limit ?? null,
-      value,
       limbo ?? false,
+      value,
       notes ?? null,
       count,
     ]
@@ -448,6 +450,7 @@ export async function createItemCore(
     quantity,
     value,
     item_limit ?? 0,
+    limbo ?? false,
     fixtureOverride,
     locationCode,
     count,
@@ -542,7 +545,10 @@ export const updateItem = async (req: Request, res: Response) => {
     const newName = validatedData.name ?? oldName;
     const oldLocationId = currentItem.rows[0].current_location_id as string | null;
     // Use 'in' check to distinguish between undefined (not provided) and null (explicitly set to null)
-    const newLocationId = 'current_location_id' in validatedData ? validatedData.current_location_id ?? null : oldLocationId;
+    const newLocationId =
+      'current_location_id' in validatedData
+        ? (validatedData.current_location_id ?? null)
+        : oldLocationId;
 
     // If product_id is being updated, verify it exists
     if (validatedData.product_id) {
@@ -619,6 +625,7 @@ export const updateItem = async (req: Request, res: Response) => {
         undefined,
         undefined,
         0,
+        false,
         undefined,
         undefined,
         -1,
@@ -631,6 +638,7 @@ export const updateItem = async (req: Request, res: Response) => {
         updatedItem.quantity,
         updatedItem.value,
         updatedItem.item_limit ?? undefined,
+        updatedItem.limbo ?? false,
         undefined,
         locationCode,
         1,
@@ -644,6 +652,7 @@ export const updateItem = async (req: Request, res: Response) => {
         updatedItem.quantity,
         updatedItem.value,
         updatedItem.item_limit ?? undefined,
+        updatedItem.limbo ?? false,
         undefined,
         locationCode,
         0,
@@ -691,6 +700,7 @@ export const deleteItem = async (req: Request, res: Response) => {
         undefined,
         undefined,
         0,
+        false,
         undefined,
         undefined,
         -1,

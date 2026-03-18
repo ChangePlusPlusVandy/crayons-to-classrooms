@@ -121,6 +121,26 @@ export const getItemsInfoByName = async (req: Request, res: Response) => {
     res.status(500).json({ error: 'Internal server error' });
   }
 };
+/**
+ * Retrieves items that are in limbo.
+ *
+ * @param {Request} req - Express request object
+ * @param {Response} res - Express response object
+ * @returns {Promise<Response>} JSON array of items in limbo or error message
+ * @throws {500} Internal server error if database query fails
+ */
+export const getLimboItems = async (req: Request, res: Response) => {
+  try {
+    const items = await pool.query('SELECT * FROM item_info WHERE limbo = TRUE AND stock = 0');
+    if (!countRows(items.rows, res)) {
+      return;
+    }
+    res.json(items.rows);
+  } catch (error) {
+    console.error('Error fetching limbo items:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
 
 /**
  * Creates a new item in the database.

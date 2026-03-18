@@ -5,6 +5,7 @@ import Activities from './pages/Activities/Activities';
 import MoveItem from './pages/MoveItem/MoveItem';
 import AddItem from './pages/AddItem/AddItem';
 import RemoveItemPage from './pages/TestPage/RemoveItemPage';
+import Limbo from './pages/Limbo/Limbo';
 import './App.css';
 
 function App() {
@@ -23,10 +24,7 @@ function App() {
             element={<div style={{ padding: '2rem' }}>Inventory Page (Coming Soon)</div>}
           />
           <Route path="/activity-log" element={<Activities />} />
-          <Route
-            path="/limbo-items"
-            element={<div style={{ padding: '2rem' }}>Limbo Items Page (Coming Soon)</div>}
-          />
+          <Route path="/limbo-items" element={<Limbo />} />
           <Route
             path="/analytics"
             element={<div style={{ padding: '2rem' }}>Analytics Page (Coming Soon)</div>}
