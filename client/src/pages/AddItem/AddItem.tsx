@@ -2,8 +2,10 @@ import { useState } from 'react';
 import { Container, Typography, Paper, Alert } from '@mui/material';
 import { createItemWithMovement } from '../../api/addItem';
 import AddItemForm, { AddItemFormData } from '../../components/AddItemForm/AddItemForm';
+import { useAuth } from '../../context/AuthContext';
 
 export default function AddItem() {
+  const { user } = useAuth();
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [formKey, setFormKey] = useState(0);
@@ -28,7 +30,7 @@ export default function AddItem() {
           stock: 1,
           current_location_id: destinationLocationId,
           status: 'active',
-          created_by: '3c53c4e6-dc90-4db4-b75b-a793fa454631', // TODO: Get user ID from auth context
+          created_by: user!.id,
           warehouse: warehouse.id,
           category: product.category || undefined,
           item_limit: itemLimit || undefined,
@@ -41,7 +43,7 @@ export default function AddItem() {
           from_location_id: null,
           to_location_id: destinationLocationId,
           quantity: quantity,
-          performed_by: '3c53c4e6-dc90-4db4-b75b-a793fa454631', // TODO: Get user ID from auth context
+          performed_by: user!.id,
           note: notes || undefined,
         },
       });

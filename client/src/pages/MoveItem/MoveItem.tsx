@@ -2,8 +2,10 @@ import { useState } from 'react';
 import { Container, Typography, Paper, Alert } from '@mui/material';
 import { getItemsByLocation, moveItemsWithMovement } from '../../api/moveItem';
 import MoveItemForm, { MoveItemFormData } from '../../components/MoveItemForm/MoveItemForm';
+import { useAuth } from '../../context/AuthContext';
 
 export default function MoveItem() {
+  const { user } = useAuth();
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [formKey, setFormKey] = useState(0);
@@ -39,7 +41,7 @@ export default function MoveItem() {
           from_location_id: sourceSlot.id,
           to_location_id: destinationLocationId,
           quantity,
-          performed_by: '3c53c4e6-dc90-4db4-b75b-a793fa454631', // TODO: Get user ID
+          performed_by: user!.id,
           note: notes || undefined,
         },
       });

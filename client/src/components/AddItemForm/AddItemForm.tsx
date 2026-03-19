@@ -8,6 +8,7 @@ import {
   Stack,
   FormControl,
   Box,
+  Tooltip,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import { getProducts, getStorageLocations } from '../../api/addItem';
@@ -23,7 +24,6 @@ import {
 } from './AddItemForm.styles';
 import { WarehouseSelector } from '../WarehouseSelector/WarehouseSelector';
 import { SlotSelector } from '../SlotSelector/SlotSelector';
-import { FixtureSelector } from '../FixtureSelector/FixtureSelector';
 
 export interface AddItemFormData {
   warehouse: Warehouse;
@@ -37,7 +37,6 @@ interface AddItemFormProps {
   initialWarehouse?: Warehouse | null;
   initialProduct?: Product | null;
   initialSlot?: string | null;
-  initialFixture?: string | null;
   initialQuantity?: number | '';
   initialNotes?: string;
   onSubmit: (data: AddItemFormData) => Promise<void>;
@@ -49,7 +48,6 @@ export default function AddItemForm({
   initialWarehouse = null,
   initialProduct = null,
   initialSlot = null,
-  initialFixture = null,
   initialQuantity = '',
   initialNotes = '',
   onSubmit,
@@ -64,7 +62,6 @@ export default function AddItemForm({
   const [selectedWarehouse, setSelectedWarehouse] = useState<Warehouse | null>(initialWarehouse);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(initialProduct);
   const [selectedSlot, setSelectedSlot] = useState<string | null>(initialSlot);
-  const [selectedFixture, setSelectedFixture] = useState<string | null>(initialFixture);
   const [quantityToAdd, setQuantityToAdd] = useState<number | ''>(initialQuantity);
   const [notes, setNotes] = useState(initialNotes);
 
@@ -133,23 +130,12 @@ export default function AddItemForm({
   };
 
   const isFormValid = (): boolean => {
-    return (
-      !!selectedWarehouse &&
-      !!selectedProduct &&
-      !!selectedSlot &&
-      !!selectedFixture &&
-      isQuantityValid()
-    );
+    return !!selectedWarehouse && !!selectedProduct && !!selectedSlot && isQuantityValid();
   };
 
   const handleSubmit = async () => {
-    // Find the destination location based on slot and fixture
-    const destinationLocation = warehouseLocations.find((loc) => {
-      if (selectedFixture === 'None') {
-        return loc.slot === selectedSlot && (!loc.fixture || loc.fixture.trim() === '');
-      }
-      return loc.slot === selectedSlot && loc.fixture === selectedFixture;
-    });
+    // Find the destination location based on slot (first matching location)
+    const destinationLocation = warehouseLocations.find((loc) => loc.slot === selectedSlot);
 
     // Validation
     if (!selectedWarehouse) {
@@ -160,8 +146,8 @@ export default function AddItemForm({
       setError('Please select an item name.');
       return;
     }
-    if (!selectedSlot || !selectedFixture) {
-      setError('Please select a slot and fixture.');
+    if (!selectedSlot) {
+      setError('Please select a slot.');
       return;
     }
     if (!destinationLocation) {
@@ -218,7 +204,6 @@ export default function AddItemForm({
         onChange={(newWarehouse) => {
           setSelectedWarehouse(newWarehouse);
           setSelectedSlot(null);
-          setSelectedFixture(null);
           setError('');
         }}
         label="Warehouse"
@@ -263,23 +248,25 @@ export default function AddItemForm({
           renderInput={(params) => <TextField {...params} placeholder="Search for an item name" />}
           noOptionsText="No matching products found"
         />
-        <Button
-          startIcon={<AddIcon />}
-          sx={{
-            justifyContent: 'flex-start',
-            textTransform: 'none',
-            color: 'primary.main',
-            marginTop: 0,
-            '&:hover': {
-              backgroundColor: 'transparent',
-            },
-          }}
-          onClick={() => {
-            // TODO: Add new item name functionality
-          }}
-        >
-          New Item Name
-        </Button>
+        <Tooltip title="Coming soon">
+          <span>
+            <Button
+              disabled
+              startIcon={<AddIcon />}
+              sx={{
+                justifyContent: 'flex-start',
+                textTransform: 'none',
+                color: 'primary.main',
+                marginTop: 0,
+                '&:hover': {
+                  backgroundColor: 'transparent',
+                },
+              }}
+            >
+              New Item Name
+            </Button>
+          </span>
+        </Tooltip>
       </FormControl>
 
       {/* Slot Selection */}
@@ -287,24 +274,10 @@ export default function AddItemForm({
         value={selectedSlot}
         onChange={(newSlot) => {
           setSelectedSlot(newSlot);
-          setSelectedFixture(null);
           setError('');
         }}
         warehouse={selectedWarehouse}
         storageLocations={storageLocations}
-      />
-
-      {/* Fixture Selection */}
-      <FixtureSelector
-        value={selectedFixture}
-        onChange={(newFixture) => {
-          setSelectedFixture(newFixture);
-          setError('');
-        }}
-        slot={selectedSlot}
-        warehouse={selectedWarehouse}
-        storageLocations={storageLocations}
-        nullFixtureLabel="None"
       />
 
       {/* Quantity to Add */}
