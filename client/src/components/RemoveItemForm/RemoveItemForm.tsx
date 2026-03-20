@@ -17,9 +17,39 @@ import { Item } from '../../types/Item';
 import { Warehouse } from '../../types/Warehouse';
 import { StorageLocation } from '../../types/StorageLocation';
 
+// Simple module-level cache to avoid repeatedly fetching all storage locations.
+let cachedStorageLocations: StorageLocation[] | null = null;
+let cachedStorageLocationsPromise: Promise<StorageLocation[]> | null = null;
+
+async function getCachedStorageLocations(): Promise<StorageLocation[]> {
+  // Return already cached locations if available.
+  if (cachedStorageLocations) {
+    return cachedStorageLocations;
+  }
+
+  // If a fetch is already in progress, reuse the same promise.
+  if (cachedStorageLocationsPromise) {
+    return cachedStorageLocationsPromise;
+  }
+
+  // Otherwise, start a new fetch and cache both the promise and result.
+  cachedStorageLocationsPromise = getAllStorageLocations()
+    .then((locations) => {
+      cachedStorageLocations = locations;
+      return locations;
+    })
+    .finally(() => {
+      // Clear the in-flight promise once settled; the data itself remains cached.
+      cachedStorageLocationsPromise = null;
+    });
+
+  return cachedStorageLocationsPromise;
+}
+
 export type ItemGroupWithLocation = {
   items: Item[];
   name: string;
+  itemInfoId: string;
   locationCode: string;
   locationId: string;
   productId: string;
@@ -107,12 +137,15 @@ export default function RemoveItemForm({
       }
 
       try {
-        const allLocations = await getAllStorageLocations();
+        // Use cached storage locations to avoid repeated full-list network requests.
+        const allLocations = await getCachedStorageLocations();
         const locationMap = new Map(allLocations.map((loc) => [loc.id, loc.location_code]));
 
+        // Group items by item_info_id + location — one dropdown entry per unique combination.
+        // Using item_info_id (not name) prevents merging distinct products that share a display name.
         const groupMap = new Map<string, ItemGroupWithLocation>();
         for (const item of itemsInSelectedWarehouse) {
-          const key = `${item.name}|${item.current_location_id}`;
+          const key = `${item.item_info}|${item.current_location_id}`;
           const locationCode = locationMap.get(item.current_location_id) ?? 'Unknown';
           if (groupMap.has(key)) {
             groupMap.get(key)!.items.push(item);
@@ -120,6 +153,7 @@ export default function RemoveItemForm({
             groupMap.set(key, {
               items: [item],
               name: item.name,
+              itemInfoId: item.item_info,
               locationCode,
               locationId: item.current_location_id,
               productId: item.product_id,
@@ -229,10 +263,10 @@ export default function RemoveItemForm({
             setSelectedGroup(newValue);
             setQuantityToRemove(null);
           }}
-          isOptionEqualToValue={(a, b) => a.name === b.name && a.locationId === b.locationId}
+          isOptionEqualToValue={(a, b) => a.itemInfoId === b.itemInfoId && a.locationId === b.locationId}
           getOptionLabel={(option) => option.name}
           renderOption={(props, option) => (
-            <li {...props} key={`${option.name}|${option.locationId}`}>
+            <li {...props} key={`${option.itemInfoId}|${option.locationId}`}>
               <Box>
                 <Typography fontWeight={500}>{option.name}</Typography>
                 <Typography variant="body2" color="text.secondary">
@@ -261,8 +295,13 @@ export default function RemoveItemForm({
               setQuantityToRemove(null);
               return;
             }
-            const val = Number(raw);
-            setQuantityToRemove(Math.min(Math.max(val, 0), selectedGroup.items.length));
+            const parsed = Math.floor(Number(raw));
+            if (!Number.isFinite(parsed)) {
+              setQuantityToRemove(null);
+              return;
+            }
+            const clamped = Math.min(Math.max(parsed, 0), selectedGroup.items.length);
+            setQuantityToRemove(clamped);
           }}
           fullWidth
           inputProps={{ min: 0, max: selectedGroup?.items.length ?? 0 }}

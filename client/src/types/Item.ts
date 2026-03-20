@@ -14,6 +14,7 @@ export type Item = {
   limbo: boolean;
   notes: string;
   name: string;
+  item_info: string;
   stock?: number;
 };
 

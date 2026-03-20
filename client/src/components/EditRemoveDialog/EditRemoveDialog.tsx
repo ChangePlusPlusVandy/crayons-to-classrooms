@@ -40,9 +40,15 @@ export function EditRemoveDialog({ open, onClose, movement, onSuccess }: EditRem
     setFetchError('');
 
     async function fetchData() {
+      if (movement.from_location_id == null) {
+        setFetchError('Failed to load movement details');
+        setLoading(false);
+        return;
+      }
+
       try {
         const [location, prod] = await Promise.all([
-          getStorageLocationById(movement.from_location_id!),
+          getStorageLocationById(movement.from_location_id),
           getProductById(movement.product_id),
         ]);
         const wh = await getWarehouseById(location.warehouse_id);

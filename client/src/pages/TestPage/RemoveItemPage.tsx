@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import {
   Container,
   Typography,
@@ -11,18 +11,18 @@ import {
   FormControl,
 } from '@mui/material';
 
-import { getItems, updateItem } from '../../api/items';
-import { createInventoryMovement } from '../../api/addItem';
-import { Item, UpdateItemRequest } from '../../types/Item';
+import { getItems } from '../../api/items';
+import { removeItemsWithMovement } from '../../api/removeItem';
+import { Item } from '../../types/Item';
 import { Warehouse } from '../../types/Warehouse';
 import { RemoveItemCard, RemoveItemFormLabel } from './RemoveItemPage.styles';
 import { WarehouseSelector } from '../../components/WarehouseSelector/WarehouseSelector';
 import { getAllStorageLocations } from '../../api/storageLocation';
-import { useMemo } from 'react';
 
 type ItemGroupWithLocation = {
-  items: Item[];        // all DB rows for this name+location group
+  items: Item[]; // all DB rows for this item_info+location group
   name: string;
+  itemInfoId: string;
   locationCode: string;
   locationId: string;
 };
@@ -83,43 +83,18 @@ export default function RemoveItemPage() {
     setLoading(true);
 
     try {
-      const isFullRemoval = quantityToRemove === selectedGroup.items.length;
-      const newStatus = 'inactive';
       const itemsToRemove = selectedGroup.items.slice(0, quantityToRemove);
-      const representative = selectedGroup.items[0];
+      const isFullRemoval = quantityToRemove === selectedGroup.items.length;
 
-      if (isFullRemoval) {
-        // Full removal: update status and nullify location fields on all items in group
-        await Promise.all(
-          itemsToRemove.map((item) =>
-            updateItem(item.id, {
-              status: newStatus,
-              current_location_id: null,
-              warehouse: null,
-            } as UpdateItemRequest)
-          )
-        );
-      } else {
-        // Partial removal: update status on the N items being removed
-        await Promise.all(
-          itemsToRemove.map((item) =>
-            updateItem(item.id, {
-              status: newStatus,
-            } as UpdateItemRequest)
-          )
-        );
-      }
-
-      // Create inventory movement record (uses first item as representative)
-      await createInventoryMovement({
-        inventory_action: removalAction,
-        item_id: representative.id,
-        product_id: representative.product_id,
-        from_location_id: representative.current_location_id,
-        to_location_id: null,
-        quantity: quantityToRemove,
-        performed_by: '3c53c4e6-dc90-4db4-b75b-a793fa454631', // Hardcoded user ID (matches Add/Move pages)
-        note: notes || undefined,
+      await removeItemsWithMovement({
+        item_ids: itemsToRemove.map((item) => item.id),
+        movement: {
+          inventory_action: removalAction,
+          from_location_id: selectedGroup.locationId,
+          quantity: quantityToRemove,
+          performed_by: '3c53c4e6-dc90-4db4-b75b-a793fa454631', // Hardcoded user ID (matches Add/Move pages)
+          note: notes || undefined,
+        },
       });
 
       // Refresh items
@@ -163,10 +138,11 @@ export default function RemoveItemPage() {
         const allLocations = await getAllStorageLocations();
         const locationMap = new Map(allLocations.map((loc) => [loc.id, loc.location_code]));
 
-        // Group items by name + location — one dropdown entry per unique combination
+        // Group items by item_info + location — one dropdown entry per unique combination.
+        // Using item_info_id (not name) prevents merging distinct products that share a display name.
         const groupMap = new Map<string, ItemGroupWithLocation>();
         for (const item of itemsInSelectedWarehouse) {
-          const key = `${item.name}|${item.current_location_id}`;
+          const key = `${item.item_info}|${item.current_location_id}`;
           const locationCode = locationMap.get(item.current_location_id) ?? 'Unknown';
           if (groupMap.has(key)) {
             groupMap.get(key)!.items.push(item);
@@ -174,6 +150,7 @@ export default function RemoveItemPage() {
             groupMap.set(key, {
               items: [item],
               name: item.name,
+              itemInfoId: item.item_info,
               locationCode,
               locationId: item.current_location_id,
             });
@@ -265,10 +242,12 @@ export default function RemoveItemPage() {
                   options={groupOptions}
                   value={selectedGroup}
                   onChange={(_, newValue) => setSelectedGroup(newValue)}
-                  isOptionEqualToValue={(a, b) => a.name === b.name && a.locationId === b.locationId}
+                  isOptionEqualToValue={(a, b) =>
+                    a.itemInfoId === b.itemInfoId && a.locationId === b.locationId
+                  }
                   getOptionLabel={(option) => option.name}
                   renderOption={(props, option) => (
-                    <li {...props} key={`${option.name}|${option.locationId}`}>
+                    <li {...props} key={`${option.itemInfoId}|${option.locationId}`}>
                       <Box>
                         <Typography fontWeight={500}>{option.name}</Typography>
                         <Typography variant="body2" color="text.secondary">
@@ -320,8 +299,13 @@ export default function RemoveItemPage() {
                     return;
                   }
 
-                  const val = Number(raw);
-                  setQuantityToRemove(Math.min(Math.max(val, 0), selectedGroup.items.length));
+                  const parsed = Math.floor(Number(raw));
+                  if (!Number.isFinite(parsed)) {
+                    setQuantityToRemove(null);
+                    return;
+                  }
+                  const clamped = Math.min(Math.max(parsed, 0), selectedGroup.items.length);
+                  setQuantityToRemove(clamped);
                 }}
                 fullWidth
                 inputProps={{ min: 0, max: selectedGroup?.items.length ?? 0 }}

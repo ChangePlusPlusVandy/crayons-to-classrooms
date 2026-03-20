@@ -76,15 +76,32 @@ export async function createItem(itemData: {
   return response.json();
 }
 
+export interface CreateInventoryMovementRequest {
+  inventory_action: InventoryMovement['inventory_action'];
+  item_id: string;
+  product_id: string;
+  from_location_id?: string | null;
+  to_location_id?: string | null;
+  quantity: number;
+  /** Must be a valid user UUID — cannot be null. */
+  performed_by: string;
+  note?: string;
+}
+
 export async function createInventoryMovement(
-  movement: Omit<InventoryMovement, 'id' | 'performed_at'>
+  movement: CreateInventoryMovementRequest
 ): Promise<InventoryMovement> {
   const response = await fetch(`${API_BASE_URL}/inventory-movement`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify(movement),
+    body: JSON.stringify({
+      ...movement,
+      // Normalise: never send null for note — omit the key instead so the
+      // server receives undefined and applies its optional default.
+      note: movement.note ?? undefined,
+    }),
   });
   if (!response.ok) throw new Error('Failed to create inventory movement');
   const data = await response.json();
