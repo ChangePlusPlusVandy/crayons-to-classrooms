@@ -105,6 +105,21 @@ export async function createInventoryMovement(
   return InventoryMovementSchema.parse(data);
 }
 
+export async function createProduct(payload: {
+  name: string;
+  value: number;
+  category?: string;
+  item_limit?: number;
+}): Promise<Product> {
+  const response = await authFetch(`${API_BASE_URL}/products`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) throw new Error('Failed to create product');
+  return response.json();
+}
+
 export async function createItemWithMovement(payload: {
   item: {
     name: string;
