@@ -453,6 +453,12 @@ export default function AddItemForm({
                   setNewItemPackSize(isNaN(val) ? '' : val);
                 }}
                 placeholder="Enter pack size (optional, default 1)"
+                error={typeof newItemPackSize === 'number' && newItemPackSize < 1}
+                helperText={
+                  typeof newItemPackSize === 'number' && newItemPackSize < 1
+                    ? 'Pack size must be at least 1'
+                    : ''
+                }
                 slotProps={{ htmlInput: { min: 1, step: 1 } }}
               />
             </FormControl>
