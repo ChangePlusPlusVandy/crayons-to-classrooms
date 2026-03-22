@@ -93,17 +93,6 @@ export default function Limbo() {
     setRestockItem(null);
   };
 
-  const handleConfirmRestock = async () => {
-    if (!restockItem || restockQuantity === null || restockQuantity <= 0) {
-      return;
-    }
-
-    // TODO: Implement actual restock call:
-    // - likely create inventory movement + update items / item_info
-    // - once backend API is defined, call it here and then refresh data
-
-    closeRestockDialog();
-  };
 
   const rowsInTable = filteredItems.length;
   // Dummy metric placeholder (backend not implemented yet)
