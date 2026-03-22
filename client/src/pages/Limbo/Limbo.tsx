@@ -217,7 +217,7 @@ export default function Limbo() {
                   fullWidth
                   size="small"
                   sx={limboStyles.searchTextField}
-                  InputLabelProps={{ shrink: true }}
+                  slotProps={{ inputLabel: { shrink: true } }}
                 />
               </Box>
             </Box>
