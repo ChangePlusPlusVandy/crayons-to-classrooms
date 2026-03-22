@@ -14,7 +14,7 @@ import {
   DialogActions,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
-import { getProducts, getStorageLocations } from '../../api/addItem';
+import { getProducts, getStorageLocations, createProduct } from '../../api/addItem';
 import { Warehouse } from '../../types/Warehouse';
 import { StorageLocation } from '../../types/StorageLocation';
 import { Product } from '../../types/Product';
@@ -38,9 +38,9 @@ export interface AddItemFormData {
   newProductData?: {
     name: string;
     category: string;
-    subcategory: string;
+    subcategoryProductId?: string;
     limit?: number;
-    value: number;
+    value?: number;
     packSize?: number;
   };
 }
@@ -83,7 +83,7 @@ export default function AddItemForm({
   const [isNewItemMode, setIsNewItemMode] = useState(false);
   const [newItemName, setNewItemName] = useState('');
   const [newItemCategory, setNewItemCategory] = useState<string | null>(null);
-  const [newItemSubcategory, setNewItemSubcategory] = useState<string | null>(null);
+  const [selectedSubcategoryProduct, setSelectedSubcategoryProduct] = useState<Product | null>(null);
   const [newItemLimit, setNewItemLimit] = useState<number | ''>('');
   const [newItemValue, setNewItemValue] = useState<number | ''>('');
   const [newItemPackSize, setNewItemPackSize] = useState<number | ''>('');
@@ -92,9 +92,9 @@ export default function AddItemForm({
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
   const [subcategoryDialogOpen, setSubcategoryDialogOpen] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
-  const [newSubcategoryName, setNewSubcategoryName] = useState('');
+  const [newSubcategoryProductName, setNewSubcategoryProductName] = useState('');
   const [customCategories, setCustomCategories] = useState<string[]>([]);
-  const [customSubcategories, setCustomSubcategories] = useState<string[]>([]);
+  const [creatingSubcategory, setCreatingSubcategory] = useState(false);
 
   // UI states
   const [loading, setLoading] = useState(true);
@@ -138,11 +138,6 @@ export default function AddItemForm({
     return unique;
   }, [products, customCategories]);
 
-  // Subcategories are session-local only
-  const availableSubcategories = useMemo(() => {
-    return [...customSubcategories].sort((a, b) => a.localeCompare(b));
-  }, [customSubcategories]);
-
   // Helper to highlight matching text in search results
   const highlightText = (text: string, searchTerm: string): React.ReactNode => {
     if (!searchTerm.trim()) {
@@ -181,9 +176,7 @@ export default function AddItemForm({
         !!selectedWarehouse &&
         !!newItemName.trim() &&
         !!selectedSlot &&
-        isQuantityValid() &&
-        typeof newItemValue === 'number' &&
-        newItemValue > 0
+        isQuantityValid()
       );
     }
     return !!selectedWarehouse && !!selectedProduct && !!selectedSlot && isQuantityValid();
@@ -204,10 +197,6 @@ export default function AddItemForm({
     }
     if (isNewItemMode && !newItemName.trim()) {
       setError('Please enter an item name.');
-      return;
-    }
-    if (isNewItemMode && (typeof newItemValue !== 'number' || newItemValue <= 0)) {
-      setError('Please enter a valid value greater than 0.');
       return;
     }
     if (!selectedSlot) {
@@ -235,7 +224,7 @@ export default function AddItemForm({
           name: newItemName.trim(),
           description: null,
           unit_of_measure: null,
-          value: newItemValue as number,
+          value: typeof newItemValue === 'number' ? newItemValue : 0,
           item_limit: typeof newItemLimit === 'number' ? newItemLimit : 0,
           category: newItemCategory || '',
           total_count: 0,
@@ -251,9 +240,9 @@ export default function AddItemForm({
           newProductData: {
             name: newItemName.trim(),
             category: newItemCategory || '',
-            subcategory: newItemSubcategory || '',
+            subcategoryProductId: selectedSubcategoryProduct?.id || undefined,
             limit: typeof newItemLimit === 'number' ? newItemLimit : undefined,
-            value: newItemValue as number,
+            value: typeof newItemValue === 'number' ? newItemValue : undefined,
             packSize: typeof newItemPackSize === 'number' ? newItemPackSize : undefined,
           },
         });
@@ -282,14 +271,22 @@ export default function AddItemForm({
     setCategoryDialogOpen(false);
   };
 
-  const handleAddSubcategory = () => {
-    const trimmed = newSubcategoryName.trim();
-    if (trimmed && !availableSubcategories.includes(trimmed)) {
-      setCustomSubcategories((prev) => [...prev, trimmed]);
+  const handleAddSubcategory = async () => {
+    const trimmed = newSubcategoryProductName.trim();
+    if (!trimmed) return;
+
+    setCreatingSubcategory(true);
+    try {
+      const newProduct = await createProduct({ name: trimmed, value: 0 });
+      setProducts((prev) => [...prev, newProduct]);
+      setSelectedSubcategoryProduct(newProduct);
+      setNewSubcategoryProductName('');
+      setSubcategoryDialogOpen(false);
+    } catch {
+      setError('Failed to create subcategory product. Please try again.');
+    } finally {
+      setCreatingSubcategory(false);
     }
-    setNewItemSubcategory(trimmed);
-    setNewSubcategoryName('');
-    setSubcategoryDialogOpen(false);
   };
 
   if (loading) {
@@ -350,7 +347,7 @@ export default function AddItemForm({
                 value={newItemCategory}
                 onChange={(_, newValue) => setNewItemCategory(newValue)}
                 renderInput={(params) => (
-                  <TextField {...params} placeholder="Select or add a category" />
+                  <TextField {...params} placeholder="Select or add a category (optional)" />
                 )}
                 freeSolo={false}
               />
@@ -369,18 +366,24 @@ export default function AddItemForm({
               </Button>
             </FormControl>
 
-            {/* Subcategory */}
+            {/* Subcategory (Product) */}
             <FormControl fullWidth sx={{ mt: 2 }}>
               <AddItemFormLabel htmlFor="subcategory-select">Subcategory</AddItemFormLabel>
               <Autocomplete
                 id="subcategory-select"
-                options={availableSubcategories}
-                value={newItemSubcategory}
-                onChange={(_, newValue) => setNewItemSubcategory(newValue)}
+                options={products}
+                getOptionLabel={(option) => option.name || 'Unknown Product'}
+                filterOptions={(options, state) => {
+                  const searchTerm = state.inputValue.toLowerCase().trim();
+                  if (!searchTerm) return options;
+                  return options.filter((p) => p.name?.toLowerCase().includes(searchTerm));
+                }}
+                value={selectedSubcategoryProduct}
+                onChange={(_, newValue) => setSelectedSubcategoryProduct(newValue)}
                 renderInput={(params) => (
-                  <TextField {...params} placeholder="Select or add a subcategory" />
+                  <TextField {...params} placeholder="Select a subcategory (optional)" />
                 )}
-                freeSolo={false}
+                noOptionsText="No matching products found"
               />
               <Button
                 startIcon={<AddIcon />}
@@ -426,14 +429,14 @@ export default function AddItemForm({
                   const val = parseFloat(e.target.value);
                   setNewItemValue(isNaN(val) ? '' : val);
                 }}
-                placeholder="Enter item value"
-                error={newItemValue !== '' && (typeof newItemValue !== 'number' || newItemValue <= 0)}
+                placeholder="Enter item value (optional)"
+                error={newItemValue !== '' && typeof newItemValue === 'number' && newItemValue < 0}
                 helperText={
-                  newItemValue !== '' && (typeof newItemValue !== 'number' || newItemValue <= 0)
-                    ? 'Value must be greater than 0'
+                  newItemValue !== '' && typeof newItemValue === 'number' && newItemValue < 0
+                    ? 'Value cannot be negative'
                     : ''
                 }
-                slotProps={{ htmlInput: { min: 0.01, step: 0.01 } }}
+                slotProps={{ htmlInput: { min: 0, step: 0.01 } }}
               />
             </FormControl>
 
@@ -622,16 +625,21 @@ export default function AddItemForm({
           <TextField
             autoFocus
             fullWidth
-            label="Subcategory Name"
-            value={newSubcategoryName}
-            onChange={(e) => setNewSubcategoryName(e.target.value)}
+            label="Product Name"
+            value={newSubcategoryProductName}
+            onChange={(e) => setNewSubcategoryProductName(e.target.value)}
             sx={{ mt: 1 }}
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setSubcategoryDialogOpen(false)}>Cancel</Button>
-          <Button onClick={handleAddSubcategory} disabled={!newSubcategoryName.trim()}>
-            Add
+          <Button onClick={() => setSubcategoryDialogOpen(false)} disabled={creatingSubcategory}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleAddSubcategory}
+            disabled={!newSubcategoryProductName.trim() || creatingSubcategory}
+          >
+            {creatingSubcategory ? <CircularProgress size={20} /> : 'Add'}
           </Button>
         </DialogActions>
       </Dialog>

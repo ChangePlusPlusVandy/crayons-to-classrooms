@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Container, Typography, Paper, Alert } from '@mui/material';
-import { createItemWithMovement, createProduct } from '../../api/addItem';
+import { createItemWithMovement } from '../../api/addItem';
 import AddItemForm, { AddItemFormData } from '../../components/AddItemForm/AddItemForm';
 import { useAuth } from '../../context/AuthContext';
 
@@ -17,30 +17,19 @@ export default function AddItem() {
     setSuccess('');
 
     try {
-      let productId: string;
+      let productId: string | undefined;
       let productName: string;
-      let productValue: number;
+      let productValue: number | undefined;
       let productCategory: string | undefined;
       let productItemLimit: number | undefined;
       let packSize = 1;
 
       if (data.isNewProduct && data.newProductData) {
-        // Step 1: Create the new product
-        const newProduct = await createProduct({
-          name: data.newProductData.name,
-          value: data.newProductData.value,
-          category: data.newProductData.category || undefined,
-          item_limit: data.newProductData.limit,
-        });
-
-        productId = newProduct.id;
-        productName = newProduct.name;
-        productValue = newProduct.value;
-        productCategory = newProduct.category || undefined;
-        productItemLimit =
-          typeof newProduct.item_limit === 'string'
-            ? parseInt(newProduct.item_limit, 10)
-            : newProduct.item_limit;
+        productId = data.newProductData.subcategoryProductId;
+        productName = data.newProductData.name;
+        productValue = data.newProductData.value;
+        productCategory = data.newProductData.category || undefined;
+        productItemLimit = data.newProductData.limit;
         if (data.newProductData.packSize) {
           packSize = data.newProductData.packSize;
         }
@@ -56,7 +45,6 @@ export default function AddItem() {
             : product.item_limit;
       }
 
-      // Step 2: Create item with movement
       await createItemWithMovement({
         item: {
           name: productName,
@@ -85,13 +73,7 @@ export default function AddItem() {
       setSuccess(`${quantity} item${quantity > 1 ? 's' : ''} added successfully!`);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to add item. Please try again.';
-      if (data.isNewProduct && message !== 'Failed to create product') {
-        setError(
-          `The product was created but adding items failed: ${message}. You can search for "${data.newProductData?.name}" in the existing items dropdown to retry.`
-        );
-      } else {
-        setError(message);
-      }
+      setError(message);
     }
   };
 
