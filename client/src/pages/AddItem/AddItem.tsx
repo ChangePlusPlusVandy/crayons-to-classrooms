@@ -30,7 +30,7 @@ export default function AddItem() {
         productValue = data.newProductData.value;
         productCategory = data.newProductData.category || undefined;
         productItemLimit = data.newProductData.limit;
-        if (data.newProductData.packSize) {
+        if (typeof data.newProductData.packSize === 'number' && data.newProductData.packSize >= 1) {
           packSize = data.newProductData.packSize;
         }
       } else {
