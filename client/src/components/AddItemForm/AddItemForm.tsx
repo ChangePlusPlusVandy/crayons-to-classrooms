@@ -42,6 +42,7 @@ export interface AddItemFormData {
     limit?: number;
     value?: number;
     packSize?: number;
+    fixture?: string;
   };
 }
 
@@ -87,6 +88,7 @@ export default function AddItemForm({
   const [newItemLimit, setNewItemLimit] = useState<number | ''>('');
   const [newItemValue, setNewItemValue] = useState<number | ''>('');
   const [newItemPackSize, setNewItemPackSize] = useState<number | ''>('');
+  const [newItemFixture, setNewItemFixture] = useState<string | null>(null);
 
   // Category/subcategory dialog states
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
@@ -127,6 +129,17 @@ export default function AddItemForm({
       ? storageLocations.filter((loc) => loc.warehouse_id === selectedWarehouse.id)
       : [];
   }, [selectedWarehouse, storageLocations]);
+
+  // Derive available fixtures from storage locations
+  const availableFixtures = useMemo(() => {
+    const fixtureSet = new Set<string>();
+    storageLocations.forEach((loc) => {
+      if (loc.fixture && loc.fixture.trim() !== '') {
+        fixtureSet.add(loc.fixture);
+      }
+    });
+    return Array.from(fixtureSet).sort();
+  }, [storageLocations]);
 
   // Derive available categories from existing products + custom ones
   const availableCategories = useMemo(() => {
@@ -244,6 +257,7 @@ export default function AddItemForm({
             limit: typeof newItemLimit === 'number' ? newItemLimit : undefined,
             value: typeof newItemValue === 'number' ? newItemValue : undefined,
             packSize: typeof newItemPackSize === 'number' ? newItemPackSize : undefined,
+            fixture: newItemFixture || undefined,
           },
         });
       } else {
@@ -460,6 +474,21 @@ export default function AddItemForm({
                     : ''
                 }
                 slotProps={{ htmlInput: { min: 1, step: 1 } }}
+              />
+            </FormControl>
+
+            {/* Fixture */}
+            <FormControl fullWidth sx={{ mt: 2 }}>
+              <AddItemFormLabel htmlFor="fixture-input">Fixture</AddItemFormLabel>
+              <Autocomplete
+                id="fixture-input"
+                options={availableFixtures}
+                value={newItemFixture}
+                onChange={(_, newValue) => setNewItemFixture(newValue)}
+                renderInput={(params) => (
+                  <TextField {...params} placeholder="Select fixture (optional)" />
+                )}
+                noOptionsText="No fixtures available"
               />
             </FormControl>
 
