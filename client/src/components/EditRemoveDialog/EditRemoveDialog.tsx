@@ -63,6 +63,7 @@ export function EditRemoveDialog({ open, onClose, movement, onSuccess }: EditRem
           locationCode: location.location_code,
           locationId: location.id,
           productId: movement.product_id,
+          itemInfoId: movement.product_id,
           items: Array.from({ length: movement.quantity }, () => ({} as Item)),
         });
       } catch {

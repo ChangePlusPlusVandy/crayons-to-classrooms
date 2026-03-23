@@ -18,6 +18,7 @@ import {
   editRemoveSchema,
   createItemWithMovementSchema,
   moveItemsWithMovementSchema,
+  removeItemsWithMovementSchema,
 } from '../utils/inventoryMovementsModel.js';
 import { ZodError } from 'zod';
 import { DbClient } from '../utils/dbTypes.js';
@@ -763,7 +764,8 @@ export const moveItemsWithMovement = async (req: Request, res: Response) => {
 };
 /**
  * POST /api/inventory-movement/with-remove
- * Atomically marks items as inactive (clearing their location) and creates a DONATED/DISCARD movement record.
+ * Atomically updates item status to reflect the removal reason ('donated' for DONATED, 'defective' for DISCARD),
+ * clears their location, and creates a corresponding DONATED/DISCARD movement record.
  * @returns {Promise<Response>} JSON object with { updatedCount, movement } or error message
  */
 export const removeItemsWithMovement = async (req: Request, res: Response) => {
@@ -1006,18 +1008,19 @@ export const editInventoryMovementRemove = async (req: Request, res: Response) =
       throw new InvalidError('Cannot restore items: original movement has no from_location_id');
     }
 
-    // Undo original removal: find the exact items from this removal batch.
+    // Undo original removal: find the items from this removal batch.
     // We match on item_info (the item type grouping, e.g. "Markers") rather than the optional
-    // product_id, and on the removal status ('donated'/'defective') set at removal time, plus
-    // updated_at = performed_at — Postgres NOW() is identical for every statement in the same
-    // transaction, so this timestamp uniquely identifies this batch.
+    // product_id, and on the removal status ('donated'/'defective') set at removal time.
+    // To avoid relying on exact timestamp equality between item updates and the movement row,
+    // we select the most recently updated matching items whose updated_at is <= performed_at,
+    // and limit the selection to the original quantity.
     const originalStatus = originalMovement.inventory_action === 'DONATED' ? 'donated' : 'defective';
     const itemsToRestore = await client.query(
       `SELECT id FROM items
        WHERE item_info = (SELECT item_info FROM items WHERE id = $1)
          AND status = $2
-         AND updated_at = $3
-       ORDER BY id
+         AND updated_at <= $3
+       ORDER BY updated_at DESC, id DESC
        LIMIT $4`,
       [originalMovement.item_id, originalStatus, originalMovement.performed_at, originalMovement.quantity]
     );
@@ -1086,6 +1089,8 @@ export const editInventoryMovementRemove = async (req: Request, res: Response) =
       updateQuery = `
         UPDATE items
         SET status = $2,
+            current_location_id = NULL,
+            warehouse = NULL,
             updated_at = NOW()
         WHERE id = ANY($1::uuid[])
           AND product_id = $3

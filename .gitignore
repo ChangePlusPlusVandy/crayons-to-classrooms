@@ -42,3 +42,6 @@ out/
 
 # Misc
 *.log
+
+# Claude Code local config (machine-specific, never commit)
+.claude/
