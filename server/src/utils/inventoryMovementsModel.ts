@@ -52,7 +52,7 @@ export const ActionParamSchema = z.enum([
 export const createInventoryMovementSchema = z.object({
   inventory_action: ActionParamSchema,
   item_id: uuidSchema,
-  product_id: uuidSchema.nullable().optional(),
+  product_id: uuidSchema,
   from_location_id: uuidSchema.nullable().optional(),
   to_location_id: uuidSchema.nullable().optional(),
   quantity: z.number().int().positive('Quantity must be a positive integer'),
