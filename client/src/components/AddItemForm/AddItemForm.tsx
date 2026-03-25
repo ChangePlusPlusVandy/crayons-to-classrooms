@@ -183,13 +183,21 @@ export default function AddItemForm({
     return typeof quantityToAdd === 'number' && quantityToAdd >= 1;
   };
 
+  const hasNewItemFieldErrors = (): boolean => {
+    if (typeof newItemValue === 'number' && newItemValue < 0) return true;
+    if (typeof newItemLimit === 'number' && newItemLimit < 0) return true;
+    if (typeof newItemPackSize === 'number' && newItemPackSize < 1) return true;
+    return false;
+  };
+
   const isFormValid = (): boolean => {
     if (isNewItemMode) {
       return (
         !!selectedWarehouse &&
         !!newItemName.trim() &&
         !!selectedSlot &&
-        isQuantityValid()
+        isQuantityValid() &&
+        !hasNewItemFieldErrors()
       );
     }
     return !!selectedWarehouse && !!selectedProduct && !!selectedSlot && isQuantityValid();
@@ -210,6 +218,10 @@ export default function AddItemForm({
     }
     if (isNewItemMode && !newItemName.trim()) {
       setError('Please enter an item name.');
+      return;
+    }
+    if (isNewItemMode && hasNewItemFieldErrors()) {
+      setError('Please fix the errors in the new item fields before submitting.');
       return;
     }
     if (!selectedSlot) {
@@ -427,6 +439,12 @@ export default function AddItemForm({
                   setNewItemLimit(isNaN(val) ? '' : val);
                 }}
                 placeholder="Enter item limit (optional)"
+                error={typeof newItemLimit === 'number' && newItemLimit < 0}
+                helperText={
+                  typeof newItemLimit === 'number' && newItemLimit < 0
+                    ? 'Limit cannot be negative'
+                    : ''
+                }
                 slotProps={{ htmlInput: { min: 0, step: 1 } }}
               />
             </FormControl>
