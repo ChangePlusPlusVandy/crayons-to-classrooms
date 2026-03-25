@@ -131,6 +131,7 @@ export const syncItemInfoStock = async (
       value,
       stockDelta,
       itemLimit,
+      limbo,
       fixture,
       lastKnownLocationCode,
       createIfMissing,
@@ -422,7 +423,7 @@ export async function createItemCore(
   }
 
   const newItems = await db.query(
-    'INSERT INTO items (name, product_id, quantity, stock, current_location_id, status, created_by, warehouse, category, item_limit, value, limbo, notes, created_at, updated_at) SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW(), NOW() FROM generate_series(1, $14) RETURNING *',
+    'INSERT INTO items (name, product_id, quantity, stock, current_location_id, status, created_by, warehouse, category, item_limit, limbo, value, notes, created_at, updated_at) SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW(), NOW() FROM generate_series(1, $14) RETURNING *',
     [
       name,
       product_id,

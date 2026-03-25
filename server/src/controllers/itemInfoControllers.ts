@@ -152,6 +152,7 @@ export const getLimboItems = async (req: Request, res: Response) => {
  *   - quantity: Quantity number (in body, optional)
  *   - value: Value number (in body, optional)
  *   - item_limit: Limit number (in body, optional)
+ *   - limbo: Limbo boolean, defaults to false (in body, optional)
  *   - stock: total stock of the item (in body, required)
  *   - fixture: fixture of the item (in body, optional)
  *   - last_known_location_code: last known location code of the item (in body, required)
@@ -171,6 +172,7 @@ export const createItemInfo = async (req: Request, res: Response) => {
       value,
       item_limit,
       stock,
+      limbo,
       fixture,
       last_known_location_code,
       time_last_updated,
@@ -184,7 +186,7 @@ export const createItemInfo = async (req: Request, res: Response) => {
     }
 
     const newItemInfo = await pool.query(
-      'INSERT INTO item_info (name, product_id, category, quantity, value, item_limit, stock, fixture, last_known_location_code, time_last_updated, notes) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *',
+      'INSERT INTO item_info (name, product_id, category, quantity, value, item_limit, limbo, stock, fixture, last_known_location_code, time_last_updated, notes) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *',
       [
         name,
         product_id,
@@ -192,6 +194,7 @@ export const createItemInfo = async (req: Request, res: Response) => {
         quantity,
         value,
         item_limit,
+        limbo,
         stock,
         fixture,
         last_known_location_code,

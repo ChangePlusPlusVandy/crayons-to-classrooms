@@ -93,7 +93,6 @@ export default function Limbo() {
     setRestockItem(null);
   };
 
-
   const rowsInTable = filteredItems.length;
   // Dummy metric placeholder (backend not implemented yet)
   const resolvedLast7DaysDummy = 0;
@@ -346,7 +345,7 @@ export default function Limbo() {
               <Box sx={limboStyles.restockFieldBox}>
                 <TextField
                   variant="standard"
-                  placeholder="Enter quantitiy"
+                  placeholder="Enter quantity"
                   value={restockQuantity ?? ''}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                     const raw = e.target.value;

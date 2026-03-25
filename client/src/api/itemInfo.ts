@@ -1,5 +1,6 @@
 // client/src/api/itemInfo.ts
 import { z } from 'zod';
+import { authFetch } from './authFetch';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
 
@@ -22,7 +23,7 @@ export const ItemInfoSchema = z.object({
 export type ItemInfo = z.infer<typeof ItemInfoSchema>;
 
 export async function getLimboItems(): Promise<ItemInfo[]> {
-  const response = await fetch(`${API_BASE_URL}/item-info/limbo`);
+  const response = await authFetch(`${API_BASE_URL}/item-info/limbo`);
   if (!response.ok) throw new Error('Failed to fetch limbo items');
   const data = await response.json();
   return z.array(ItemInfoSchema).parse(data);
