@@ -11,7 +11,7 @@ export default function AlertsSection() {
       <CardContent>
         <Box sx={alertsSectionStyles.header}>
           <Typography variant="body1" sx={{ fontWeight: 400, color: '#8b4513' }}>
-            Alerts
+            Limbo Notifications
           </Typography>
           <Button
             variant="contained"

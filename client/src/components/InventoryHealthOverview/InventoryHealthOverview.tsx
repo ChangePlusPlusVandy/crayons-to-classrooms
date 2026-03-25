@@ -42,26 +42,6 @@ export default function InventoryHealthOverview() {
             </CardContent>
           </Card>
         </Box>
-
-        <Box sx={{ flex: 1, display: 'flex' }}>
-          <Card sx={{ boxShadow: 1, borderRadius: 2, flex: 1 }}>
-            <CardContent>
-              <Typography variant="body2" color="text.secondary" gutterBottom>
-                % Stocked
-              </Typography>
-              <Box
-                sx={{
-                  display: 'flex',
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  height: 100,
-                }}
-              >
-                {/* Empty - to be populated later */}
-              </Box>
-            </CardContent>
-          </Card>
-        </Box>
       </Box>
     </Box>
   );
