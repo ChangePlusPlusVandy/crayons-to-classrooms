@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Container, Typography, Paper, Alert } from '@mui/material';
-import { createItemWithMovement } from '../../api/addItem';
+import { createItemWithMovement, createProduct } from '../../api/addItem';
 import AddItemForm, { AddItemFormData } from '../../components/AddItemForm/AddItemForm';
 import PalletAddForm, { PalletAddFormData } from '../../components/PalletAddForm/PalletAddForm';
 import FormModeToggle, { FormMode } from '../../components/FormModeToggle/FormModeToggle';
@@ -89,22 +89,55 @@ export default function AddItem() {
       let totalCreated = 0;
 
       for (const item of items) {
+        let productId: string | undefined;
+        let productName: string;
+        let productValue: number | undefined;
+        let productCategory: string | undefined;
+        let productItemLimit: number | undefined;
+        let packSize = 1;
+
+        if (item.isNewProduct && item.newProductData) {
+          // If a new subcategory was entered, create the product now
+          if (item.newProductData.newSubcategoryName) {
+            const newProduct = await createProduct({
+              name: item.newProductData.newSubcategoryName,
+              value: 0,
+            });
+            productId = newProduct.id;
+          } else {
+            productId = item.newProductData.subcategoryProductId;
+          }
+          productName = item.newProductData.name;
+          productValue = item.newProductData.value;
+          productCategory = item.newProductData.category || undefined;
+          productItemLimit = item.newProductData.limit;
+          if (typeof item.newProductData.packSize === 'number' && item.newProductData.packSize >= 1) {
+            packSize = item.newProductData.packSize;
+          }
+        } else {
+          productId = item.product.id;
+          productName = item.product.name;
+          productValue = item.product.value;
+          productCategory = item.product.category || undefined;
+          productItemLimit =
+            typeof item.product.item_limit === 'string'
+              ? parseInt(item.product.item_limit, 10) || undefined
+              : item.product.item_limit || undefined;
+        }
+
         await createItemWithMovement({
           item: {
-            name: item.product.name,
-            product_id: item.product.id,
-            quantity: 1,
-            stock: 1,
+            name: productName,
+            product_id: productId,
+            quantity: packSize,
+            stock: packSize,
             current_location_id: destinationLocationId,
             status: 'active',
             created_by: user!.id,
             warehouse: warehouse.id,
-            category: item.product.category || undefined,
-            item_limit:
-              typeof item.product.item_limit === 'string'
-                ? parseInt(item.product.item_limit, 10) || undefined
-                : item.product.item_limit || undefined,
-            value: item.product.value,
+            category: productCategory,
+            item_limit: productItemLimit,
+            value: productValue,
             limbo: false,
             notes: notes || undefined,
           },

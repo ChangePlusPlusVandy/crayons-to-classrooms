@@ -111,7 +111,7 @@ export const syncItemInfoStock = async (
         productId ?? null,
         category ?? null,
         quantity ?? null,
-        value ?? null,
+        value != null ? Math.round(value) : null,
         itemLimit ?? null,
         stockDelta,
         fixture ?? null,

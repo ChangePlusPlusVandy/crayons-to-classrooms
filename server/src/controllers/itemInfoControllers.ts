@@ -170,7 +170,7 @@ export const createItemInfo = async (req: Request, res: Response) => {
         product_id,
         category,
         quantity,
-        value,
+        value != null ? Math.round(value) : null,
         item_limit,
         stock,
         fixture,
@@ -222,9 +222,9 @@ export const updateItemInfo = async (req: Request, res: Response) => {
     const values: any[] = [];
     let idx = 1;
 
-    for (const [key, value] of Object.entries(validatedData)) {
+    for (const [key, val] of Object.entries(validatedData)) {
       setClauses.push(`${key} = $${idx++}`);
-      values.push(value);
+      values.push(key === 'value' && val != null ? Math.round(val as number) : val);
     }
 
     setClauses.push(`updated_at = NOW()`);

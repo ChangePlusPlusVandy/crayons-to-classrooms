@@ -9,8 +9,10 @@ import {
   FormControl,
   Box,
   IconButton,
+  createFilterOptions,
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
+import EditIcon from '@mui/icons-material/Edit';
 import AddIcon from '@mui/icons-material/Add';
 import { getProducts, getStorageLocations } from '../../api/addItem';
 import { Warehouse } from '../../types/Warehouse';
@@ -19,16 +21,35 @@ import { Product } from '../../types/Product';
 import { AddItemFormLabel } from '../AddItemForm/AddItemForm.styles';
 import { WarehouseSelector } from '../WarehouseSelector/WarehouseSelector';
 import { SlotSelector } from '../SlotSelector/SlotSelector';
+import NewItemDialog from './NewItemDialog';
+
+export interface NewProductData {
+  name: string;
+  category: string;
+  subcategoryProductId?: string;
+  newSubcategoryName?: string;
+  limit?: number;
+  value?: number;
+  packSize?: number;
+  fixture?: string;
+}
 
 interface ManifestRow {
   product: Product | null;
   quantity: number | '';
+  isNewProduct?: boolean;
+  newProductData?: NewProductData;
 }
 
 export interface PalletAddFormData {
   warehouse: Warehouse;
   destinationLocationId: string;
-  items: Array<{ product: Product; quantity: number }>;
+  items: Array<{
+    product: Product;
+    quantity: number;
+    isNewProduct?: boolean;
+    newProductData?: NewProductData;
+  }>;
   notes: string;
 }
 
@@ -38,6 +59,21 @@ interface PalletAddFormProps {
   onCancel: () => void;
   submitLabel?: string;
 }
+
+// Sentinel option used to trigger "Create new item" in the Autocomplete
+const CREATE_NEW_SENTINEL: Product = {
+  id: '__create_new__',
+  created_at: '',
+  name: '+ Create new item...',
+  description: null,
+  unit_of_measure: null,
+  value: 0,
+  item_limit: 0,
+  category: '',
+  total_count: 0,
+};
+
+const defaultFilter = createFilterOptions<Product>();
 
 export default function PalletAddForm({
   initialWarehouse = null,
@@ -58,6 +94,12 @@ export default function PalletAddForm({
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+
+  // New item dialog state
+  const [newItemDialogOpen, setNewItemDialogOpen] = useState(false);
+  const [editingRowIndex, setEditingRowIndex] = useState<number | null>(null);
+  const [localNewProducts, setLocalNewProducts] = useState<Product[]>([]);
+  const [customCategories, setCustomCategories] = useState<string[]>([]);
 
   useEffect(() => {
     async function fetchInitialData() {
@@ -83,11 +125,40 @@ export default function PalletAddForm({
       : [];
   }, [selectedWarehouse, storageLocations]);
 
+  // Merged product list: real products + locally created placeholders
+  const allProducts = useMemo(
+    () => [...products, ...localNewProducts],
+    [products, localNewProducts]
+  );
+
+  // Derive available fixtures from storage locations
+  const availableFixtures = useMemo(() => {
+    const fixtures = storageLocations
+      .map((loc) => loc.fixture)
+      .filter((f): f is string => !!f && f.trim() !== '');
+    return Array.from(new Set(fixtures)).sort((a, b) => a.localeCompare(b));
+  }, [storageLocations]);
+
+  // Derive available categories from products + custom ones
+  const availableCategories = useMemo(() => {
+    const fromProducts = allProducts
+      .map((p) => p.category)
+      .filter((c): c is string => !!c && c.trim() !== '');
+    const unique = Array.from(new Set([...fromProducts, ...customCategories]));
+    unique.sort((a, b) => a.localeCompare(b));
+    return unique;
+  }, [allProducts, customCategories]);
+
   const updateRow = (index: number, updates: Partial<ManifestRow>) => {
     setManifestRows((prev) => prev.map((row, i) => (i === index ? { ...row, ...updates } : row)));
   };
 
   const removeRow = (index: number) => {
+    const row = manifestRows[index];
+    // Clean up placeholder from localNewProducts if removing a new-item row
+    if (row.isNewProduct && row.product) {
+      setLocalNewProducts((prev) => prev.filter((p) => p.id !== row.product!.id));
+    }
     setManifestRows((prev) => prev.filter((_, i) => i !== index));
   };
 
@@ -125,10 +196,15 @@ export default function PalletAddForm({
     try {
       const validItems = manifestRows
         .filter(
-          (row): row is { product: Product; quantity: number } =>
+          (row): row is ManifestRow & { product: Product; quantity: number } =>
             row.product !== null && typeof row.quantity === 'number' && row.quantity >= 1
         )
-        .map((row) => ({ product: row.product, quantity: row.quantity }));
+        .map((row) => ({
+          product: row.product,
+          quantity: row.quantity,
+          isNewProduct: row.isNewProduct,
+          newProductData: row.newProductData,
+        }));
 
       await onSubmit({
         warehouse: selectedWarehouse,
@@ -141,6 +217,58 @@ export default function PalletAddForm({
     }
   };
 
+  // Handle Autocomplete selection including sentinel
+  const handleProductSelect = (index: number, newValue: Product | null) => {
+    if (newValue && newValue.id === CREATE_NEW_SENTINEL.id) {
+      // Open dialog to create a new item for this row
+      setEditingRowIndex(index);
+      setNewItemDialogOpen(true);
+      return;
+    }
+
+    // If switching from a new-item row to a real product, clean up
+    const row = manifestRows[index];
+    if (row.isNewProduct && row.product) {
+      setLocalNewProducts((prev) => prev.filter((p) => p.id !== row.product!.id));
+    }
+
+    updateRow(index, {
+      product: newValue,
+      isNewProduct: false,
+      newProductData: undefined,
+    });
+  };
+
+  // Handle dialog confirm (create or edit)
+  const handleNewItemConfirm = (data: NewProductData, placeholderProduct: Product) => {
+    if (editingRowIndex === null) return;
+
+    const row = manifestRows[editingRowIndex];
+
+    // If editing an existing new-item, replace its placeholder
+    if (row.isNewProduct && row.product) {
+      setLocalNewProducts((prev) => prev.filter((p) => p.id !== row.product!.id));
+    }
+
+    // Add new placeholder to local products
+    setLocalNewProducts((prev) => [...prev, placeholderProduct]);
+
+    updateRow(editingRowIndex, {
+      product: placeholderProduct,
+      isNewProduct: true,
+      newProductData: data,
+    });
+
+    setNewItemDialogOpen(false);
+    setEditingRowIndex(null);
+  };
+
+  // Handle edit button click on a new-item row
+  const handleEditNewItem = (index: number) => {
+    setEditingRowIndex(index);
+    setNewItemDialogOpen(true);
+  };
+
   if (loading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
@@ -148,6 +276,8 @@ export default function PalletAddForm({
       </Box>
     );
   }
+
+  const editingRow = editingRowIndex !== null ? manifestRows[editingRowIndex] : null;
 
   return (
     <Stack
@@ -196,10 +326,36 @@ export default function PalletAddForm({
             <Box key={index} sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
               <Autocomplete
                 sx={{ flex: 2 }}
-                options={products}
-                getOptionLabel={(option) => option.name || 'Unknown Product'}
+                options={allProducts}
+                getOptionLabel={(option) =>
+                  option.id === CREATE_NEW_SENTINEL.id
+                    ? CREATE_NEW_SENTINEL.name
+                    : option.name || 'Unknown Product'
+                }
                 value={row.product}
-                onChange={(_, newValue) => updateRow(index, { product: newValue })}
+                onChange={(_, newValue) => handleProductSelect(index, newValue)}
+                filterOptions={(options, params) => {
+                  const filtered = defaultFilter(options, params);
+                  // Always append the sentinel at the end
+                  filtered.push(CREATE_NEW_SENTINEL);
+                  return filtered;
+                }}
+                renderOption={(props, option) => {
+                  const { key, ...otherProps } = props;
+                  if (option.id === CREATE_NEW_SENTINEL.id) {
+                    return (
+                      <li key={key} {...otherProps} style={{ fontStyle: 'italic', color: '#1976d2' }}>
+                        {CREATE_NEW_SENTINEL.name}
+                      </li>
+                    );
+                  }
+                  return (
+                    <li key={key} {...otherProps}>
+                      {option.name || 'Unknown Product'}
+                    </li>
+                  );
+                }}
+                isOptionEqualToValue={(option, val) => option.id === val.id}
                 renderInput={(params) => (
                   <TextField {...params} placeholder="Select product" size="small" />
                 )}
@@ -217,6 +373,15 @@ export default function PalletAddForm({
                 placeholder="Qty"
                 slotProps={{ htmlInput: { min: 1, step: 1 } }}
               />
+              {row.isNewProduct && (
+                <IconButton
+                  onClick={() => handleEditNewItem(index)}
+                  size="small"
+                  color="primary"
+                >
+                  <EditIcon />
+                </IconButton>
+              )}
               <IconButton
                 onClick={() => removeRow(index)}
                 disabled={manifestRows.length <= 1}
@@ -264,6 +429,20 @@ export default function PalletAddForm({
           {submitting ? <CircularProgress size={24} /> : submitLabel}
         </Button>
       </Box>
+
+      {/* New Item Dialog */}
+      <NewItemDialog
+        open={newItemDialogOpen}
+        onClose={() => {
+          setNewItemDialogOpen(false);
+          setEditingRowIndex(null);
+        }}
+        onConfirm={handleNewItemConfirm}
+        products={allProducts}
+        availableFixtures={availableFixtures}
+        availableCategories={availableCategories}
+        initialData={editingRow?.isNewProduct ? editingRow.newProductData ?? null : null}
+      />
     </Stack>
   );
 }
