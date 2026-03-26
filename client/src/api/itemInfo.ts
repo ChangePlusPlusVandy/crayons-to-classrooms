@@ -1,0 +1,69 @@
+import { authFetch } from './authFetch';
+
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
+
+export interface ItemInfoBrowseParams {
+  page?: number;
+  limit?: number;
+  search?: string;
+  warehouse?: string;
+  category?: string;
+  stock_status?: 'in_stock' | 'out_of_stock';
+}
+
+export interface ItemInfoBrowseItem {
+  id: string;
+  name: string;
+  product_id: string | null;
+  category: string | null;
+  quantity: number | null;
+  stock: number;
+  value: number | null;
+  item_limit: number | null;
+  fixture: string | null;
+  last_known_location_code: string;
+  time_last_updated: string;
+  notes: string | null;
+  updated_at: string;
+  warehouses: { id: string; name: string }[];
+  in_stock: boolean;
+}
+
+export interface ItemInfoBrowseResponse {
+  data: ItemInfoBrowseItem[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export async function browseItemsInfo(
+  params: ItemInfoBrowseParams = {}
+): Promise<ItemInfoBrowseResponse> {
+  const searchParams = new URLSearchParams();
+  if (params.page) searchParams.set('page', String(params.page));
+  if (params.limit) searchParams.set('limit', String(params.limit));
+  if (params.search) searchParams.set('search', params.search);
+  if (params.warehouse) searchParams.set('warehouse', params.warehouse);
+  if (params.category) searchParams.set('category', params.category);
+  if (params.stock_status) searchParams.set('stock_status', params.stock_status);
+
+  const response = await authFetch(
+    `${API_BASE_URL}/item-info/browse?${searchParams.toString()}`
+  );
+  if (!response.ok) throw new Error('Failed to fetch items');
+  return response.json();
+}
+
+export async function getItemInfoCategories(): Promise<string[]> {
+  const response = await authFetch(`${API_BASE_URL}/item-info/categories`);
+  if (!response.ok) throw new Error('Failed to fetch categories');
+  return response.json();
+}
+
+//TODO: remove this?
+export async function deleteItemInfo(id: string): Promise<void> {
+  const response = await authFetch(`${API_BASE_URL}/item-info/${id}`, {
+    method: 'DELETE',
+  });
+  if (!response.ok) throw new Error('Failed to delete item');
+}

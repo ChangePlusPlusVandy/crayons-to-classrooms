@@ -56,13 +56,18 @@ const handleValidationError = (error: unknown, res: Response) => {
  */
 export const getItemsInfoPaginated = async (req: Request, res: Response) => {
   try {
-    const { page, limit, warehouse, category, stock_status } =
+    const { page, limit, search, warehouse, category, stock_status } =
       itemInfoBrowseQuerySchema.parse(req.query);
     const offset = (page - 1) * limit;
 
     const conditions: string[] = [];
     const params: any[] = [];
     let paramIdx = 1;
+
+    if (search) {
+      conditions.push(`LOWER(ii.name) LIKE LOWER($${paramIdx++})`);
+      params.push(`%${search}%`);
+    }
 
     if (warehouse) {
       conditions.push(
@@ -382,6 +387,21 @@ export const deleteItemInfo = async (req: Request, res: Response) => {
       return handleValidationError(error, res);
     }
     console.error('Error deleting item:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+/**
+ * Retrieves distinct categories from item_info.
+ */
+export const getItemInfoCategories = async (_req: Request, res: Response) => {
+  try {
+    const result = await pool.query(
+      'SELECT DISTINCT category FROM item_info WHERE category IS NOT NULL ORDER BY category'
+    );
+    res.json(result.rows.map((row: { category: string }) => row.category));
+  } catch (error) {
+    console.error('Error fetching categories:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };

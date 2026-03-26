@@ -8,6 +8,7 @@ import AddItem from './pages/AddItem/AddItem';
 import Login from './pages/Login/Login';
 import SetPassword from './pages/SetPassword/SetPassword';
 import Users from './pages/Users/Users';
+import Inventory from './pages/Inventory/Inventory';
 import RemoveItemPage from './pages/TestPage/RemoveItemPage';
 import './App.css';
 
@@ -29,11 +30,7 @@ function App() {
                   <Route path="/move-item" element={<MoveItem />} />
                   <Route path="/remove-item" element={<RemoveItemPage />} />
                   <Route path="/users" element={<Users />} />
-                  {/* Placeholder routes - these don't have to work yet */}
-                  <Route
-                    path="/inventory"
-                    element={<div style={{ padding: '2rem' }}>Inventory Page (Coming Soon)</div>}
-                  />
+                  <Route path="/inventory" element={<Inventory />} />
                   <Route path="/activity-log" element={<Activities />} />
                   <Route
                     path="/limbo-items"

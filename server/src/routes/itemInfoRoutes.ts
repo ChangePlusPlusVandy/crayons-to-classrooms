@@ -2,6 +2,7 @@ import {
   getItemsInfo,
   getItemInfoById,
   getItemsInfoPaginated,
+  getItemInfoCategories,
   createItemInfo,
   updateItemInfo,
   deleteItemInfo,
@@ -15,6 +16,8 @@ const router = express.Router();
 router.get('/name/:name', getItemsInfoByName);
 // get paginated, filterable items info
 router.get('/browse', getItemsInfoPaginated);
+// get distinct categories
+router.get('/categories', getItemInfoCategories);
 // get all items info
 router.get('/', getItemsInfo);
 // create a new item
