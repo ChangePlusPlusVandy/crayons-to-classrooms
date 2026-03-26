@@ -99,7 +99,6 @@ export default function PalletAddForm({
   const [newItemDialogOpen, setNewItemDialogOpen] = useState(false);
   const [editingRowIndex, setEditingRowIndex] = useState<number | null>(null);
   const [localNewProducts, setLocalNewProducts] = useState<Product[]>([]);
-  const [customCategories, setCustomCategories] = useState<string[]>([]);
 
   useEffect(() => {
     async function fetchInitialData() {
@@ -139,15 +138,15 @@ export default function PalletAddForm({
     return Array.from(new Set(fixtures)).sort((a, b) => a.localeCompare(b));
   }, [storageLocations]);
 
-  // Derive available categories from products + custom ones
+  // Derive available categories from products
   const availableCategories = useMemo(() => {
     const fromProducts = allProducts
       .map((p) => p.category)
       .filter((c): c is string => !!c && c.trim() !== '');
-    const unique = Array.from(new Set([...fromProducts, ...customCategories]));
+    const unique = Array.from(new Set(fromProducts));
     unique.sort((a, b) => a.localeCompare(b));
     return unique;
-  }, [allProducts, customCategories]);
+  }, [allProducts]);
 
   const updateRow = (index: number, updates: Partial<ManifestRow>) => {
     setManifestRows((prev) => prev.map((row, i) => (i === index ? { ...row, ...updates } : row)));
