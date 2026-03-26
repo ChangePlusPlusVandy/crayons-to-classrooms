@@ -54,6 +54,42 @@ export async function browseItemsInfo(
   return response.json();
 }
 
+export interface ItemInfoWarehouseLocation {
+  warehouse_id: string;
+  warehouse_name: string;
+  item_count: number;
+  locations: {
+    location_code: string;
+    aisle: string;
+    slot: string;
+    fixture: string | null;
+  }[];
+}
+
+export interface ItemInfoDetails {
+  id: string;
+  name: string;
+  product_id: string | null;
+  category: string | null;
+  quantity: number | null;
+  stock: number;
+  value: number | null;
+  item_limit: number | null;
+  fixture: string | null;
+  last_known_location_code: string;
+  time_last_updated: string;
+  notes: string | null;
+  updated_at: string;
+  warehouse_locations: ItemInfoWarehouseLocation[];
+  in_stock: boolean;
+}
+
+export async function getItemInfoDetails(id: string): Promise<ItemInfoDetails> {
+  const response = await authFetch(`${API_BASE_URL}/item-info/${id}/details`);
+  if (!response.ok) throw new Error('Failed to fetch item details');
+  return response.json();
+}
+
 export async function getItemInfoCategories(): Promise<string[]> {
   const response = await authFetch(`${API_BASE_URL}/item-info/categories`);
   if (!response.ok) throw new Error('Failed to fetch categories');

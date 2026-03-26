@@ -1,6 +1,7 @@
 import {
   getItemsInfo,
   getItemInfoById,
+  getItemInfoDetails,
   getItemsInfoPaginated,
   getItemInfoCategories,
   createItemInfo,
@@ -22,6 +23,8 @@ router.get('/categories', getItemInfoCategories);
 router.get('/', getItemsInfo);
 // create a new item
 router.post('/', createItemInfo);
+// get item details with location data
+router.get('/:id/details', getItemInfoDetails);
 // get item by ID
 router.get('/:id', getItemInfoById);
 // update an existing item

@@ -198,6 +198,71 @@ export const getItemInfoById = async (req: Request, res: Response) => {
 };
 
 /**
+ * Retrieves detailed item info by ID, enriched with location data grouped by warehouse.
+ *
+ * @param {Request} req - Express request object with:
+ *   - id: UUID of the item_info (in params)
+ * @param {Response} res - Express response object
+ * @returns {Promise<Response>} JSON object with item_info fields plus warehouse_locations array
+ */
+export const getItemInfoDetails = async (req: Request, res: Response) => {
+  try {
+    const { id } = itemInfoIdParamSchema.parse(req.params);
+
+    //TODO: stop doing coalesce
+    const result = await pool.query(
+      `SELECT
+        ii.*,
+        COALESCE(
+          (SELECT json_agg(wh_data)
+           FROM (
+             SELECT
+               w.id   AS warehouse_id,
+               w.name AS warehouse_name,
+               COALESCE(
+                 json_agg(
+                   DISTINCT jsonb_build_object(
+                     'location_code', sl.location_code,
+                     'aisle', sl.aisle,
+                     'slot', sl.slot,
+                     'fixture', sl.fixture
+                   )
+                 ) FILTER (WHERE sl.id IS NOT NULL),
+                 '[]'::json
+               ) AS locations,
+               COUNT(i.id)::int AS item_count
+             FROM items i
+             JOIN warehouse w ON i.warehouse::uuid = w.id
+             LEFT JOIN storage_locations sl ON i.current_location_id::uuid = sl.id
+             WHERE i.name = ii.name AND i.status = 'active'
+             GROUP BY w.id, w.name
+           ) wh_data
+          ),
+          '[]'::json
+        ) AS warehouse_locations,
+        EXISTS (
+          SELECT 1 FROM items i WHERE i.name = ii.name AND i.status = 'active'
+        ) AS in_stock
+      FROM item_info ii
+      WHERE ii.id = $1`,
+      [id]
+    );
+
+    if (!countRows(result.rows, res)) {
+      return;
+    }
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    if (error instanceof ZodError) {
+      return handleValidationError(error, res);
+    }
+    console.error('Error fetching item details:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+/**
  * Retrieves item info with a specific name.
  *
  * @param {Request} req - Express request object with:

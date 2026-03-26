@@ -34,6 +34,7 @@ import {
 } from '../../api/itemInfo';
 import { getWarehouses } from '../../api/warehouse';
 import { Warehouse } from '../../types/Warehouse';
+import { ItemDetailsDialog } from '../../components/ItemDetailsDialog/ItemDetailsDialog';
 import { inventoryStyles } from './Inventory.styles';
 
 const PAGE_SIZE = 10;
@@ -54,6 +55,7 @@ export default function Inventory() {
 
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
+  const [detailsItemId, setDetailsItemId] = useState<string | null>(null);
 
   const debounceTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
@@ -258,6 +260,7 @@ export default function Inventory() {
                         <Button
                           size="small"
                           startIcon={<VisibilityOutlinedIcon />}
+                          onClick={() => setDetailsItemId(item.id)}
                           sx={{ mr: 1, textTransform: 'none' }}
                         >
                           View Details
@@ -290,6 +293,11 @@ export default function Inventory() {
         </>
       )}
 
+      <ItemDetailsDialog
+        open={detailsItemId !== null}
+        onClose={() => setDetailsItemId(null)}
+        itemId={detailsItemId}
+      />
     </Container>
   );
 }
