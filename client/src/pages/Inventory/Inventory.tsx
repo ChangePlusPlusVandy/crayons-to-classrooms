@@ -21,21 +21,15 @@ import {
   MenuItem,
   Chip,
   Button,
-  Snackbar,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogContentText,
-  DialogActions,
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import FilterListIcon from '@mui/icons-material/FilterList';
+import { useNavigate } from 'react-router-dom';
 import {
   browseItemsInfo,
   getItemInfoCategories,
-  deleteItemInfo,
   ItemInfoBrowseItem,
 } from '../../api/itemInfo';
 import { getWarehouses } from '../../api/warehouse';
@@ -45,6 +39,7 @@ import { inventoryStyles } from './Inventory.styles';
 const PAGE_SIZE = 10;
 
 export default function Inventory() {
+  const navigate = useNavigate();
   const [items, setItems] = useState<ItemInfoBrowseItem[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -59,16 +54,6 @@ export default function Inventory() {
 
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
-
-  const [deleteDialog, setDeleteDialog] = useState<{
-    open: boolean;
-    item: ItemInfoBrowseItem | null;
-  }>({ open: false, item: null });
-  const [snackbar, setSnackbar] = useState<{
-    open: boolean;
-    message: string;
-    severity: 'success' | 'error';
-  }>({ open: false, message: '', severity: 'success' });
 
   const debounceTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
@@ -118,32 +103,6 @@ export default function Inventory() {
   useEffect(() => {
     fetchItems();
   }, [fetchItems]);
-
-  const handleDeleteClick = (item: ItemInfoBrowseItem) => {
-    setDeleteDialog({ open: true, item });
-  };
-
-  const handleDeleteConfirm = async () => {
-    const item = deleteDialog.item;
-    setDeleteDialog({ open: false, item: null });
-    if (!item) return;
-
-    try {
-      await deleteItemInfo(item.id);
-      setSnackbar({
-        open: true,
-        message: `Deleted "${item.name}" successfully`,
-        severity: 'success',
-      });
-      fetchItems();
-    } catch (err) {
-      setSnackbar({
-        open: true,
-        message: err instanceof Error ? err.message : 'Failed to delete item',
-        severity: 'error',
-      });
-    }
-  };
 
   return (
     <Container maxWidth="lg" sx={inventoryStyles.container}>
@@ -307,7 +266,7 @@ export default function Inventory() {
                           size="small"
                           color="error"
                           startIcon={<DeleteOutlineIcon />}
-                          onClick={() => handleDeleteClick(item)}
+                          onClick={() => navigate('/remove-item', { state: { itemName: item.name } })}
                           sx={{ textTransform: 'none' }}
                         >
                           Delete
@@ -331,41 +290,6 @@ export default function Inventory() {
         </>
       )}
 
-      <Dialog
-        open={deleteDialog.open}
-        onClose={() => setDeleteDialog({ open: false, item: null })}
-      >
-        <DialogTitle>Confirm Delete</DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            Are you sure you want to delete "{deleteDialog.item?.name}"? This
-            action cannot be undone.
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDeleteDialog({ open: false, item: null })}>
-            Cancel
-          </Button>
-          <Button onClick={handleDeleteConfirm} color="error">
-            Delete
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={4000}
-        onClose={() => setSnackbar({ ...snackbar, open: false })}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      >
-        <Alert
-          onClose={() => setSnackbar({ ...snackbar, open: false })}
-          severity={snackbar.severity}
-          sx={{ width: '100%' }}
-        >
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
     </Container>
   );
 }

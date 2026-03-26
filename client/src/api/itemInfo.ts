@@ -60,10 +60,3 @@ export async function getItemInfoCategories(): Promise<string[]> {
   return response.json();
 }
 
-//TODO: remove this?
-export async function deleteItemInfo(id: string): Promise<void> {
-  const response = await authFetch(`${API_BASE_URL}/item-info/${id}`, {
-    method: 'DELETE',
-  });
-  if (!response.ok) throw new Error('Failed to delete item');
-}
