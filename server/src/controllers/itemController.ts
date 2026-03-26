@@ -444,7 +444,7 @@ export async function createItemCore(
       category ?? null,
       item_limit ?? null,
       limbo ?? false,
-      value,
+      value ?? 0,
       notes ?? null,
       count,
     ]
