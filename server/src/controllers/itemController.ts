@@ -393,13 +393,17 @@ export async function createItemCore(
     notes,
   } = data;
 
-  // Check if product_id, created_by, warehouse exist in tables
-  // Only check current_location_id if it's provided
-  const validationPromises = [
-    db.query('SELECT id FROM products WHERE id = $1', [product_id]),
-    db.query('SELECT id FROM users WHERE id = $1', [created_by]),
+  // Check if product_id, warehouse exist in tables
+  // Only check current_location_id and product_id if provided
+  const validationPromises: Promise<any>[] = [
     db.query('SELECT id FROM warehouse WHERE id = $1', [warehouse]),
   ];
+
+  if (product_id) {
+    validationPromises.push(
+      db.query('SELECT id FROM products WHERE id = $1', [product_id])
+    );
+  }
 
   if (current_location_id) {
     validationPromises.push(
@@ -409,16 +413,20 @@ export async function createItemCore(
 
   const validationResults = await Promise.all(validationPromises);
 
-  if (validationResults[0].rows.length === 0) {
-    throw new ForeignKeyError('product_id');
-  }
-  if (validationResults[1].rows.length === 0) {
-    throw new ForeignKeyError('created_by user id');
-  }
-  if (validationResults[2].rows.length === 0) {
+  let resultIdx = 0;
+  if (validationResults[resultIdx].rows.length === 0) {
     throw new ForeignKeyError('warehouse id');
   }
-  if (current_location_id && validationResults[3]?.rows.length === 0) {
+  resultIdx++;
+
+  if (product_id) {
+    if (validationResults[resultIdx].rows.length === 0) {
+      throw new ForeignKeyError('product_id');
+    }
+    resultIdx++;
+  }
+
+  if (current_location_id && validationResults[resultIdx]?.rows.length === 0) {
     throw new ForeignKeyError('current_location_id');
   }
 
@@ -426,7 +434,7 @@ export async function createItemCore(
     'INSERT INTO items (name, product_id, quantity, stock, current_location_id, status, created_by, warehouse, category, item_limit, limbo, value, notes, created_at, updated_at) SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW(), NOW() FROM generate_series(1, $14) RETURNING *',
     [
       name,
-      product_id,
+      product_id ?? null,
       quantity,
       stock ?? null,
       current_location_id ?? null,
@@ -446,10 +454,10 @@ export async function createItemCore(
   const fixtureOverride = fixture ?? null;
   const itemInfoId = await syncItemInfoStock(
     name,
-    product_id,
+    product_id ?? undefined,
     category ?? 'UNKNOWN',
     quantity,
-    value,
+    value ?? 0,
     item_limit ?? 0,
     limbo ?? false,
     fixtureOverride,

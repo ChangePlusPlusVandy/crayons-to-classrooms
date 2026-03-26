@@ -10,6 +10,8 @@ import storageLocationRoutes from './routes/storageLocationRoutes.js';
 import usersRoutes from './routes/usersRoutes.js';
 import inventoryMovementRoutes from './routes/inventoryMovementRoutes.js';
 import itemInfoRoutes from './routes/itemInfoRoutes.js';
+import authRoutes from './routes/authRoutes.js';
+import { requireAuth } from './middleware/auth.js';
 
 dotenv.config();
 
@@ -22,15 +24,16 @@ app.get('/', (_req, res) => {
   res.send('Server is running');
 });
 
-// Mount example test routes
-app.use('/api/test', testRoutes);
-app.use('/api/products', productRoutes);
-app.use('/api/item-info', itemInfoRoutes);
-app.use('/api/items', itemsRoutes);
-app.use('/api/storage-locations', storageLocationRoutes);
-app.use('/api/users', usersRoutes);
-app.use('/api/inventory-movement', inventoryMovementRoutes);
-app.use('/api/warehouses', warehouseRoutes);
+// All API routes require authentication
+app.use('/api/auth', requireAuth, authRoutes);
+app.use('/api/test', requireAuth, testRoutes);
+app.use('/api/products', requireAuth, productRoutes);
+app.use('/api/item-info', requireAuth, itemInfoRoutes);
+app.use('/api/items', requireAuth, itemsRoutes);
+app.use('/api/storage-locations', requireAuth, storageLocationRoutes);
+app.use('/api/users', requireAuth, usersRoutes);
+app.use('/api/inventory-movement', requireAuth, inventoryMovementRoutes);
+app.use('/api/warehouses', requireAuth, warehouseRoutes);
 
 // Start server
 const PORT = process.env.PORT || 5001;

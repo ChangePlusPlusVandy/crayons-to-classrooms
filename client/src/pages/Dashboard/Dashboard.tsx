@@ -1,10 +1,16 @@
-import { Container, Box, MenuItem, Select } from '@mui/material';
+import { useState } from 'react';
+import { useLocation } from 'react-router-dom';
+import { Container, Box, MenuItem, Select, Snackbar, Alert, AlertColor } from '@mui/material';
 import AlertsSection from '../../components/AlertsSection/AlertsSection';
 import QuickActions from '../../components/QuickActions/QuickActions';
 import InventoryHealthOverview from '../../components/InventoryHealthOverview/InventoryHealthOverview';
 import ActivityLog from '../../components/ActivityLog/ActivityLog';
 
 export default function Dashboard() {
+  const location = useLocation();
+  const stateInput = location.state as { message?: string; alertType?: AlertColor } | null;
+  const [toastOpen, setToastOpen] = useState(!!stateInput?.message);
+
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
       {/* Header with Warehouse Selector */}
@@ -52,6 +58,16 @@ export default function Dashboard() {
           <ActivityLog />
         </Box>
       </Box>
+      <Snackbar
+        open={toastOpen}
+        autoHideDuration={5000}
+        onClose={() => setToastOpen(false)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert severity={stateInput?.alertType} onClose={() => setToastOpen(false)}>
+          {stateInput?.message}
+        </Alert>
+      </Snackbar>
     </Container>
   );
 }

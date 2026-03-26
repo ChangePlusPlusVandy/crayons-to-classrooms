@@ -33,12 +33,20 @@ export const performedDateParamSchema = z.object({
 });
 
 // Validates action types for inventory movements
-export const ActionParamSchema = z.enum(['ADD', 'MOVE', 'CHECKOUT', 'DISCARD', 'ADJUSTMENT', 'DONATED']);
+export const ActionParamSchema = z.enum([
+  'ADD',
+  'MOVE',
+  'CHECKOUT',
+  'DISCARD',
+  'ADJUSTMENT',
+  'DONATED',
+]);
 
 /**
- * Schema for inventory creation
- * Requires: inventory_action, item_id, product_id, to_location_id, quantity, performed_by
- * from_location_id is optional (null for ADD actions)
+ * Schema for inventory movement creation
+ * Requires: inventory_action, item_id, product_id, quantity, performed_by
+ * Optional: from_location_id (nullable — null for ADD actions),
+ *           to_location_id (nullable), note
  */
 export const createInventoryMovementSchema = z.object({
   inventory_action: ActionParamSchema,

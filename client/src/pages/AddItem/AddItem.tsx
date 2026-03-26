@@ -1,38 +1,71 @@
 import { useState } from 'react';
 import { Container, Typography, Paper, Alert } from '@mui/material';
-import { createItemWithMovement } from '../../api/addItem';
+import { createItemWithMovement, createProduct } from '../../api/addItem';
 import AddItemForm, { AddItemFormData } from '../../components/AddItemForm/AddItemForm';
+import { useAuth } from '../../context/AuthContext';
 
 export default function AddItem() {
+  const { user } = useAuth();
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [formKey, setFormKey] = useState(0);
 
   const handleSubmit = async (data: AddItemFormData) => {
-    const { warehouse, product, destinationLocationId, quantity, notes } = data;
+    const { warehouse, destinationLocationId, quantity, notes } = data;
 
     setError('');
     setSuccess('');
 
-    const itemLimit =
-      typeof product.item_limit === 'string'
-        ? parseInt(product.item_limit, 10)
-        : product.item_limit;
-
     try {
+      let productId: string | undefined;
+      let productName: string;
+      let productValue: number | undefined;
+      let productCategory: string | undefined;
+      let productItemLimit: number | undefined;
+      let packSize = 1;
+
+      if (data.isNewProduct && data.newProductData) {
+        productName = data.newProductData.name;
+        productValue = data.newProductData.value;
+        productCategory = data.newProductData.category || undefined;
+        productItemLimit = data.newProductData.limit;
+        if (typeof data.newProductData.packSize === 'number' && data.newProductData.packSize >= 1) {
+          packSize = data.newProductData.packSize;
+        }
+
+        // Create a product row so the new name appears in the product picker
+        const newProduct = await createProduct({
+          name: productName,
+          value: productValue ?? 0,
+          category: productCategory,
+          item_limit: productItemLimit,
+        });
+        productId = newProduct.id;
+      } else {
+        const { product } = data;
+        productId = product.id;
+        productName = product.name;
+        productValue = product.value;
+        productCategory = product.category || undefined;
+        productItemLimit =
+          typeof product.item_limit === 'string'
+            ? parseInt(product.item_limit, 10)
+            : product.item_limit;
+      }
+
       await createItemWithMovement({
         item: {
-          name: product.name,
-          product_id: product.id,
-          quantity: 1,
-          stock: 1,
+          name: productName,
+          product_id: productId,
+          quantity: packSize,
+          stock: packSize,
           current_location_id: destinationLocationId,
           status: 'active',
-          created_by: 'b4974f63-ee89-42a1-bdb3-ce9df255c682', // TODO: Get user ID from auth context
+          created_by: user!.id,
           warehouse: warehouse.id,
-          category: product.category || undefined,
-          item_limit: itemLimit || undefined,
-          value: product.value,
+          category: productCategory,
+          item_limit: productItemLimit || undefined,
+          value: productValue,
           limbo: false,
           notes: notes || undefined,
         },
@@ -41,7 +74,7 @@ export default function AddItem() {
           from_location_id: null,
           to_location_id: destinationLocationId,
           quantity: quantity,
-          performed_by: 'b4974f63-ee89-42a1-bdb3-ce9df255c682', // TODO: Get user ID from auth context
+          performed_by: user!.id,
           note: notes || undefined,
         },
       });

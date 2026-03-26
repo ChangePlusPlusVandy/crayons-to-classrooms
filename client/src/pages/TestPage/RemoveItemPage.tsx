@@ -13,6 +13,7 @@ import {
 
 import { getItems, updateItem } from '../../api/items';
 import { createInventoryMovement } from '../../api/addItem';
+import { useAuth } from '../../context/AuthContext';
 import { Item, UpdateItemRequest } from '../../types/Item';
 import { Warehouse } from '../../types/Warehouse';
 import { RemoveItemCard, RemoveItemFormLabel } from './RemoveItemPage.styles';
@@ -28,6 +29,7 @@ type ItemGroupWithLocation = {
 };
 
 export default function RemoveItemPage() {
+  const { user } = useAuth();
   const [items, setItems] = useState<Item[]>([]);
   const [formKey, setFormKey] = useState(0);
   const [selectedWarehouse, setSelectedWarehouse] = useState<Warehouse | null>(null);
@@ -129,7 +131,7 @@ export default function RemoveItemPage() {
         from_location_id: representative.current_location_id,
         to_location_id: null,
         quantity: quantityToRemove,
-        performed_by: 'b4974f63-ee89-42a1-bdb3-ce9df255c682', // Hardcoded user ID (matches Add/Move pages)
+        performed_by: user!.id,
         note: notes || undefined,
       });
 
