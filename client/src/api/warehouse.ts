@@ -5,7 +5,7 @@ const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
 
 export async function getWarehouses(): Promise<Warehouse[]> {
   const response = await authFetch(`${API_BASE_URL}/warehouses`);
-  if (!response.ok) throw new Error('Failed to fetch warehouses');
+  if (!response.ok) throw new Error('Failed to authFetch warehouses');
   return response.json();
 }
 
@@ -14,7 +14,7 @@ export async function getWarehouseById(id: string): Promise<Warehouse> {
   const response = await authFetch(`${API_BASE_URL}/warehouses/${id}`);
 
   if (!response.ok) {
-    throw new Error('Failed to fetch warehouse');
+    throw new Error('Failed to authFetch warehouse');
   }
 
   return response.json();
@@ -25,7 +25,7 @@ export async function getWarehouseByName(name: string): Promise<Warehouse> {
   const response = await authFetch(`${API_BASE_URL}/warehouses/name/${name}`);
 
   if (!response.ok) {
-    throw new Error('Failed to fetch warehouse by name');
+    throw new Error('Failed to authFetch warehouse by name');
   }
 
   return response.json();

@@ -43,9 +43,10 @@ export const ActionParamSchema = z.enum([
 ]);
 
 /**
- * Schema for inventory creation
- * Requires: inventory_action, item_id, product_id, to_location_id, quantity, performed_by
- * from_location_id is optional (null for ADD actions)
+ * Schema for inventory movement creation
+ * Requires: inventory_action, item_id, product_id, quantity, performed_by
+ * Optional: from_location_id (nullable — null for ADD actions),
+ *           to_location_id (nullable), note
  */
 export const createInventoryMovementSchema = z.object({
   inventory_action: ActionParamSchema,
