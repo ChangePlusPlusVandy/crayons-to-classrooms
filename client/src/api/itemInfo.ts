@@ -24,6 +24,10 @@ export type ItemInfo = z.infer<typeof ItemInfoSchema>;
 
 export async function getLimboItems(): Promise<ItemInfo[]> {
   const response = await authFetch(`${API_BASE_URL}/item-info/limbo`);
+  if (response.status === 404) {
+    // No limbo items found; return empty list instead of treating as an error.
+    return [];
+  }
   if (!response.ok) throw new Error('Failed to fetch limbo items');
   const data = await response.json();
   return z.array(ItemInfoSchema).parse(data);
