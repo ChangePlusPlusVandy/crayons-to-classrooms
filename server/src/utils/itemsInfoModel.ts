@@ -25,7 +25,7 @@ export const createItemInfoSchema = z.object({
   quantity: z.number().int().nonnegative('Quantity cannot be negative').optional(),
   value: z.number().nonnegative('Value cannot be negative').optional(),
   item_limit: z.number().int().nonnegative('Limit cannot be negative').optional(),
-  limbo: z.boolean().optional(),
+  limbo: z.boolean().default(false),
   stock: z.number().int().nonnegative('Stock cannot be negative'),
   fixture: z.string().optional(),
   last_known_location_code: z.string(),
