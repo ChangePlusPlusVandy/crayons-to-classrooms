@@ -121,6 +121,26 @@ export const getItemsInfoByName = async (req: Request, res: Response) => {
     res.status(500).json({ error: 'Internal server error' });
   }
 };
+/**
+ * Retrieves items that are in limbo.
+ *
+ * @param {Request} req - Express request object
+ * @param {Response} res - Express response object
+ * @returns {Promise<Response>} JSON array of items in limbo or error message
+ * @throws {500} Internal server error if database query fails
+ */
+export const getLimboItems = async (req: Request, res: Response) => {
+  try {
+    const items = await pool.query('SELECT * FROM item_info WHERE limbo = TRUE AND stock = 0');
+    if (!countRows(items.rows, res)) {
+      return;
+    }
+    res.json(items.rows);
+  } catch (error) {
+    console.error('Error fetching limbo items:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
 
 /**
  * Creates a new item in the database.
@@ -132,6 +152,7 @@ export const getItemsInfoByName = async (req: Request, res: Response) => {
  *   - quantity: Quantity number (in body, optional)
  *   - value: Value number (in body, optional)
  *   - item_limit: Limit number (in body, optional)
+ *   - limbo: Limbo boolean, defaults to false (in body, optional)
  *   - stock: total stock of the item (in body, required)
  *   - fixture: fixture of the item (in body, optional)
  *   - last_known_location_code: last known location code of the item (in body, required)
@@ -151,6 +172,7 @@ export const createItemInfo = async (req: Request, res: Response) => {
       value,
       item_limit,
       stock,
+      limbo,
       fixture,
       last_known_location_code,
       time_last_updated,
@@ -164,7 +186,7 @@ export const createItemInfo = async (req: Request, res: Response) => {
     }
 
     const newItemInfo = await pool.query(
-      'INSERT INTO item_info (name, product_id, category, quantity, value, item_limit, stock, fixture, last_known_location_code, time_last_updated, notes) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *',
+      'INSERT INTO item_info (name, product_id, category, quantity, value, item_limit, limbo, stock, fixture, last_known_location_code, time_last_updated, notes) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *',
       [
         name,
         product_id,
@@ -172,6 +194,7 @@ export const createItemInfo = async (req: Request, res: Response) => {
         quantity,
         value,
         item_limit,
+        limbo,
         stock,
         fixture,
         last_known_location_code,

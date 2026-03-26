@@ -984,6 +984,7 @@ export const undoInventoryMovementCore = async (
         undefined, // quantity - don't update
         undefined, // value - don't update
         undefined, // itemLimit - don't update
+        undefined, // limbo - don't update
         fromLocation?.fixture ?? null,
         fromLocation?.location_code ?? null,
         0, // stockDelta - no change to stock count for MOVE
@@ -1046,6 +1047,7 @@ export const undoInventoryMovementCore = async (
         undefined, // quantity - don't update
         undefined, // value - don't update
         undefined, // itemLimit - don't update
+        undefined, // limbo - don't update
         null, // fixture - don't update
         null, // locationCode - don't update
         -deletedCount, // stockDelta - decrement by number of deleted items
