@@ -5,6 +5,7 @@ import {
   updateItemInfoSchema,
   nameParamSchema,
   itemInfoIdParamSchema,
+  itemInfoBrowseQuerySchema,
   CreateItemInfoInput,
   UpdateItemInfoInput,
 } from '../utils/itemsInfoModel.js';
@@ -41,6 +42,101 @@ const handleValidationError = (error: unknown, res: Response) => {
   }
   console.error('Unexpected error:', error);
   return res.status(500).json({ error: 'Internal server error' });
+};
+
+/**
+ * Retrieves a paginated, filterable list of items with warehouse and stock info.
+ *
+ * Query params:
+ *   - page: Page number (default 1)
+ *   - limit: Items per page (default 20, max 100)
+ *   - warehouse: UUID - filter to items present in this warehouse
+ *   - category: string - filter by item_info category
+ *   - stock_status: 'in_stock' | 'out_of_stock' - filter by stock availability
+ */
+export const getItemsInfoPaginated = async (req: Request, res: Response) => {
+  try {
+    const { page, limit, warehouse, category, stock_status } =
+      itemInfoBrowseQuerySchema.parse(req.query);
+    const offset = (page - 1) * limit;
+
+    const conditions: string[] = [];
+    const params: any[] = [];
+    let paramIdx = 1;
+
+    if (warehouse) {
+      conditions.push(
+        `EXISTS (SELECT 1 FROM items i WHERE i.name = ii.name AND i.warehouse = $${paramIdx++})`
+      );
+      params.push(warehouse);
+    }
+
+    if (category) {
+      conditions.push(`ii.category = $${paramIdx++}`);
+      params.push(category);
+    }
+
+    if (stock_status === 'in_stock') {
+      conditions.push(
+        `EXISTS (SELECT 1 FROM items i WHERE i.name = ii.name AND i.status = 'active')`
+      );
+    } else if (stock_status === 'out_of_stock') {
+      conditions.push(
+        `NOT EXISTS (SELECT 1 FROM items i WHERE i.name = ii.name AND i.status = 'active')`
+      );
+    }
+
+    const whereClause =
+      conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : '';
+
+    // TODO: Can this be done without the complicated correlated subquery and json? Is item_info table even needed or do it all in items?
+    const dataQuery = `
+      SELECT
+        ii.*,
+        COALESCE(
+          (SELECT json_agg(DISTINCT jsonb_build_object('id', w.id, 'name', w.name))
+           FROM items i
+           JOIN warehouse w ON i.warehouse = w.id
+           WHERE i.name = ii.name),
+          '[]'::json
+        ) AS warehouses,
+        EXISTS (
+          SELECT 1 FROM items i WHERE i.name = ii.name AND i.status = 'active'
+        ) AS in_stock
+      FROM item_info ii
+      ${whereClause}
+      ORDER BY ii.name ASC
+      LIMIT $${paramIdx++} OFFSET $${paramIdx++}
+    `;
+
+    const countQuery = `
+      SELECT COUNT(*) FROM item_info ii
+      ${whereClause}
+    `;
+
+    const dataParams = [...params, limit, offset];
+    const countParams = [...params];
+
+    const [dataResult, countResult] = await Promise.all([
+      pool.query(dataQuery, dataParams),
+      pool.query(countQuery, countParams),
+    ]);
+
+    const total = parseInt(countResult.rows[0].count, 10);
+
+    res.json({
+      data: dataResult.rows,
+      total,
+      page,
+      limit,
+    });
+  } catch (error) {
+    if (error instanceof ZodError) {
+      return handleValidationError(error, res);
+    }
+    console.error('Error fetching paginated item info:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 };
 
 /**

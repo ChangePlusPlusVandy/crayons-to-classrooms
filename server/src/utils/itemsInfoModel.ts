@@ -61,5 +61,14 @@ export const updateItemInfoSchema = z
 /**
  * Type exports for TypeScript
  */
+export const itemInfoBrowseQuerySchema = z.object({
+  page: z.coerce.number().int().positive().default(1),
+  limit: z.coerce.number().int().positive().max(100).default(20),
+  warehouse: z.string().uuid().optional(),
+  category: z.string().min(1).optional(),
+  stock_status: z.enum(['in_stock', 'out_of_stock']).optional(),
+});
+
 export type CreateItemInfoInput = z.infer<typeof createItemInfoSchema>;
 export type UpdateItemInfoInput = z.infer<typeof updateItemInfoSchema>;
+export type ItemInfoBrowseQuery = z.infer<typeof itemInfoBrowseQuerySchema>;
