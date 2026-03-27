@@ -136,3 +136,20 @@ export type InventoryStatusType = z.infer<typeof actionQuerySchema>;
 export type CreateItemWithMovementInput = z.infer<typeof createItemWithMovementSchema>;
 export type MovementIdParamType = z.infer<typeof movementIdParamSchema>;
 export type MoveItemsWithMovementInput = z.infer<typeof moveItemsWithMovementSchema>;
+
+/**
+ * Schema for the combined remove-items-with-movement request body.
+ * item_ids are the existing items to deactivate; movement records the action.
+ */
+export const removeItemsWithMovementSchema = z.object({
+  item_ids: z.array(uuidSchema).nonempty('At least one item_id is required'),
+  movement: z.object({
+    inventory_action: z.enum(['DONATED', 'DISCARD']),
+    from_location_id: uuidSchema,
+    quantity: z.number().int().positive('Quantity must be a positive integer'),
+    performed_by: uuidSchema,
+    note: z.string().optional(),
+  }),
+});
+
+export type RemoveItemsWithMovementInput = z.infer<typeof removeItemsWithMovementSchema>;

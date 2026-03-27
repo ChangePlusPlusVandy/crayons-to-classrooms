@@ -11,11 +11,10 @@ import {
   FormControl,
 } from '@mui/material';
 
-import { getItems, updateItem } from '../../api/items';
-import { createInventoryMovement } from '../../api/addItem';
-import { getItemsByLocation } from '../../api/moveItem';
+import { getItems } from '../../api/items';
+import { getItemsByLocation, removeItemsWithMovement } from '../../api/moveItem';
 import { useAuth } from '../../context/AuthContext';
-import { Item, UpdateItemRequest } from '../../types/Item';
+import { Item } from '../../types/Item';
 import { Warehouse } from '../../types/Warehouse';
 import { RemoveItemCard, RemoveItemFormLabel } from './RemoveItemPage.styles';
 import { WarehouseSelector } from '../../components/WarehouseSelector/WarehouseSelector';
@@ -103,43 +102,17 @@ export default function RemoveItemPage() {
     setLoading(true);
 
     try {
-      const isFullRemoval = quantityToRemove === selectedGroupLive.items.length;
-      const newStatus = 'inactive';
       const itemsToRemove = selectedGroupLive.items.slice(0, quantityToRemove);
-      const representative = selectedGroupLive.items[0];
 
-      if (isFullRemoval) {
-        // Full removal: update status and nullify location fields on all items in group
-        await Promise.all(
-          itemsToRemove.map((item) =>
-            updateItem(item.id, {
-              status: newStatus,
-              current_location_id: null,
-              warehouse: null,
-            } as UpdateItemRequest)
-          )
-        );
-      } else {
-        // Partial removal: update status on the N items being removed
-        await Promise.all(
-          itemsToRemove.map((item) =>
-            updateItem(item.id, {
-              status: newStatus,
-            } as UpdateItemRequest)
-          )
-        );
-      }
-
-      // Create inventory movement record (uses first item as representative)
-      await createInventoryMovement({
-        inventory_action: removalAction,
-        item_id: representative.id,
-        product_id: representative.product_id,
-        from_location_id: representative.current_location_id,
-        to_location_id: null,
-        quantity: quantityToRemove,
-        performed_by: user!.id,
-        note: notes || undefined,
+      await removeItemsWithMovement({
+        item_ids: itemsToRemove.map((item) => item.id),
+        movement: {
+          inventory_action: removalAction,
+          from_location_id: selectedGroupLive.locationId,
+          quantity: quantityToRemove,
+          performed_by: user!.id,
+          note: notes || undefined,
+        },
       });
 
       // Refresh items
@@ -154,9 +127,7 @@ export default function RemoveItemPage() {
       setNotes('');
 
       const actionLabel = removalAction === 'DONATED' ? 'donated' : 'marked as defective';
-      setSuccess(
-        isFullRemoval ? `Item fully ${actionLabel}.` : `${quantityToRemove} item(s) ${actionLabel}.`
-      );
+      setSuccess(`${quantityToRemove} item(s) ${actionLabel}.`);
     } catch (err) {
       console.error(err);
       setError('Failed to remove item.');
@@ -180,30 +151,15 @@ export default function RemoveItemPage() {
         throw new Error('No active items found in the source slot.');
       }
 
-      const newStatus = 'inactive';
-
-      // Update all items: set status to inactive, nullify location
-      await Promise.all(
-        activeItems.map((item) =>
-          updateItem(item.id, {
-            status: newStatus,
-            current_location_id: null,
-            warehouse: null,
-          } as UpdateItemRequest)
-        )
-      );
-
-      // Create inventory movement record
-      const representative = activeItems[0];
-      await createInventoryMovement({
-        inventory_action: action,
-        item_id: representative.id,
-        product_id: representative.product_id,
-        from_location_id: sourceSlotId,
-        to_location_id: null,
-        quantity: activeItems.length,
-        performed_by: user!.id,
-        note: palletNotes || undefined,
+      await removeItemsWithMovement({
+        item_ids: activeItems.map((item) => item.id),
+        movement: {
+          inventory_action: action,
+          from_location_id: sourceSlotId,
+          quantity: activeItems.length,
+          performed_by: user!.id,
+          note: palletNotes || undefined,
+        },
       });
 
       // Refresh items
