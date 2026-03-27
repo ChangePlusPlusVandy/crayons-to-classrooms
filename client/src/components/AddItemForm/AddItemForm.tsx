@@ -27,6 +27,7 @@ import {
 } from './AddItemForm.styles';
 import { WarehouseSelector } from '../WarehouseSelector/WarehouseSelector';
 import { SlotSelector } from '../SlotSelector/SlotSelector';
+import { FixtureSelector } from '../FixtureSelector/FixtureSelector';
 
 export interface AddItemFormData {
   warehouse: Warehouse;
@@ -76,6 +77,7 @@ export default function AddItemForm({
   const [selectedWarehouse, setSelectedWarehouse] = useState<Warehouse | null>(initialWarehouse);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(initialProduct);
   const [selectedSlot, setSelectedSlot] = useState<string | null>(initialSlot);
+  const [selectedFixture, setSelectedFixture] = useState<string | null>(null);
   const [quantityToAdd, setQuantityToAdd] = useState<number | ''>(initialQuantity);
   const [notes, setNotes] = useState(initialNotes);
 
@@ -176,15 +178,21 @@ export default function AddItemForm({
         !!selectedWarehouse &&
         !!newItemName.trim() &&
         !!selectedSlot &&
+        !!selectedFixture &&
         isQuantityValid()
       );
     }
-    return !!selectedWarehouse && !!selectedProduct && !!selectedSlot && isQuantityValid();
+    return !!selectedWarehouse && !!selectedProduct && !!selectedSlot && !!selectedFixture && isQuantityValid();
   };
 
   const handleSubmit = async () => {
-    // Find the destination location based on slot (first matching location)
-    const destinationLocation = warehouseLocations.find((loc) => loc.slot === selectedSlot);
+    // Find the destination location based on slot + fixture
+    const destinationLocation = warehouseLocations.find((loc) => {
+      if (selectedFixture === 'N/A') {
+        return loc.slot === selectedSlot && (!loc.fixture || loc.fixture.trim() === '');
+      }
+      return loc.slot === selectedSlot && loc.fixture === selectedFixture;
+    });
 
     // Validation
     if (!selectedWarehouse) {
@@ -318,6 +326,7 @@ export default function AddItemForm({
         onChange={(newWarehouse) => {
           setSelectedWarehouse(newWarehouse);
           setSelectedSlot(null);
+          setSelectedFixture(null);
           setError('');
         }}
         label="Warehouse"
@@ -543,15 +552,31 @@ export default function AddItemForm({
       </FormControl>
 
       {/* Slot Selection */}
-      <SlotSelector
-        value={selectedSlot}
-        onChange={(newSlot) => {
-          setSelectedSlot(newSlot);
-          setError('');
-        }}
-        warehouse={selectedWarehouse}
-        storageLocations={storageLocations}
-      />
+      <Stack spacing={0}>
+        <SlotSelector
+          value={selectedSlot}
+          onChange={(newSlot) => {
+            setSelectedSlot(newSlot);
+            setSelectedFixture(null);
+            setError('');
+          }}
+          warehouse={selectedWarehouse}
+          storageLocations={storageLocations}
+        />
+
+        <FixtureSelector
+          value={selectedFixture}
+          onChange={(newFixture) => {
+            setSelectedFixture(newFixture);
+            setError('');
+          }}
+          slot={selectedSlot}
+          warehouse={selectedWarehouse}
+          storageLocations={storageLocations}
+          nullFixtureLabel="N/A"
+          autoSelectNull
+        />
+      </Stack>
 
       {/* Quantity to Add */}
       <FormControl fullWidth>

@@ -21,6 +21,7 @@ import { Product } from '../../types/Product';
 import { AddItemFormLabel } from '../AddItemForm/AddItemForm.styles';
 import { WarehouseSelector } from '../WarehouseSelector/WarehouseSelector';
 import { SlotSelector } from '../SlotSelector/SlotSelector';
+import { FixtureSelector } from '../FixtureSelector/FixtureSelector';
 import NewItemDialog from './NewItemDialog';
 
 export interface NewProductData {
@@ -86,6 +87,7 @@ export default function PalletAddForm({
 
   const [selectedWarehouse, setSelectedWarehouse] = useState<Warehouse | null>(initialWarehouse);
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
+  const [selectedFixture, setSelectedFixture] = useState<string | null>(null);
   const [manifestRows, setManifestRows] = useState<ManifestRow[]>([
     { product: null, quantity: '' },
   ]);
@@ -166,7 +168,7 @@ export default function PalletAddForm({
   };
 
   const isFormValid = (): boolean => {
-    if (!selectedWarehouse || !selectedSlot) return false;
+    if (!selectedWarehouse || !selectedSlot || !selectedFixture) return false;
     if (manifestRows.length === 0) return false;
     return manifestRows.every(
       (row) => row.product !== null && typeof row.quantity === 'number' && row.quantity >= 1
@@ -174,14 +176,19 @@ export default function PalletAddForm({
   };
 
   const handleSubmit = async () => {
-    const destinationLocation = warehouseLocations.find((loc) => loc.slot === selectedSlot);
+    const destinationLocation = warehouseLocations.find((loc) => {
+      if (selectedFixture === 'N/A') {
+        return loc.slot === selectedSlot && (!loc.fixture || loc.fixture.trim() === '');
+      }
+      return loc.slot === selectedSlot && loc.fixture === selectedFixture;
+    });
 
     if (!selectedWarehouse) {
       setError('Please select a warehouse.');
       return;
     }
-    if (!selectedSlot || !destinationLocation) {
-      setError('Please select a valid destination slot.');
+    if (!selectedSlot || !selectedFixture || !destinationLocation) {
+      setError('Please select a valid destination slot and fixture.');
       return;
     }
     if (!isFormValid()) {
@@ -298,6 +305,7 @@ export default function PalletAddForm({
         onChange={(newWarehouse) => {
           setSelectedWarehouse(newWarehouse);
           setSelectedSlot(null);
+          setSelectedFixture(null);
           setError('');
         }}
         label="Warehouse"
@@ -305,17 +313,33 @@ export default function PalletAddForm({
         fullWidth
       />
 
-      <SlotSelector
-        value={selectedSlot}
-        onChange={(newSlot) => {
-          setSelectedSlot(newSlot);
-          setError('');
-        }}
-        warehouse={selectedWarehouse}
-        storageLocations={storageLocations}
-        label="Destination Slot"
-        placeholder="Select destination slot"
-      />
+      <Stack spacing={0}>
+        <SlotSelector
+          value={selectedSlot}
+          onChange={(newSlot) => {
+            setSelectedSlot(newSlot);
+            setSelectedFixture(null);
+            setError('');
+          }}
+          warehouse={selectedWarehouse}
+          storageLocations={storageLocations}
+          label="Destination Slot"
+          placeholder="Select destination slot"
+        />
+
+        <FixtureSelector
+          value={selectedFixture}
+          onChange={(newFixture) => {
+            setSelectedFixture(newFixture);
+            setError('');
+          }}
+          slot={selectedSlot}
+          warehouse={selectedWarehouse}
+          storageLocations={storageLocations}
+          nullFixtureLabel="N/A"
+          autoSelectNull
+        />
+      </Stack>
 
       {/* Item Manifest */}
       <FormControl fullWidth>
