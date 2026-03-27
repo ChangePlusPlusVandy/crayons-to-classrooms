@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Container, Typography, Paper, Alert } from '@mui/material';
-import { createItemWithMovement, createProduct } from '../../api/addItem';
+import { createItemWithMovement, bulkCreateItemsWithMovement, createProduct } from '../../api/addItem';
 import AddItemForm, { AddItemFormData } from '../../components/AddItemForm/AddItemForm';
 import PalletAddForm, { PalletAddFormData } from '../../components/PalletAddForm/PalletAddForm';
 import FormModeToggle, { FormMode } from '../../components/FormModeToggle/FormModeToggle';
@@ -86,9 +86,20 @@ export default function AddItem() {
     setSuccess('');
 
     try {
-      let totalCreated = 0;
-
+      // Create any new subcategory products first (they need IDs before the bulk call)
+      const resolvedProductIds = new Map<string, string>();
       for (const item of items) {
+        if (item.isNewProduct && item.newProductData?.newSubcategoryName) {
+          const key = item.newProductData.newSubcategoryName;
+          if (!resolvedProductIds.has(key)) {
+            const newProduct = await createProduct({ name: key, value: 0 });
+            resolvedProductIds.set(key, newProduct.id);
+          }
+        }
+      }
+
+      // Build entries array for the bulk call
+      const entries = items.map((item) => {
         let productId: string | undefined;
         let productName: string;
         let productValue: number | undefined;
@@ -97,13 +108,8 @@ export default function AddItem() {
         let packSize = 1;
 
         if (item.isNewProduct && item.newProductData) {
-          // If a new subcategory was entered, create the product now
           if (item.newProductData.newSubcategoryName) {
-            const newProduct = await createProduct({
-              name: item.newProductData.newSubcategoryName,
-              value: 0,
-            });
-            productId = newProduct.id;
+            productId = resolvedProductIds.get(item.newProductData.newSubcategoryName);
           } else {
             productId = item.newProductData.subcategoryProductId;
           }
@@ -125,14 +131,14 @@ export default function AddItem() {
               : item.product.item_limit || undefined;
         }
 
-        await createItemWithMovement({
+        return {
           item: {
             name: productName,
             product_id: productId,
             quantity: packSize,
             stock: packSize,
             current_location_id: destinationLocationId,
-            status: 'active',
+            status: 'active' as const,
             created_by: user!.id,
             warehouse: warehouse.id,
             category: productCategory,
@@ -142,17 +148,19 @@ export default function AddItem() {
             notes: notes || undefined,
           },
           movement: {
-            inventory_action: 'ADD',
+            inventory_action: 'ADD' as const,
             from_location_id: null,
             to_location_id: destinationLocationId,
             quantity: item.quantity,
             performed_by: user!.id,
             note: notes || undefined,
           },
-        });
-        totalCreated += item.quantity;
-      }
+        };
+      });
 
+      await bulkCreateItemsWithMovement({ entries });
+
+      const totalCreated = items.reduce((sum, item) => sum + item.quantity, 0);
       setSuccess(`${totalCreated} item${totalCreated > 1 ? 's' : ''} added successfully!`);
       setFormKey((k) => k + 1);
     } catch (err) {

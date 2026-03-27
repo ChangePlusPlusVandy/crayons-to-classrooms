@@ -134,6 +134,21 @@ export type CreateInventoryInput = z.infer<typeof createInventoryMovementSchema>
 export type UpdateInventoryInput = z.infer<typeof updateInventoryMovementSchema>;
 export type InventoryStatusType = z.infer<typeof actionQuerySchema>;
 export type CreateItemWithMovementInput = z.infer<typeof createItemWithMovementSchema>;
+
+export const bulkCreateItemsWithMovementSchema = z.object({
+  entries: z
+    .array(
+      z.object({
+        item: createItemSchema,
+        movement: movementFieldsSchema.extend({
+          inventory_action: z.literal('ADD'),
+        }),
+      })
+    )
+    .nonempty('At least one entry is required'),
+});
+
+export type BulkCreateItemsWithMovementInput = z.infer<typeof bulkCreateItemsWithMovementSchema>;
 export type MovementIdParamType = z.infer<typeof movementIdParamSchema>;
 export type MoveItemsWithMovementInput = z.infer<typeof moveItemsWithMovementSchema>;
 

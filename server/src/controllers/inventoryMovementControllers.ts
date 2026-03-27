@@ -16,6 +16,7 @@ import {
   actionQuerySchema,
   editMoveSchema,
   createItemWithMovementSchema,
+  bulkCreateItemsWithMovementSchema,
   moveItemsWithMovementSchema,
   removeItemsWithMovementSchema,
 } from '../utils/inventoryMovementsModel.js';
@@ -692,6 +693,85 @@ export const createItemWithMovement = async (req: Request, res: Response) => {
       return res.status(400).json({ error: error.message });
     }
     console.error('Error creating items with movement:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  } finally {
+    client.release();
+  }
+};
+
+/**
+ * Creates multiple items with their associated inventory movements atomically in a single transaction.
+ * Each entry in the array is processed identically to createItemWithMovement.
+ * If any entry fails, the entire batch is rolled back.
+ *
+ * @param {Request} req - Express request object with:
+ *   - entries: Array of { item, movement } pairs
+ * @param {Response} res - Express response object
+ * @returns {Promise<Response>} JSON object with { results: [{ items, movement }] } or error message
+ */
+export const bulkCreateItemsWithMovement = async (req: Request, res: Response) => {
+  let parsedData;
+  try {
+    parsedData = bulkCreateItemsWithMovementSchema.parse(req.body);
+  } catch (error) {
+    if (error instanceof ZodError) {
+      return handleValidationError(error, res);
+    }
+    return res.status(400).json({ error: 'Invalid request body' });
+  }
+
+  const { entries } = parsedData;
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const results: { items: any[]; movement: any }[] = [];
+
+    for (const entry of entries) {
+      const { item: itemData, movement: movementData } = entry;
+
+      if (movementData.quantity <= 0) {
+        throw new Error('Quantity must be greater than 0');
+      }
+
+      const createdItems = await createItemCore(itemData, movementData.quantity, client);
+
+      if (createdItems.length === 0) {
+        throw new Error('No items were created');
+      }
+
+      // Always set fixture to null for ADD operations
+      await client.query(
+        'UPDATE item_info SET fixture = NULL, time_last_updated = NOW() WHERE name = $1',
+        [createdItems[0].name]
+      );
+
+      const fullMovementData: CreateInventoryInput = {
+        inventory_action: movementData.inventory_action,
+        item_id: createdItems[0].id,
+        product_id: createdItems[0].product_id,
+        from_location_id: movementData.from_location_id,
+        to_location_id: movementData.to_location_id,
+        quantity: movementData.quantity,
+        performed_by: movementData.performed_by,
+        note: movementData.note,
+      };
+
+      const createdMovement = await createInventoryMovementCore(fullMovementData, client);
+
+      results.push({ items: createdItems, movement: createdMovement });
+    }
+
+    await client.query('COMMIT');
+
+    res.status(201).json({ results });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    if (error instanceof ForeignKeyError) {
+      return res.status(400).json({ error: error.message });
+    }
+    console.error('Error bulk creating items with movements:', error);
     res.status(500).json({ error: 'Internal server error' });
   } finally {
     client.release();
