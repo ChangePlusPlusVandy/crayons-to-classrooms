@@ -312,3 +312,34 @@ export const deleteItemInfo = async (req: Request, res: Response) => {
     res.status(500).json({ error: 'Internal server error' });
   }
 };
+
+export const getInventoryStats = async (req: Request, res: Response) => {
+  try {
+    const [skuResult, slotResult] = await Promise.all([
+      pool.query(`
+        SELECT
+          COUNT(*) AS total_skus,
+          SUM(CASE WHEN stock > 0 THEN 1 ELSE 0 END) AS stocked_skus
+        FROM item_info
+      `),
+      pool.query(`
+        SELECT
+          COUNT(sl.id) AS total_slots,
+          COUNT(DISTINCT i.current_location_id) AS occupied_slots
+        FROM storage_locations sl
+        LEFT JOIN items i ON sl.id = i.current_location_id
+        WHERE sl.active = true
+      `),
+    ]);
+
+    res.json({
+      total_skus: Number(skuResult.rows[0].total_skus),
+      stocked_skus: Number(skuResult.rows[0].stocked_skus),
+      total_slots: Number(slotResult.rows[0].total_slots),
+      occupied_slots: Number(slotResult.rows[0].occupied_slots),
+    });
+  } catch (error) {
+    console.error('Error fetching inventory stats:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};

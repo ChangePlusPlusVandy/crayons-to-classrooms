@@ -6,6 +6,7 @@ import {
   deleteItemInfo,
   getItemsInfoByName,
   getLimboItems,
+  getInventoryStats,
 } from '../controllers/itemInfoControllers.js';
 import express from 'express';
 
@@ -19,6 +20,8 @@ router.get('/', getItemsInfo);
 router.post('/', createItemInfo);
 // get limbo items
 router.get('/limbo', getLimboItems);
+// get inventory health stats
+router.get('/stats', getInventoryStats);
 // get item by ID
 router.get('/:id', getItemInfoById);
 // update an existing item
