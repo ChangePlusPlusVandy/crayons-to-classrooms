@@ -433,12 +433,20 @@ export async function createInventoryMovementCore(
   // Normalize to_location_id: undefined → null to avoid node-postgres invalid parameter errors
   const normalizedToLocationId = to_location_id ?? null;
 
-  // Check if item_id, product_id, from_location_id (if provided), to_location_id exist in tables (in parallel)
-  const checks = [
+  // Check if item_id, product_id (if provided), from_location_id (if provided), to_location_id (if provided) exist in tables (in parallel)
+  const checks: Promise<any>[] = [
     db.query('SELECT id FROM items WHERE id = $1', [item_id]),
-    db.query('SELECT id FROM products WHERE id = $1', [product_id]),
-    db.query('SELECT id FROM storage_locations WHERE id = $1', [to_location_id]),
   ];
+
+  if (normalizedToLocationId) {
+    checks.push(
+      db.query('SELECT id FROM storage_locations WHERE id = $1', [normalizedToLocationId])
+    );
+  }
+
+  if (product_id) {
+    checks.push(db.query('SELECT id FROM products WHERE id = $1', [product_id]));
+  }
 
   // Only check from_location_id if it's provided (it's optional for ADD actions)
   if (normalizedFromLocationId) {
@@ -447,12 +455,18 @@ export async function createInventoryMovementCore(
     );
   }
 
-  const [itemCheck, productCheck, toLocationCheck, fromLocationCheck] = await Promise.all(checks);
+  const results = await Promise.all(checks);
+
+  let idx = 0;
+  const itemCheck = results[idx++];
+  const toLocationCheck = normalizedToLocationId ? results[idx++] : null;
+  const productCheck = product_id ? results[idx++] : null;
+  const fromLocationCheck = normalizedFromLocationId ? results[idx++] : null;
 
   if (itemCheck.rows.length === 0) {
     throw new ForeignKeyError('item_id');
   }
-  if (productCheck.rows.length === 0) {
+  if (productCheck && productCheck.rows.length === 0) {
     throw new ForeignKeyError('product_id');
   }
   if (normalizedFromLocationId && fromLocationCheck && fromLocationCheck.rows.length === 0) {
@@ -480,7 +494,7 @@ export async function createInventoryMovementCore(
     [
       inventory_action,
       item_id,
-      product_id,
+      product_id ?? null,
       normalizedFromLocationId,
       normalizedToLocationId,
       quantity,
@@ -813,7 +827,7 @@ export const removeItemsWithMovement = async (req: Request, res: Response) => {
     const fullMovementData: CreateInventoryInput = {
       inventory_action: movementData.inventory_action,
       item_id: representativeItem.id,
-      product_id: representativeItem.product_id,
+      product_id: undefined,
       from_location_id: normalizedFromLocationId,
       to_location_id: null,
       quantity: updateResult.rowCount!,
@@ -1003,10 +1017,10 @@ export const editInventoryMovementRemove = async (req: Request, res: Response) =
 
     const originalMovement = original.rows[0];
 
-    // Undo original removal: find inactive items with matching product_id, restore them to active
+    // Undo original removal: find inactive items with the same name as the representative item, restore them to active
     const itemsToRestore = await client.query(
-      `SELECT id FROM items WHERE product_id = $1 AND status = 'inactive' ORDER BY updated_at DESC LIMIT $2`,
-      [originalMovement.product_id, originalMovement.quantity]
+      `SELECT id FROM items WHERE name = (SELECT name FROM items WHERE id = $1) AND status = 'inactive' ORDER BY updated_at DESC LIMIT $2`,
+      [originalMovement.item_id, originalMovement.quantity]
     );
 
     if (itemsToRestore.rows.length < originalMovement.quantity) {
@@ -1022,10 +1036,10 @@ export const editInventoryMovementRemove = async (req: Request, res: Response) =
     // Delete original movement record
     await client.query('DELETE FROM "inventory movement" WHERE id = $1', [id]);
 
-    // Find active items at new source location matching product_id (LIFO order)
+    // Find active items at new source location matching item_name (LIFO order)
     const itemsAtSource = await client.query(
-      `SELECT id FROM items WHERE product_id = $1 AND current_location_id = $2 AND status = 'active' ORDER BY created_at DESC LIMIT $3`,
-      [removeData.product_id, removeData.from_location_id, removeData.quantity]
+      `SELECT id FROM items WHERE name = $1 AND current_location_id = $2 AND status = 'active' ORDER BY created_at DESC LIMIT $3`,
+      [removeData.item_name, removeData.from_location_id, removeData.quantity]
     );
 
     if (itemsAtSource.rows.length < removeData.quantity) {
@@ -1036,30 +1050,16 @@ export const editInventoryMovementRemove = async (req: Request, res: Response) =
 
     const newRemoveIds: string[] = itemsAtSource.rows.map((row: { id: string }) => row.id);
 
-    // Determine if this is a full removal (removes all active items of this product at the location)
-    const totalAtLocation = await client.query(
-      `SELECT COUNT(*) FROM items WHERE product_id = $1 AND current_location_id = $2 AND status = 'active'`,
-      [removeData.product_id, removeData.from_location_id]
+    await client.query(
+      `UPDATE items SET status = 'inactive', current_location_id = NULL, warehouse = NULL, updated_at = NOW() WHERE id = ANY($1::uuid[])`,
+      [newRemoveIds]
     );
-    const isFullRemoval = parseInt(totalAtLocation.rows[0].count, 10) === removeData.quantity;
-
-    if (isFullRemoval) {
-      await client.query(
-        `UPDATE items SET status = 'inactive', current_location_id = NULL, warehouse = NULL, updated_at = NOW() WHERE id = ANY($1::uuid[])`,
-        [newRemoveIds]
-      );
-    } else {
-      await client.query(
-        `UPDATE items SET status = 'inactive', updated_at = NOW() WHERE id = ANY($1::uuid[])`,
-        [newRemoveIds]
-      );
-    }
 
     // Create new movement record
     const fullMovementData: CreateInventoryInput = {
       inventory_action: removeData.inventory_action,
       item_id: newRemoveIds[0],
-      product_id: removeData.product_id,
+      product_id: undefined,
       from_location_id: removeData.from_location_id,
       to_location_id: null,
       quantity: removeData.quantity,
@@ -1156,6 +1156,7 @@ export const undoInventoryMovementCore = async (
         undefined, // quantity - don't update
         undefined, // value - don't update
         undefined, // itemLimit - don't update
+        undefined, // limbo - don't update
         fromLocation?.fixture ?? null,
         fromLocation?.location_code ?? null,
         0, // stockDelta - no change to stock count for MOVE
@@ -1218,6 +1219,7 @@ export const undoInventoryMovementCore = async (
         undefined, // quantity - don't update
         undefined, // value - don't update
         undefined, // itemLimit - don't update
+        undefined, // limbo - don't update
         null, // fixture - don't update
         null, // locationCode - don't update
         -deletedCount, // stockDelta - decrement by number of deleted items

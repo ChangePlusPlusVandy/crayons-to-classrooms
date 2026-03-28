@@ -11,10 +11,10 @@ import {
   FormControl,
 } from '@mui/material';
 
-import { getItems } from '../../api/items';
-import { removeItemsWithMovement } from '../../api/removeItem';
+import { getItems, updateItem } from '../../api/items';
+import { createInventoryMovement } from '../../api/addItem';
 import { useAuth } from '../../context/AuthContext';
-import { Item } from '../../types/Item';
+import { Item, UpdateItemRequest } from '../../types/Item';
 import { Warehouse } from '../../types/Warehouse';
 import { RemoveItemCard, RemoveItemFormLabel } from './RemoveItemPage.styles';
 import { WarehouseSelector } from '../../components/WarehouseSelector/WarehouseSelector';
@@ -96,19 +96,43 @@ export default function RemoveItemPage() {
     setLoading(true);
 
     try {
+      const isFullRemoval = quantityToRemove === selectedGroupLive.items.length;
+      const newStatus = 'inactive';
       const itemsToRemove = selectedGroupLive.items.slice(0, quantityToRemove);
-      const isFullRemoval = itemsToRemove.length === selectedGroupLive.items.length;
       const representative = selectedGroupLive.items[0];
 
-      await removeItemsWithMovement({
-        item_ids: itemsToRemove.map((item) => item.id),
-        movement: {
-          inventory_action: removalAction,
-          from_location_id: representative.current_location_id,
-          quantity: quantityToRemove,
-          performed_by: user!.id,
-          note: notes || undefined,
-        },
+      if (isFullRemoval) {
+        // Full removal: update status and nullify location fields on all items in group
+        await Promise.all(
+          itemsToRemove.map((item) =>
+            updateItem(item.id, {
+              status: newStatus,
+              current_location_id: null,
+              warehouse: null,
+            } as UpdateItemRequest)
+          )
+        );
+      } else {
+        // Partial removal: update status on the N items being removed
+        await Promise.all(
+          itemsToRemove.map((item) =>
+            updateItem(item.id, {
+              status: newStatus,
+            } as UpdateItemRequest)
+          )
+        );
+      }
+
+      // Create inventory movement record (uses first item as representative)
+      await createInventoryMovement({
+        inventory_action: removalAction,
+        item_id: representative.id,
+        product_id: representative.product_id,
+        from_location_id: representative.current_location_id,
+        to_location_id: null,
+        quantity: quantityToRemove,
+        performed_by: user!.id,
+        note: notes || undefined,
       });
 
       // Refresh items

@@ -43,14 +43,15 @@ export const ActionParamSchema = z.enum([
 ]);
 
 /**
- * Schema for inventory creation
- * Requires: inventory_action, item_id, product_id, to_location_id, quantity, performed_by
- * from_location_id is optional (null for ADD actions)
+ * Schema for inventory movement creation
+ * Requires: inventory_action, item_id, quantity, performed_by
+ * Optional: product_id, from_location_id (nullable — null for ADD actions),
+ *           to_location_id (nullable), note
  */
 export const createInventoryMovementSchema = z.object({
   inventory_action: ActionParamSchema,
   item_id: uuidSchema,
-  product_id: uuidSchema,
+  product_id: uuidSchema.nullable().optional(),
   from_location_id: uuidSchema.nullable().optional(),
   to_location_id: uuidSchema.nullable().optional(),
   quantity: z.number().int().positive('Quantity must be a positive integer'),
@@ -126,7 +127,7 @@ export type EditMoveInput = z.infer<typeof editMoveSchema>;
 export const editRemoveSchema = z.object({
   inventory_action: z.enum(['DONATED', 'DISCARD']),
   from_location_id: uuidSchema,
-  product_id: uuidSchema,
+  item_name: z.string().min(1),
   quantity: z.number().int().positive('Quantity must be a positive integer'),
   performed_by: uuidSchema,
   note: z.string().optional(),
@@ -154,7 +155,6 @@ export const removeItemsWithMovementSchema = z.object({
   movement: z.object({
     inventory_action: z.enum(['DONATED', 'DISCARD']),
     from_location_id: uuidSchema.nullable().optional(),
-    quantity: z.number().int().positive('Quantity must be a positive integer'),
     performed_by: uuidSchema,
     note: z.string().optional(),
   }),

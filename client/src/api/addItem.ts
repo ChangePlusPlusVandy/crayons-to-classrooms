@@ -54,7 +54,7 @@ export async function getInventoryMovements(): Promise<InventoryMovement[]> {
 
 export async function createItem(itemData: {
   name: string;
-  product_id: string;
+  product_id?: string;
   quantity: number;
   stock: number;
   current_location_id: string;
@@ -63,7 +63,7 @@ export async function createItem(itemData: {
   warehouse: string;
   category?: string;
   item_limit?: number;
-  value: number;
+  value?: number;
   limbo?: boolean;
   notes?: string;
 }): Promise<Item> {
@@ -93,10 +93,25 @@ export async function createInventoryMovement(
   return InventoryMovementSchema.parse(data);
 }
 
+export async function createProduct(payload: {
+  name: string;
+  value: number;
+  category?: string;
+  item_limit?: number;
+}): Promise<Product> {
+  const response = await authFetch(`${API_BASE_URL}/products`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) throw new Error('Failed to create product');
+  return response.json();
+}
+
 export async function createItemWithMovement(payload: {
   item: {
     name: string;
-    product_id: string;
+    product_id?: string;
     quantity: number;
     stock: number;
     current_location_id: string;
@@ -105,7 +120,7 @@ export async function createItemWithMovement(payload: {
     warehouse: string;
     category?: string;
     item_limit?: number;
-    value: number;
+    value?: number;
     limbo?: boolean;
     notes?: string;
   };

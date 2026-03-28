@@ -42,7 +42,6 @@ router.post('/:id/undo', undoInventoryMovement); // POST /api/inventory-movement
 router.get('/:id', getMovementById); // GET /api/inventory-movement/:id
 router.patch('/:id', updateInventoryMovement); // PATCH /api/inventory-movement/:id
 router.delete('/:id', deleteInventoryMovement); // DELETE /api/inventory-movement/:id
-router.post('/:id/undo', undoInventoryMovement); // POST /api/inventory-movement/:id/undo
 router.post('/:id/edit-add', editInventoryMovementAdd); // POST /api/inventory-movement/:id/edit-add
 router.post('/:id/edit-move', editInventoryMovementMove); // POST /api/inventory-movement/:id/edit-move
 router.post('/:id/edit-remove', editInventoryMovementRemove); // POST /api/inventory-movement/:id/edit-remove
