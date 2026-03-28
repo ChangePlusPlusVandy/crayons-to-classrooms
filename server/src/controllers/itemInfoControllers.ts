@@ -319,13 +319,13 @@ export const getInventoryStats = async (req: Request, res: Response) => {
       pool.query(`
         SELECT
           COUNT(*) AS total_skus,
-          SUM(CASE WHEN stock > 0 THEN 1 ELSE 0 END) AS stocked_skus
+          COALESCE(SUM(CASE WHEN stock > 0 THEN 1 ELSE 0 END), 0) AS stocked_skus
         FROM item_info
       `),
       pool.query(`
         SELECT
-          COUNT(sl.id) AS total_slots,
-          COUNT(DISTINCT i.current_location_id) AS occupied_slots
+          COUNT(*) AS total_slots,
+          COUNT(*) FILTER (WHERE i.current_location_id IS NOT NULL) AS occupied_slots
         FROM storage_locations sl
         LEFT JOIN items i ON sl.id = i.current_location_id
         WHERE sl.active = true
