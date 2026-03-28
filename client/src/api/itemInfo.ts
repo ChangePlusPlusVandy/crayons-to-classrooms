@@ -33,7 +33,7 @@ export async function getLimboItems(): Promise<ItemInfo[]> {
   return z.array(ItemInfoSchema).parse(data);
 }
 
-const InventoryStatsSchema = z.object({
+export const InventoryStatsSchema = z.object({
   total_skus: z.number(),
   stocked_skus: z.number(),
   total_slots: z.number(),
