@@ -33,15 +33,18 @@ export async function getLimboItems(): Promise<ItemInfo[]> {
   return z.array(ItemInfoSchema).parse(data);
 }
 
-export type InventoryStats = {
-  total_skus: number;
-  stocked_skus: number;
-  total_slots: number;
-  occupied_slots: number;
-};
+const InventoryStatsSchema = z.object({
+  total_skus: z.number(),
+  stocked_skus: z.number(),
+  total_slots: z.number(),
+  occupied_slots: z.number(),
+});
+
+export type InventoryStats = z.infer<typeof InventoryStatsSchema>;
 
 export async function getInventoryStats(): Promise<InventoryStats> {
   const response = await authFetch(`${API_BASE_URL}/item-info/stats`);
   if (!response.ok) throw new Error('Failed to fetch inventory stats');
-  return response.json();
+  const data = await response.json();
+  return InventoryStatsSchema.parse(data);
 }

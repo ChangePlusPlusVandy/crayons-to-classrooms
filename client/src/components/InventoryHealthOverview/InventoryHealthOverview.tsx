@@ -1,14 +1,20 @@
 import { useEffect, useState } from 'react';
-import { Card, CardContent, Typography, Box, LinearProgress, CircularProgress } from '@mui/material';
+import { Card, CardContent, Typography, Box, LinearProgress, CircularProgress, Alert } from '@mui/material';
 import { getInventoryStats, InventoryStats } from '../../api/itemInfo';
 
 export default function InventoryHealthOverview() {
   const [stats, setStats] = useState<InventoryStats | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     getInventoryStats()
       .then(setStats)
-      .catch((err) => console.error('Failed to load inventory stats:', err));
+      .catch((err) => {
+        console.error('Failed to load inventory stats:', err);
+        setError('Failed to load inventory stats');
+      })
+      .finally(() => setLoading(false));
   }, []);
 
   const stockedPct = stats && stats.total_skus > 0
@@ -40,10 +46,16 @@ export default function InventoryHealthOverview() {
               <Typography variant="body2" color="text.secondary" gutterBottom>
                 Total SKUs
               </Typography>
-              {stats ? (
+              {loading ? (
+                <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
+                  <CircularProgress size={24} />
+                </Box>
+              ) : error ? (
+                <Alert severity="error" sx={{ mt: 1 }}>{error}</Alert>
+              ) : (
                 <>
                   <Typography variant="h5" sx={{ mb: 2, fontWeight: 600 }}>
-                    {stats.stocked_skus.toLocaleString()}
+                    {stats!.stocked_skus.toLocaleString()}
                   </Typography>
                   <LinearProgress
                     variant="determinate"
@@ -57,13 +69,9 @@ export default function InventoryHealthOverview() {
                     }}
                   />
                   <Typography variant="caption" color="text.secondary">
-                    {stats.stocked_skus.toLocaleString()} / {stats.total_skus.toLocaleString()} stocked ({stockedPct}%)
+                    {stats!.stocked_skus.toLocaleString()} / {stats!.total_skus.toLocaleString()} stocked ({stockedPct}%)
                   </Typography>
                 </>
-              ) : (
-                <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
-                  <CircularProgress size={24} />
-                </Box>
               )}
             </CardContent>
           </Card>
@@ -76,7 +84,13 @@ export default function InventoryHealthOverview() {
               <Typography variant="body2" color="text.secondary" gutterBottom>
                 % Open Slots
               </Typography>
-              {stats ? (
+              {loading ? (
+                <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
+                  <CircularProgress size={24} />
+                </Box>
+              ) : error ? (
+                <Alert severity="error" sx={{ mt: 1 }}>{error}</Alert>
+              ) : (
                 <>
                   <Typography variant="h5" sx={{ mb: 2, fontWeight: 600 }}>
                     {openPct}%
@@ -93,13 +107,9 @@ export default function InventoryHealthOverview() {
                     }}
                   />
                   <Typography variant="caption" color="text.secondary">
-                    {openSlots.toLocaleString()} / {stats.total_slots.toLocaleString()} slots open
+                    {openSlots.toLocaleString()} / {stats!.total_slots.toLocaleString()} slots open
                   </Typography>
                 </>
-              ) : (
-                <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
-                  <CircularProgress size={24} />
-                </Box>
               )}
             </CardContent>
           </Card>
