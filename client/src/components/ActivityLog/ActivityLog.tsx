@@ -164,6 +164,8 @@ export default function ActivityLog() {
                 const fromLabel = activity.from_location_name ?? undefined;
                 const toLabel = activity.to_location_name ?? undefined;
                 const productName = activity.product_name || 'Unknown Product';
+                const isUndoable =
+                  activity.inventory_action === 'MOVE' || activity.inventory_action === 'ADD';
 
                 return (
                   <Box key={activity.id} sx={activityLogStyles.activityItem}>
@@ -206,7 +208,7 @@ export default function ActivityLog() {
                         size="small"
                         aria-label={`Undo ${activity.inventory_action.toLowerCase()} for ${productName}`}
                         onClick={() => handleUndoClick(activity)}
-                        disabled={undoingId === activity.id}
+                        disabled={!isUndoable || undoingId === activity.id}
                       >
                         {undoingId === activity.id ? (
                           <CircularProgress size={16} />
@@ -286,11 +288,11 @@ export default function ActivityLog() {
       <Snackbar
         open={undoSnackbar.open}
         autoHideDuration={4000}
-        onClose={() => setUndoSnackbar({ ...undoSnackbar, open: false })}
+        onClose={() => setUndoSnackbar(prev => ({ ...prev, open: false }))}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       >
         <Alert
-          onClose={() => setUndoSnackbar({ ...undoSnackbar, open: false })}
+          onClose={() => setUndoSnackbar(prev => ({ ...prev, open: false }))}
           severity={undoSnackbar.severity}
           sx={{ width: '100%' }}
         >
