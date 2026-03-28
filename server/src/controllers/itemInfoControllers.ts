@@ -324,10 +324,10 @@ export const getInventoryStats = async (req: Request, res: Response) => {
       `),
       pool.query(`
         SELECT
-          COUNT(*) AS total_slots,
-          COUNT(*) FILTER (WHERE i.current_location_id IS NOT NULL) AS occupied_slots
+          COUNT(DISTINCT sl.id) AS total_slots,
+          COUNT(DISTINCT sl.id) FILTER (WHERE i.id IS NOT NULL) AS occupied_slots
         FROM storage_locations sl
-        LEFT JOIN items i ON sl.id = i.current_location_id::uuid
+        LEFT JOIN items i ON sl.id = i.current_location_id
         WHERE sl.active = true
       `),
     ]);
