@@ -433,7 +433,7 @@ export async function createInventoryMovementCore(
 
   // Check if item_id, product_id (if provided), from_location_id (if provided), to_location_id (if provided) exist in tables (in parallel)
   const checks: Promise<any>[] = [
-    db.query('SELECT id FROM items WHERE id = $1', [item_id]),
+    db.query('SELECT id, name FROM items WHERE id = $1', [item_id]),
   ];
 
   if (normalizedToLocationId) {
@@ -501,7 +501,38 @@ export async function createInventoryMovementCore(
     ]
   );
 
-  return newInventoryAction.rows[0];
+  const createdMovement = newInventoryAction.rows[0];
+
+  const REMOVE_ACTIONS = ['CHECKOUT', 'DISCARD', 'DONATED'];
+  if (REMOVE_ACTIONS.includes(inventory_action)) {
+    const itemName = itemCheck.rows[0].name as string;
+
+    let fromLocationCode: string | null = null;
+    if (normalizedFromLocationId) {
+      const locResult = await db.query(
+        'SELECT location_code FROM storage_locations WHERE id = $1',
+        [normalizedFromLocationId]
+      );
+      fromLocationCode = locResult.rows[0]?.location_code ?? null;
+    }
+
+    await syncItemInfoStock(
+      itemName,
+      undefined,        // productId — don't update
+      undefined,        // category — don't update
+      undefined,        // quantity — don't update
+      undefined,        // value — don't update
+      undefined,        // itemLimit — don't update
+      undefined,        // limbo — don't update
+      null,             // fixture — don't update (COALESCE keeps existing)
+      fromLocationCode, // update last_known_location_code if we have it
+      -quantity,        // decrement stock
+      false,            // don't create if missing
+      db
+    );
+  }
+
+  return createdMovement;
 }
 
 /**
