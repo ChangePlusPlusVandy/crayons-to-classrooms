@@ -256,20 +256,20 @@ export default function ActivityLog() {
         </CardContent>
       </Card>
 
-      {editingMovement && editingMovement.inventory_action === 'ADD' && (
+      {editingMovement && editingMovement.inventory_action === 'ADD' && editingMovement.product_id && (
         <EditAddDialog
           open={!!editingMovement}
           onClose={handleEditClose}
-          movement={editingMovement}
+          movement={{ ...editingMovement, product_id: editingMovement.product_id }}
           onSuccess={handleEditSuccess}
         />
       )}
 
-      {editingMovement && editingMovement.inventory_action === 'MOVE' && (
+      {editingMovement && editingMovement.inventory_action === 'MOVE' && editingMovement.product_id && (
         <EditMoveDialog
           open={!!editingMovement}
           onClose={handleEditClose}
-          movement={editingMovement}
+          movement={{ ...editingMovement, product_id: editingMovement.product_id }}
           onSuccess={handleEditSuccess}
         />
       )}

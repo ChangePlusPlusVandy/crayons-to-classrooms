@@ -20,7 +20,7 @@ import { getProductById, getStorageLocationById, getWarehouseById } from '../../
 interface EditMoveDialogProps {
   open: boolean;
   onClose: () => void;
-  movement: InventoryMovement;
+  movement: Omit<InventoryMovement, 'product_id'> & { product_id: string };
   onSuccess?: () => void;
 }
 
