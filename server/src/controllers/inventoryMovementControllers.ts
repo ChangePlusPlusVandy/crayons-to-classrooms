@@ -554,14 +554,18 @@ export async function createInventoryMovementCore(
  */
 export const createInventoryMovement = async (req: Request, res: Response) => {
   const client = await pool.connect();
+  let began = false;
   try {
     const data: CreateInventoryInput = createInventoryMovementSchema.parse(req.body);
     await client.query('BEGIN');
+    began = true;
     const createdMovement = await createInventoryMovementCore(data, client);
     await client.query('COMMIT');
     res.status(201).json(createdMovement);
   } catch (error) {
-    await client.query('ROLLBACK');
+    if (began) {
+      await client.query('ROLLBACK').catch(() => {});
+    }
     if (error instanceof ZodError) {
       return handleValidationError(error, res);
     }
