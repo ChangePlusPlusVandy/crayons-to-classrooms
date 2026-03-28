@@ -39,7 +39,7 @@ export function EditAddDialog({ open, onClose, movement, onSuccess }: EditAddDia
     async function fetchData() {
       try {
         const [prod, location] = await Promise.all([
-          getProductById(movement.product_id),
+          getProductById(movement.product_id!),
           getStorageLocationById(movement.to_location_id!),
         ]);
         const wh = await getWarehouseById(location.warehouse_id);
