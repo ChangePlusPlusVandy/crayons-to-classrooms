@@ -449,7 +449,7 @@ export async function createInventoryMovementCore(
   // Only check from_location_id if it's provided (it's optional for ADD actions)
   if (normalizedFromLocationId) {
     checks.push(
-      db.query('SELECT id FROM storage_locations WHERE id = $1', [normalizedFromLocationId])
+      db.query('SELECT id, location_code FROM storage_locations WHERE id = $1', [normalizedFromLocationId])
     );
   }
 
@@ -507,16 +507,10 @@ export async function createInventoryMovementCore(
   if (REMOVE_ACTIONS.includes(inventory_action)) {
     const itemName = itemCheck.rows[0].name as string;
 
-    let fromLocationCode: string | null = null;
-    if (normalizedFromLocationId) {
-      const locResult = await db.query(
-        'SELECT location_code FROM storage_locations WHERE id = $1',
-        [normalizedFromLocationId]
-      );
-      fromLocationCode = locResult.rows[0]?.location_code ?? null;
-    }
+    const fromLocationCode = fromLocationCheck?.rows[0]?.location_code ?? null;
 
-    await syncItemInfoStock(
+    // Capture the return value to detect missing item_info rows
+    const syncedId = await syncItemInfoStock(
       itemName,
       undefined,        // productId — don't update
       undefined,        // category — don't update
@@ -530,6 +524,9 @@ export async function createInventoryMovementCore(
       false,            // don't create if missing
       db
     );
+    if (!syncedId) {
+      console.warn(`[createInventoryMovementCore] item_info row not found for item "${itemName}" during ${inventory_action} — stock not decremented`);
+    }
   }
 
   return createdMovement;
@@ -556,11 +553,15 @@ export async function createInventoryMovementCore(
  * @throws {500} Internal server error if validation or creation fails
  */
 export const createInventoryMovement = async (req: Request, res: Response) => {
+  const client = await pool.connect();
   try {
     const data: CreateInventoryInput = createInventoryMovementSchema.parse(req.body);
-    const createdMovement = await createInventoryMovementCore(data);
+    await client.query('BEGIN');
+    const createdMovement = await createInventoryMovementCore(data, client);
+    await client.query('COMMIT');
     res.status(201).json(createdMovement);
   } catch (error) {
+    await client.query('ROLLBACK');
     if (error instanceof ZodError) {
       return handleValidationError(error, res);
     }
@@ -569,6 +570,8 @@ export const createInventoryMovement = async (req: Request, res: Response) => {
     }
     console.error('Error creating inventory movement:', error);
     res.status(500).json({ error: 'Internal server error' });
+  } finally {
+    client.release();
   }
 };
 

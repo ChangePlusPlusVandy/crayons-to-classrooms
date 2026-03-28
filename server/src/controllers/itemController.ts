@@ -86,7 +86,7 @@ export const syncItemInfoStock = async (
   try {
     if (!createIfMissing) {
       const updateResult = await db.query(
-        'UPDATE item_info SET stock = stock + $1, fixture = COALESCE($2, fixture), last_known_location_code = COALESCE($3, last_known_location_code), time_last_updated = NOW() WHERE name = $4 RETURNING id',
+        'UPDATE item_info SET stock = GREATEST(stock + $1, 0), fixture = COALESCE($2, fixture), last_known_location_code = COALESCE($3, last_known_location_code), time_last_updated = NOW() WHERE name = $4 RETURNING id',
         [stockDelta, fixture ?? null, lastKnownLocationCode ?? null, itemName]
       );
       return updateResult.rows[0]?.id ?? null;
