@@ -1,6 +1,25 @@
-import { Card, CardContent, Typography, Box, LinearProgress } from '@mui/material';
+import { useEffect, useState } from 'react';
+import { Card, CardContent, Typography, Box, LinearProgress, CircularProgress } from '@mui/material';
+import { getInventoryStats, InventoryStats } from '../../api/itemInfo';
 
 export default function InventoryHealthOverview() {
+  const [stats, setStats] = useState<InventoryStats | null>(null);
+
+  useEffect(() => {
+    getInventoryStats()
+      .then(setStats)
+      .catch((err) => console.error('Failed to load inventory stats:', err));
+  }, []);
+
+  const stockedPct = stats && stats.total_skus > 0
+    ? Math.round((stats.stocked_skus / stats.total_skus) * 100)
+    : 0;
+
+  const openSlots = stats ? stats.total_slots - stats.occupied_slots : 0;
+  const openPct = stats && stats.total_slots > 0
+    ? Math.round((openSlots / stats.total_slots) * 100)
+    : 0;
+
   return (
     <Box>
       <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
@@ -14,51 +33,74 @@ export default function InventoryHealthOverview() {
           gap: 2,
         }}
       >
+        {/* Total SKUs stocked */}
         <Box sx={{ flex: 1, display: 'flex' }}>
           <Card sx={{ boxShadow: 1, borderRadius: 2, flex: 1 }}>
             <CardContent>
               <Typography variant="body2" color="text.secondary" gutterBottom>
                 Total SKUs
               </Typography>
-              <Typography variant="h5" sx={{ mb: 2, fontWeight: 600 }}>
-                1,240
-              </Typography>
-              <LinearProgress
-                variant="determinate"
-                value={82}
-                sx={{
-                  mb: 1,
-                  height: 8,
-                  borderRadius: 4,
-                  bgcolor: '#e0e0e0',
-                  '& .MuiLinearProgress-bar': {
-                    bgcolor: '#2c2c3e',
-                  },
-                }}
-              />
-              <Typography variant="caption" color="text.secondary">
-                1,240 / 1,500 stocked (82%)
-              </Typography>
+              {stats ? (
+                <>
+                  <Typography variant="h5" sx={{ mb: 2, fontWeight: 600 }}>
+                    {stats.stocked_skus.toLocaleString()}
+                  </Typography>
+                  <LinearProgress
+                    variant="determinate"
+                    value={stockedPct}
+                    sx={{
+                      mb: 1,
+                      height: 8,
+                      borderRadius: 4,
+                      bgcolor: '#e0e0e0',
+                      '& .MuiLinearProgress-bar': { bgcolor: '#2c2c3e' },
+                    }}
+                  />
+                  <Typography variant="caption" color="text.secondary">
+                    {stats.stocked_skus.toLocaleString()} / {stats.total_skus.toLocaleString()} stocked ({stockedPct}%)
+                  </Typography>
+                </>
+              ) : (
+                <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
+                  <CircularProgress size={24} />
+                </Box>
+              )}
             </CardContent>
           </Card>
         </Box>
 
+        {/* % Open Slots */}
         <Box sx={{ flex: 1, display: 'flex' }}>
           <Card sx={{ boxShadow: 1, borderRadius: 2, flex: 1 }}>
             <CardContent>
               <Typography variant="body2" color="text.secondary" gutterBottom>
-                % Stocked
+                % Open Slots
               </Typography>
-              <Box
-                sx={{
-                  display: 'flex',
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  height: 100,
-                }}
-              >
-                {/* Empty - to be populated later */}
-              </Box>
+              {stats ? (
+                <>
+                  <Typography variant="h5" sx={{ mb: 2, fontWeight: 600 }}>
+                    {openPct}%
+                  </Typography>
+                  <LinearProgress
+                    variant="determinate"
+                    value={openPct}
+                    sx={{
+                      mb: 1,
+                      height: 8,
+                      borderRadius: 4,
+                      bgcolor: '#e0e0e0',
+                      '& .MuiLinearProgress-bar': { bgcolor: '#4caf50' },
+                    }}
+                  />
+                  <Typography variant="caption" color="text.secondary">
+                    {openSlots.toLocaleString()} / {stats.total_slots.toLocaleString()} slots open
+                  </Typography>
+                </>
+              ) : (
+                <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
+                  <CircularProgress size={24} />
+                </Box>
+              )}
             </CardContent>
           </Card>
         </Box>
