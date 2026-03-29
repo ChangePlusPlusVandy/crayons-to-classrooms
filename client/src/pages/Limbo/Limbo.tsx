@@ -23,7 +23,12 @@ import {
   Snackbar,
 } from '@mui/material';
 import { getLimboItems, ItemInfo } from '../../api/itemInfo';
-import { createItemWithMovement, getStorageLocations, getWarehouses } from '../../api/addItem';
+import {
+  createItemWithMovement,
+  createStorageLocation,
+  getStorageLocations,
+  getWarehouses,
+} from '../../api/addItem';
 import { Warehouse } from '../../types/Warehouse';
 import { StorageLocation } from '../../types/StorageLocation';
 import { useAuth } from '../../context/AuthContext';
@@ -54,6 +59,9 @@ export default function Limbo() {
   const [restockSubmitting, setRestockSubmitting] = useState(false);
   const [restockSuccessOpen, setRestockSuccessOpen] = useState(false);
   const [restockSuccessMessage, setRestockSuccessMessage] = useState('');
+  const [newSlotDialogOpen, setNewSlotDialogOpen] = useState(false);
+  const [newSlotCode, setNewSlotCode] = useState('');
+  const [creatingNewSlot, setCreatingNewSlot] = useState(false);
 
   const warehouseNameOptions = useMemo(
     () => [...warehouses].map((w) => w.name).sort((a, b) => a.localeCompare(b)),
@@ -84,7 +92,6 @@ export default function Limbo() {
   /** After warehouse changes, drop slot if it is not valid for that warehouse */
   useEffect(() => {
     if (!restockOpen || !restockWarehouse) return;
-    if (warehouseSlotOptions.length === 0) return;
     if (
       restockSlotCode &&
       !warehouseSlotOptions.some((c) => c.toLowerCase() === restockSlotCode.toLowerCase())
@@ -161,6 +168,8 @@ export default function Limbo() {
     setRestockWarehouse('');
     setRestockSlotCode(item.last_known_location_code?.trim() ?? '');
     setRestockError('');
+    setNewSlotDialogOpen(false);
+    setNewSlotCode('');
     setRestockOpen(true);
   };
 
@@ -168,6 +177,39 @@ export default function Limbo() {
     setRestockOpen(false);
     setRestockItem(null);
     setRestockError('');
+    setNewSlotDialogOpen(false);
+    setNewSlotCode('');
+  };
+
+  const handleAddNewSlotFromRestock = async () => {
+    const slot = newSlotCode.trim();
+    const wh = warehouses.find((w) => w.name === restockWarehouse);
+    if (!wh) {
+      setRestockError('Select a warehouse before adding a slot.');
+      return;
+    }
+    if (!slot) {
+      setRestockError('Enter a slot code.');
+      return;
+    }
+
+    setCreatingNewSlot(true);
+    setRestockError('');
+    try {
+      const created = await createStorageLocation({
+        slot,
+        active: true,
+        warehouse_id: wh.id,
+      });
+      setStorageLocations((prev) => [...prev, created]);
+      setRestockSlotCode(created.slot);
+      setNewSlotCode('');
+      setNewSlotDialogOpen(false);
+    } catch (e) {
+      setRestockError(e instanceof Error ? e.message : 'Failed to create slot.');
+    } finally {
+      setCreatingNewSlot(false);
+    }
   };
 
   const handleRestock = async () => {
@@ -197,14 +239,6 @@ export default function Limbo() {
     const slotCode = restockSlotCode.trim();
     if (!slotCode) {
       setRestockError('Please select a slot.');
-      return;
-    }
-
-    const slotInList = warehouseSlotOptions.some(
-      (code) => code.toLowerCase() === slotCode.toLowerCase()
-    );
-    if (!slotInList) {
-      setRestockError('Choose a slot from the list. New locations cannot be created from restock.');
       return;
     }
 
@@ -565,7 +599,7 @@ export default function Limbo() {
               <Box sx={limboStyles.restockFieldBox}>
                 <Autocomplete
                   fullWidth
-                  disabled={!restockWarehouse || warehouseSlotOptions.length === 0}
+                  disabled={!restockWarehouse}
                   options={warehouseSlotOptions}
                   value={slotAutocompleteValue}
                   onChange={(_, newValue) => setRestockSlotCode(newValue ?? '')}
@@ -581,7 +615,7 @@ export default function Limbo() {
                         !restockWarehouse
                           ? 'Select a warehouse first'
                           : warehouseSlotOptions.length === 0
-                            ? 'No slots in this warehouse'
+                            ? 'No slots yet — add one below'
                             : 'Select slot'
                       }
                       sx={limboStyles.restockInput}
@@ -593,6 +627,21 @@ export default function Limbo() {
                     />
                   )}
                 />
+              </Box>
+              <Box sx={{ width: 462, display: 'flex', justifyContent: 'flex-start' }}>
+                <Button
+                  type="button"
+                  variant="text"
+                  disabled={!restockWarehouse || creatingNewSlot}
+                  onClick={() => {
+                    setRestockError('');
+                    setNewSlotCode('');
+                    setNewSlotDialogOpen(true);
+                  }}
+                  sx={limboStyles.restockNewSlotLink}
+                >
+                  Add new slot
+                </Button>
               </Box>
             </Box>
 
@@ -642,6 +691,80 @@ export default function Limbo() {
             }}
           >
             Restock Item
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={newSlotDialogOpen}
+        onClose={() => !creatingNewSlot && setNewSlotDialogOpen(false)}
+        maxWidth={false}
+        slotProps={{ paper: { sx: limboStyles.restockDialogPaper } }}
+      >
+        <DialogContent sx={limboStyles.restockDialogContent}>
+          <Box
+            sx={limboStyles.restockDialogClose}
+            onClick={() => !creatingNewSlot && setNewSlotDialogOpen(false)}
+          >
+            ×
+          </Box>
+          <Typography sx={limboStyles.restockDialogTitle}>Add new slot</Typography>
+          <Box sx={limboStyles.restockOptionsBox}>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+              <Typography sx={limboStyles.restockFieldHeader}>Slot code</Typography>
+              <Box sx={limboStyles.restockFieldBox}>
+                <TextField
+                  autoFocus
+                  fullWidth
+                  variant="standard"
+                  placeholder="e.g. A-12-03"
+                  value={newSlotCode}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                    setNewSlotCode(e.target.value)
+                  }
+                  sx={limboStyles.restockInput}
+                  InputProps={{ disableUnderline: true }}
+                />
+              </Box>
+              <Typography sx={limboStyles.restockingLabel}>
+                {restockWarehouse
+                  ? `Creates a storage location in ${restockWarehouse}.`
+                  : 'Select a warehouse in the restock form first.'}
+              </Typography>
+            </Box>
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ justifyContent: 'flex-end', pr: 3, pb: 2, gap: 1.5 }}>
+          <Button
+            onClick={() => !creatingNewSlot && setNewSlotDialogOpen(false)}
+            disabled={creatingNewSlot}
+            sx={{
+              height: 36,
+              width: '79.3515625px',
+              textTransform: 'none',
+              bgcolor: '#FFFFFF',
+              color: '#0A0A0A',
+              borderRadius: '10px',
+              px: 2.5,
+              boxShadow: 'none',
+              '&:hover': {
+                bgcolor: '#F3F4F6',
+                boxShadow: 'none',
+              },
+            }}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            onClick={() => void handleAddNewSlotFromRestock()}
+            disabled={!newSlotCode.trim() || !restockWarehouse || creatingNewSlot}
+            sx={{
+              ...limboStyles.restockButton,
+              minWidth: 120,
+            }}
+          >
+            {creatingNewSlot ? <CircularProgress size={20} sx={{ color: '#FFFFFF' }} /> : 'Add slot'}
           </Button>
         </DialogActions>
       </Dialog>
