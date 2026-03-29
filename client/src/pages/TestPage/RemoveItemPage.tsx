@@ -235,24 +235,25 @@ export default function RemoveItemPage() {
 
   return (
     <Container maxWidth="md" sx={{ py: 4 }}>
-      <Typography variant="h4" sx={{ mb: 3 }}>
-        Remove Item
-      </Typography>
-      <FormModeToggle value={mode} onChange={handleModeChange} />
+      <RemoveItemCard>
+        <Typography variant="h4" sx={{ mb: 3, textAlign: 'left' }}>
+          Remove Item
+        </Typography>
+        <FormModeToggle value={mode} onChange={handleModeChange} />
+        {error && (
+          <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
+            {error}
+          </Alert>
+        )}
+        {success && (
+          <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess('')}>
+            {success}
+          </Alert>
+        )}
 
-      {mode === 'pallet' ? (
-        <RemoveItemCard key={formKey}>
-          {error && (
-            <Alert severity="error" sx={{ mb: 2 }}>
-              {error}
-            </Alert>
-          )}
-          {success && (
-            <Alert severity="success" sx={{ mb: 2 }}>
-              {success}
-            </Alert>
-          )}
+        {mode === 'pallet' ? (
           <PalletRemoveForm
+            key={formKey}
             onSubmit={handlePalletRemoveSubmit}
             onCancel={() => {
               setFormKey((k) => k + 1);
@@ -260,20 +261,14 @@ export default function RemoveItemPage() {
               setSuccess('');
             }}
           />
-        </RemoveItemCard>
-      ) : (
-        <>
-          {loading && (
-            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
-              <CircularProgress />
-            </Box>
-          )}
-
-          {!loading && (
-            <RemoveItemCard key={formKey}>
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                {error && <Alert severity="error">{error}</Alert>}
-                {success && <Alert severity="success">{success}</Alert>}
+        ) : (
+          <>
+            {loading ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
+                <CircularProgress />
+              </Box>
+            ) : (
+              <Box key={formKey} sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                 {/* Warehouse */}
                 <WarehouseSelector
                   value={selectedWarehouse}
@@ -287,7 +282,7 @@ export default function RemoveItemPage() {
                   placeholder="Select warehouse"
                   fullWidth
                 />
-                {/* Remove By */}{' '}
+                {/* Remove By */}
                 <FormControl>
                   <RemoveItemFormLabel htmlFor="remove-by-select">Remove By</RemoveItemFormLabel>
                   <Autocomplete
@@ -329,7 +324,7 @@ export default function RemoveItemPage() {
                   />
                 </FormControl>
                 {/* CONDITIONAL FIELDS */}
-                {/* Remove by ITEM */}{' '}
+                {/* Remove by ITEM */}
                 {removeBy === 'item' && (
                   <FormControl>
                     <RemoveItemFormLabel>Item Name</RemoveItemFormLabel>
@@ -360,8 +355,8 @@ export default function RemoveItemPage() {
                       )}
                     />
                   </FormControl>
-                )}{' '}
-                {/* Remove by PRODUCT */}{' '}
+                )}
+                {/* Remove by PRODUCT */}
                 {removeBy === 'product' && (
                   <Autocomplete
                     options={productOptions}
@@ -446,10 +441,10 @@ export default function RemoveItemPage() {
                   </Button>
                 </Box>
               </Box>
-            </RemoveItemCard>
-          )}
-        </>
-      )}
+            )}
+          </>
+        )}
+      </RemoveItemCard>
     </Container>
   );
 }

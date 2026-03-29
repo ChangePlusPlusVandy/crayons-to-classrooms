@@ -22,7 +22,6 @@ import { ItemGroup } from '../../types/Item';
 import { MoveItemFormLabel } from '../MoveItemForm/MoveItemForm.styles';
 import { WarehouseSelector } from '../WarehouseSelector/WarehouseSelector';
 import { SlotSelector } from '../SlotSelector/SlotSelector';
-import { FixtureSelector } from '../FixtureSelector/FixtureSelector';
 
 export interface PalletMoveFormData {
   warehouse: Warehouse;
@@ -49,7 +48,6 @@ export default function PalletMoveForm({
   const [selectedSourceSlot, setSelectedSourceSlot] = useState<StorageLocation | null>(null);
   const [itemGroups, setItemGroups] = useState<ItemGroup[]>([]);
   const [selectedDestinationSlot, setSelectedDestinationSlot] = useState<string | null>(null);
-  const [selectedFixture, setSelectedFixture] = useState<string | null>(null);
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(true);
   const [loadingItems, setLoadingItems] = useState(false);
@@ -107,18 +105,15 @@ export default function PalletMoveForm({
       !!selectedWarehouse &&
       !!selectedSourceSlot &&
       itemGroups.length > 0 &&
-      !!selectedDestinationSlot &&
-      !!selectedFixture
+      !!selectedDestinationSlot
     );
   };
 
   const handleSubmit = async () => {
-    const destinationLocation = warehouseLocations.find((loc) => {
-      if (selectedFixture === 'N/A') {
-        return loc.slot === selectedDestinationSlot && (!loc.fixture || loc.fixture.trim() === '');
-      }
-      return loc.slot === selectedDestinationSlot && loc.fixture === selectedFixture;
-    });
+    // Resolve destination: prefer location with null/empty fixture, fall back to first match
+    const slotLocations = warehouseLocations.filter((loc) => loc.slot === selectedDestinationSlot);
+    const destinationLocation =
+      slotLocations.find((loc) => !loc.fixture || loc.fixture.trim() === '') ?? slotLocations[0] ?? null;
 
     if (!selectedWarehouse) {
       setError('Please select a warehouse.');
@@ -132,8 +127,8 @@ export default function PalletMoveForm({
       setError('No items found in the source slot.');
       return;
     }
-    if (!selectedDestinationSlot || !selectedFixture || !destinationLocation) {
-      setError('Please select a valid destination slot and fixture.');
+    if (!selectedDestinationSlot || !destinationLocation) {
+      setError('Please select a valid destination slot.');
       return;
     }
     if (selectedSourceSlot.id === destinationLocation.id) {
@@ -186,7 +181,6 @@ export default function PalletMoveForm({
           setSelectedSourceSlot(null);
           setItemGroups([]);
           setSelectedDestinationSlot(null);
-          setSelectedFixture(null);
           setError('');
         }}
         label="Warehouse"
@@ -206,7 +200,6 @@ export default function PalletMoveForm({
             setSelectedSourceSlot(newValue);
             setItemGroups([]);
             setSelectedDestinationSlot(null);
-            setSelectedFixture(null);
             setError('');
           }}
           renderInput={(params) => (
@@ -263,33 +256,17 @@ export default function PalletMoveForm({
         <ArrowDownwardIcon aria-hidden="true" sx={{ fontSize: '2rem', color: 'text.secondary' }} />
       </Box>
 
-      <Stack spacing={0}>
-        <SlotSelector
-          value={selectedDestinationSlot}
-          onChange={(newSlot) => {
-            setSelectedDestinationSlot(newSlot);
-            setSelectedFixture(null);
-            setError('');
-          }}
-          warehouse={selectedWarehouse}
-          storageLocations={storageLocations}
-          label="Destination Slot"
-          placeholder="Select destination slot"
-        />
-
-        <FixtureSelector
-          value={selectedFixture}
-          onChange={(newFixture) => {
-            setSelectedFixture(newFixture);
-            setError('');
-          }}
-          slot={selectedDestinationSlot}
-          warehouse={selectedWarehouse}
-          storageLocations={storageLocations}
-          nullFixtureLabel="N/A"
-          autoSelectNull
-        />
-      </Stack>
+      <SlotSelector
+        value={selectedDestinationSlot}
+        onChange={(newSlot) => {
+          setSelectedDestinationSlot(newSlot);
+          setError('');
+        }}
+        warehouse={selectedWarehouse}
+        storageLocations={storageLocations}
+        label="Destination Slot"
+        placeholder="Select destination slot"
+      />
 
       <FormControl fullWidth>
         <MoveItemFormLabel htmlFor="pallet-move-notes-input">Notes</MoveItemFormLabel>

@@ -32,7 +32,6 @@ export function EditMoveDialog({ open, onClose, movement, onSuccess }: EditMoveD
   const [sourceSlot, setSourceSlot] = useState<StorageLocation | null>(null);
   const [productName, setProductName] = useState('');
   const [destinationSlot, setDestinationSlot] = useState('');
-  const [destinationFixture, setDestinationFixture] = useState('');
 
   useEffect(() => {
     if (!open) return;
@@ -55,7 +54,6 @@ export function EditMoveDialog({ open, onClose, movement, onSuccess }: EditMoveD
         setSourceSlot(src);
         setProductName(prod.name);
         setDestinationSlot(dest.slot);
-        setDestinationFixture(dest.fixture || 'N/A');
       } catch {
         setFetchError('Failed to load movement details');
       } finally {
@@ -149,7 +147,6 @@ export function EditMoveDialog({ open, onClose, movement, onSuccess }: EditMoveD
               initialSourceSlot={sourceSlot}
               initialProductId={movement.product_id}
               initialDestinationSlot={destinationSlot}
-              initialDestinationFixture={destinationFixture}
               initialQuantity={movement.quantity}
               initialNotes={movement.note || ''}
               onSubmit={handleSubmit}

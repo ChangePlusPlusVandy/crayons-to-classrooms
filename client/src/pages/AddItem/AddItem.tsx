@@ -80,7 +80,7 @@ export default function AddItem() {
   };
 
   const handlePalletSubmit = async (data: PalletAddFormData) => {
-    const { warehouse, destinationLocationId, items, notes } = data;
+    const { warehouse, items, notes } = data;
 
     setError('');
     setSuccess('');
@@ -137,7 +137,7 @@ export default function AddItem() {
             product_id: productId,
             quantity: packSize,
             stock: packSize,
-            current_location_id: destinationLocationId,
+            current_location_id: item.destinationLocationId,
             status: 'active' as const,
             created_by: user!.id,
             warehouse: warehouse.id,
@@ -150,7 +150,7 @@ export default function AddItem() {
           movement: {
             inventory_action: 'ADD' as const,
             from_location_id: null,
-            to_location_id: destinationLocationId,
+            to_location_id: item.destinationLocationId,
             quantity: item.quantity,
             performed_by: user!.id,
             note: notes || undefined,
