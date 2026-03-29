@@ -22,8 +22,7 @@ import {
   Autocomplete,
 } from '@mui/material';
 import { getLimboItems, ItemInfo } from '../../api/itemInfo';
-import { getWarehouses } from '../../api/warehouse';
-import { createItemWithMovement, getStorageLocations } from '../../api/addItem';
+import { createItemWithMovement, getStorageLocations, getWarehouses } from '../../api/addItem';
 import { Warehouse } from '../../types/Warehouse';
 import { StorageLocation } from '../../types/StorageLocation';
 import { useAuth } from '../../context/AuthContext';
