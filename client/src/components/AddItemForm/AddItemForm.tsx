@@ -27,7 +27,6 @@ import {
 } from './AddItemForm.styles';
 import { WarehouseSelector } from '../WarehouseSelector/WarehouseSelector';
 import { SlotSelector } from '../SlotSelector/SlotSelector';
-import { FixtureSelector } from '../FixtureSelector/FixtureSelector';
 
 export interface AddItemFormData {
   warehouse: Warehouse;
@@ -43,6 +42,7 @@ export interface AddItemFormData {
     limit?: number;
     value?: number;
     packSize?: number;
+    fixture?: string;
   };
 }
 
@@ -77,7 +77,6 @@ export default function AddItemForm({
   const [selectedWarehouse, setSelectedWarehouse] = useState<Warehouse | null>(initialWarehouse);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(initialProduct);
   const [selectedSlot, setSelectedSlot] = useState<string | null>(initialSlot);
-  const [selectedFixture, setSelectedFixture] = useState<string | null>(null);
   const [quantityToAdd, setQuantityToAdd] = useState<number | ''>(initialQuantity);
   const [notes, setNotes] = useState(initialNotes);
 
@@ -89,6 +88,7 @@ export default function AddItemForm({
   const [newItemLimit, setNewItemLimit] = useState<number | ''>('');
   const [newItemValue, setNewItemValue] = useState<number | ''>('');
   const [newItemPackSize, setNewItemPackSize] = useState<number | ''>('');
+  const [newItemFixture, setNewItemFixture] = useState<string | null>(null);
 
   // Category/subcategory dialog states
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
@@ -129,6 +129,17 @@ export default function AddItemForm({
       ? storageLocations.filter((loc) => loc.warehouse_id === selectedWarehouse.id)
       : [];
   }, [selectedWarehouse, storageLocations]);
+
+  // Derive available fixtures from storage locations
+  const availableFixtures = useMemo(() => {
+    const fixtureSet = new Set<string>();
+    storageLocations.forEach((loc) => {
+      if (loc.fixture && loc.fixture.trim() !== '') {
+        fixtureSet.add(loc.fixture);
+      }
+    });
+    return Array.from(fixtureSet).sort();
+  }, [storageLocations]);
 
   // Derive available categories from existing products + custom ones
   const availableCategories = useMemo(() => {
@@ -172,27 +183,31 @@ export default function AddItemForm({
     return typeof quantityToAdd === 'number' && quantityToAdd >= 1;
   };
 
+  const hasNewItemFieldErrors = (): boolean => {
+    if (typeof newItemValue === 'number' && newItemValue < 0) return true;
+    if (typeof newItemLimit === 'number' && newItemLimit < 0) return true;
+    if (typeof newItemPackSize === 'number' && newItemPackSize < 1) return true;
+    return false;
+  };
+
   const isFormValid = (): boolean => {
     if (isNewItemMode) {
       return (
         !!selectedWarehouse &&
         !!newItemName.trim() &&
         !!selectedSlot &&
-        !!selectedFixture &&
-        isQuantityValid()
+        isQuantityValid() &&
+        !hasNewItemFieldErrors()
       );
     }
-    return !!selectedWarehouse && !!selectedProduct && !!selectedSlot && !!selectedFixture && isQuantityValid();
+    return !!selectedWarehouse && !!selectedProduct && !!selectedSlot && isQuantityValid();
   };
 
   const handleSubmit = async () => {
-    // Find the destination location based on slot + fixture
-    const destinationLocation = warehouseLocations.find((loc) => {
-      if (selectedFixture === 'N/A') {
-        return loc.slot === selectedSlot && (!loc.fixture || loc.fixture.trim() === '');
-      }
-      return loc.slot === selectedSlot && loc.fixture === selectedFixture;
-    });
+    // Resolve destination: prefer location with null/empty fixture, fall back to first match
+    const slotLocations = warehouseLocations.filter((loc) => loc.slot === selectedSlot);
+    const destinationLocation =
+      slotLocations.find((loc) => !loc.fixture || loc.fixture.trim() === '') ?? slotLocations[0] ?? null;
 
     // Validation
     if (!selectedWarehouse) {
@@ -205,6 +220,10 @@ export default function AddItemForm({
     }
     if (isNewItemMode && !newItemName.trim()) {
       setError('Please enter an item name.');
+      return;
+    }
+    if (isNewItemMode && hasNewItemFieldErrors()) {
+      setError('Please fix the errors in the new item fields before submitting.');
       return;
     }
     if (!selectedSlot) {
@@ -252,6 +271,7 @@ export default function AddItemForm({
             limit: typeof newItemLimit === 'number' ? newItemLimit : undefined,
             value: typeof newItemValue === 'number' ? newItemValue : undefined,
             packSize: typeof newItemPackSize === 'number' ? newItemPackSize : undefined,
+            fixture: newItemFixture || undefined,
           },
         });
       } else {
@@ -326,7 +346,6 @@ export default function AddItemForm({
         onChange={(newWarehouse) => {
           setSelectedWarehouse(newWarehouse);
           setSelectedSlot(null);
-          setSelectedFixture(null);
           setError('');
         }}
         label="Warehouse"
@@ -422,6 +441,12 @@ export default function AddItemForm({
                   setNewItemLimit(isNaN(val) ? '' : val);
                 }}
                 placeholder="Enter item limit (optional)"
+                error={typeof newItemLimit === 'number' && newItemLimit < 0}
+                helperText={
+                  typeof newItemLimit === 'number' && newItemLimit < 0
+                    ? 'Limit cannot be negative'
+                    : ''
+                }
                 slotProps={{ htmlInput: { min: 0, step: 1 } }}
               />
             </FormControl>
@@ -462,13 +487,32 @@ export default function AddItemForm({
                   setNewItemPackSize(isNaN(val) ? '' : val);
                 }}
                 placeholder="Enter pack size (optional, default 1)"
-                error={typeof newItemPackSize === 'number' && newItemPackSize < 1}
+                error={
+                  newItemPackSize !== '' &&
+                  (typeof newItemPackSize !== 'number' || newItemPackSize < 1)
+                }
                 helperText={
-                  typeof newItemPackSize === 'number' && newItemPackSize < 1
+                  newItemPackSize !== '' &&
+                  (typeof newItemPackSize !== 'number' || newItemPackSize < 1)
                     ? 'Pack size must be at least 1'
                     : ''
                 }
                 slotProps={{ htmlInput: { min: 1, step: 1 } }}
+              />
+            </FormControl>
+
+            {/* Fixture */}
+            <FormControl fullWidth sx={{ mt: 2 }}>
+              <AddItemFormLabel htmlFor="fixture-input">Fixture</AddItemFormLabel>
+              <Autocomplete
+                id="fixture-input"
+                options={availableFixtures}
+                value={newItemFixture}
+                onChange={(_, newValue) => setNewItemFixture(newValue)}
+                renderInput={(params) => (
+                  <TextField {...params} placeholder="Select fixture (optional)" />
+                )}
+                noOptionsText="No fixtures available"
               />
             </FormControl>
 
@@ -552,31 +596,15 @@ export default function AddItemForm({
       </FormControl>
 
       {/* Slot Selection */}
-      <Stack spacing={0}>
-        <SlotSelector
-          value={selectedSlot}
-          onChange={(newSlot) => {
-            setSelectedSlot(newSlot);
-            setSelectedFixture(null);
-            setError('');
-          }}
-          warehouse={selectedWarehouse}
-          storageLocations={storageLocations}
-        />
-
-        <FixtureSelector
-          value={selectedFixture}
-          onChange={(newFixture) => {
-            setSelectedFixture(newFixture);
-            setError('');
-          }}
-          slot={selectedSlot}
-          warehouse={selectedWarehouse}
-          storageLocations={storageLocations}
-          nullFixtureLabel="N/A"
-          autoSelectNull
-        />
-      </Stack>
+      <SlotSelector
+        value={selectedSlot}
+        onChange={(newSlot) => {
+          setSelectedSlot(newSlot);
+          setError('');
+        }}
+        warehouse={selectedWarehouse}
+        storageLocations={storageLocations}
+      />
 
       {/* Quantity to Add */}
       <FormControl fullWidth>

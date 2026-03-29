@@ -27,7 +27,6 @@ export default function AddItem() {
       let packSize = 1;
 
       if (data.isNewProduct && data.newProductData) {
-        productId = data.newProductData.subcategoryProductId;
         productName = data.newProductData.name;
         productValue = data.newProductData.value;
         productCategory = data.newProductData.category || undefined;
@@ -35,6 +34,15 @@ export default function AddItem() {
         if (typeof data.newProductData.packSize === 'number' && data.newProductData.packSize >= 1) {
           packSize = data.newProductData.packSize;
         }
+
+        // Create a product row so the new name appears in the product picker
+        const newProduct = await createProduct({
+          name: productName,
+          value: productValue ?? 0,
+          category: productCategory,
+          item_limit: productItemLimit,
+        });
+        productId = newProduct.id;
       } else {
         const { product } = data;
         productId = product.id;

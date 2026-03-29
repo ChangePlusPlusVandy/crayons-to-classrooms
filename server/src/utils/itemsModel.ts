@@ -43,12 +43,12 @@ export const ItemStatus = z.enum([
 
 /**
  * Schema for validating item creation
- * Requires: name, product_id, quantity, status, created_by, warehouse, value
- * Optional: current_location_id, stock
+ * Requires: name, product_id, quantity, status, created_by, warehouse
+ * Optional: current_location_id, fixture, stock, category, item_limit, value, limbo, notes
  */
 export const createItemSchema = z.object({
   name: z.string().min(1, 'Name is required').max(255, 'Name must be less than 255 characters'),
-  product_id: uuidSchema.nullable().optional(),
+  product_id: uuidSchema,
   current_location_id: uuidSchema.optional(),
   fixture: z.string().optional(),
   created_by: uuidSchema,

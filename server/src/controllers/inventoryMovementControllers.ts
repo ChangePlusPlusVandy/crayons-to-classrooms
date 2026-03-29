@@ -433,11 +433,16 @@ export async function createInventoryMovementCore(
   // Normalize to_location_id: undefined → null to avoid node-postgres invalid parameter errors
   const normalizedToLocationId = to_location_id ?? null;
 
-  // Check if item_id, product_id (if provided), from_location_id (if provided), to_location_id exist in tables (in parallel)
+  // Check if item_id, product_id (if provided), from_location_id (if provided), to_location_id (if provided) exist in tables (in parallel)
   const checks: Promise<any>[] = [
     db.query('SELECT id FROM items WHERE id = $1', [item_id]),
-    db.query('SELECT id FROM storage_locations WHERE id = $1', [normalizedToLocationId]),
   ];
+
+  if (normalizedToLocationId) {
+    checks.push(
+      db.query('SELECT id FROM storage_locations WHERE id = $1', [normalizedToLocationId])
+    );
+  }
 
   if (product_id) {
     checks.push(db.query('SELECT id FROM products WHERE id = $1', [product_id]));
@@ -454,7 +459,7 @@ export async function createInventoryMovementCore(
 
   let idx = 0;
   const itemCheck = results[idx++];
-  const toLocationCheck = results[idx++];
+  const toLocationCheck = normalizedToLocationId ? results[idx++] : null;
   const productCheck = product_id ? results[idx++] : null;
   const fromLocationCheck = normalizedFromLocationId ? results[idx++] : null;
 
@@ -1165,6 +1170,7 @@ export const undoInventoryMovementCore = async (
         undefined, // quantity - don't update
         undefined, // value - don't update
         undefined, // itemLimit - don't update
+        undefined, // limbo - don't update
         fromLocation?.fixture ?? null,
         fromLocation?.location_code ?? null,
         0, // stockDelta - no change to stock count for MOVE
@@ -1227,6 +1233,7 @@ export const undoInventoryMovementCore = async (
         undefined, // quantity - don't update
         undefined, // value - don't update
         undefined, // itemLimit - don't update
+        undefined, // limbo - don't update
         null, // fixture - don't update
         null, // locationCode - don't update
         -deletedCount, // stockDelta - decrement by number of deleted items
