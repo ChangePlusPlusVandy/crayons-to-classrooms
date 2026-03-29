@@ -924,6 +924,7 @@ export const removeItemsWithMovement = async (req: Request, res: Response) => {
         undefined, // quantity
         undefined, // value
         undefined, // itemLimit
+        undefined, // limbo
         null, // fixture
         null, // locationCode
         -count, // stockDelta - decrement by removed count
