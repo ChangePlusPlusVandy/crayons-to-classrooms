@@ -1189,9 +1189,6 @@ export const editInventoryMovementRemove = async (req: Request, res: Response) =
       [originalMovement.item_id, originalStatus, originalMovement.performed_at, originalMovement.quantity]
     );
 
-    if (itemsToRestore.rows.length < originalMovement.quantity) {
-      throw new UndoConflictError('Cannot undo: not enough inactive items found to restore');
-    }
 
     const restoreIds: string[] = itemsToRestore.rows.map((row: { id: string }) => row.id);
 
