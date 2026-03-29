@@ -194,7 +194,7 @@ export default function PalletMoveForm({
           id="pallet-source-slot-select"
           options={warehouseLocations}
           getOptionLabel={(option) => option.location_code ?? 'No location code'}
-          getOptionKey={(option) => option.id}
+          isOptionEqualToValue={(option, value) => option.id === value.id}
           value={selectedSourceSlot}
           onChange={(_, newValue) => {
             setSelectedSourceSlot(newValue);
