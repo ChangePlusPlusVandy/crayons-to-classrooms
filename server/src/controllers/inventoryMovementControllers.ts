@@ -868,7 +868,7 @@ export const moveItemsWithMovement = async (req: Request, res: Response) => {
     }
     // Use the first item as the representative for the movement record
     const representativeItem = updateResult.rows[0];
-    const uniqueProductIds = new Set(updateResult.rows.map((r: { product_id: string }) => r.product_id));
+    const uniqueProductIds = new Set(updateResult.rows.map((r) => r.product_id));
 
     const fullMovementData: CreateInventoryInput = {
       inventory_action: movementData.inventory_action,
@@ -972,7 +972,7 @@ export const removeItemsWithMovement = async (req: Request, res: Response) => {
 
     // Use the first item as the representative for the movement record
     const representativeItem = updateResult.rows[0];
-    const uniqueProductIds = new Set(updateResult.rows.map((r: { product_id: string }) => r.product_id));
+    const uniqueProductIds = new Set(updateResult.rows.map((r) => r.product_id));
 
     const fullMovementData: CreateInventoryInput = {
       inventory_action: movementData.inventory_action,
