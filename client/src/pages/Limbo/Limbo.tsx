@@ -160,8 +160,8 @@ export default function Limbo() {
       setRestockError('Please select a warehouse.');
       return;
     }
-    if (!restockQuantity || restockQuantity < 1) {
-      setRestockError('Please enter a valid quantity.');
+    if (!restockQuantity || restockQuantity < 1 || !Number.isInteger(restockQuantity)) {
+      setRestockError('Please enter a valid whole number quantity.');
       return;
     }
 
