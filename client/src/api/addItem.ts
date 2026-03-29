@@ -9,18 +9,6 @@ import { authFetch } from './authFetch';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
 
-const CreateInventoryMovementRequestSchema = InventoryMovementSchema.omit({
-  id: true,
-  performed_at: true,
-}).extend({
-  product_id: z.string(),
-  performed_by: z.string(),
-  from_location_id: z.string().nullable().optional(),
-  to_location_id: z.string().nullable().optional(),
-});
-
-type CreateInventoryMovementRequest = z.input<typeof CreateInventoryMovementRequestSchema>;
-
 export async function getProducts(): Promise<Product[]> {
   const response = await authFetch(`${API_BASE_URL}/products`);
   if (!response.ok) throw new Error('Failed to fetch products');
