@@ -171,7 +171,7 @@ export default function Activities() {
 
   const formatAction = (activity: ActivityDisplay) => {
     const action = activity.inventory_action;
-    const product = activity.product_name || 'Unknown Item';
+    const product = activity.product_name || 'Entire Pallet';
     const from = activity.from_location_name;
     const to = activity.to_location_name;
 
@@ -320,7 +320,7 @@ export default function Activities() {
                         {activity.user_name ?? activity.user_email ?? 'Unknown User'}
                       </TableCell>
                       <TableCell sx={activitiesStyles.tableCell}>
-                        {activity.product_name || 'Unknown Item'}
+                        {activity.product_name || 'Entire Pallet'}
                       </TableCell>
                       <TableCell sx={activitiesStyles.tableCell}>
                         {formatAction(activity)}
