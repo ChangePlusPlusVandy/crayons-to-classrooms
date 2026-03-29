@@ -250,7 +250,7 @@ export const getItemsByName = async (req: Request, res: Response) => {
   }
 };
 /**
- * Retrieves all items currently at a specific location.
+ * Retrieves all active items currently at a specific location.
  *
  * @param {Request} req - Express request object with:
  *   - locationId: UUID of the location (in params)
@@ -261,9 +261,10 @@ export const getItemsByName = async (req: Request, res: Response) => {
 export const getItemsByLocationId = async (req: Request, res: Response) => {
   try {
     const { locationId } = locationIdParamSchema.parse(req.params);
-    const items = await pool.query('SELECT * FROM items WHERE current_location_id = $1', [
-      locationId,
-    ]);
+    const items = await pool.query(
+      "SELECT * FROM items WHERE current_location_id = $1 AND status = 'active'",
+      [locationId]
+    );
 
     if (!countRows(items.rows, res)) {
       return;
