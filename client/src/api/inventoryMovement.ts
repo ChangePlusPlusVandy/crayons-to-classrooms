@@ -9,6 +9,7 @@ const CreateInventoryMovementRequestSchema = InventoryMovementSchema.omit({
   id: true,
   performed_at: true,
 }).extend({
+  product_id: z.string(),
   performed_by: z.string(),
   from_location_id: z.string().nullable().optional(),
   to_location_id: z.string().nullable().optional(),

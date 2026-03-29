@@ -21,7 +21,7 @@ import { getProductById, getStorageLocationById, getWarehouseById } from '../../
 interface EditMoveDialogProps {
   open: boolean;
   onClose: () => void;
-  movement: InventoryMovement;
+  movement: Omit<InventoryMovement, 'product_id'> & { product_id: string };
   onSuccess?: () => void;
 }
 
@@ -47,9 +47,9 @@ export function EditMoveDialog({ open, onClose, movement, onSuccess }: EditMoveD
           return;
         }
         const [src, dest, prod] = await Promise.all([
-          getStorageLocationById(movement.from_location_id),
-          getStorageLocationById(movement.to_location_id),
-          getProductById(movement.product_id),
+          getStorageLocationById(movement.from_location_id!),
+          getStorageLocationById(movement.to_location_id!),
+          getProductById(movement.product_id!),
         ]);
         const wh = await getWarehouseById(src.warehouse_id);
         setWarehouse(wh);
@@ -82,7 +82,7 @@ export function EditMoveDialog({ open, onClose, movement, onSuccess }: EditMoveD
           current_location_id: sourceSlotId,
           warehouse: warehouse!.id,
           name: productName,
-          product_id: movement.product_id ?? '',
+          product_id: movement.product_id!,
           quantity: movement.quantity,
         });
       }

@@ -6,6 +6,7 @@ import {
   deleteItemInfo,
   getItemsInfoByName,
   getLimboItems,
+  getInventoryStats,
 } from '../controllers/itemInfoControllers.js';
 import express from 'express';
 
@@ -17,8 +18,9 @@ router.get('/name/:name', getItemsInfoByName);
 router.get('/', getItemsInfo);
 // create a new item
 router.post('/', createItemInfo);
-// get limbo items
+// NOTE: /stats and /limbo must remain above /:id to prevent the dynamic segment from shadowing them
 router.get('/limbo', getLimboItems);
+router.get('/stats', getInventoryStats);
 // get item by ID
 router.get('/:id', getItemInfoById);
 // update an existing item

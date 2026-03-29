@@ -377,20 +377,20 @@ export default function Activities() {
           {renderPagination()}
         </>
       )}
-      {editingMovement?.inventory_action === 'ADD' && (
+      {editingMovement?.inventory_action === 'ADD' && editingMovement.product_id && (
         <EditAddDialog
           open={!!editingMovement}
           onClose={handleEditClose}
-          movement={editingMovement}
+          movement={{ ...editingMovement, product_id: editingMovement.product_id }}
           onSuccess={handleEditSuccess}
         />
       )}
 
-      {editingMovement?.inventory_action === 'MOVE' && (
+      {editingMovement?.inventory_action === 'MOVE' && editingMovement.product_id && (
         <EditMoveDialog
           open={!!editingMovement}
           onClose={handleEditClose}
-          movement={editingMovement}
+          movement={{ ...editingMovement, product_id: editingMovement.product_id }}
           onSuccess={handleEditSuccess}
         />
       )}
