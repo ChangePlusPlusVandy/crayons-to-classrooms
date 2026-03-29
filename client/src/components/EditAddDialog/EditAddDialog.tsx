@@ -19,7 +19,7 @@ import { getProductById, getStorageLocationById, getWarehouseById } from '../../
 interface EditAddDialogProps {
   open: boolean;
   onClose: () => void;
-  movement: InventoryMovement;
+  movement: Omit<InventoryMovement, 'product_id'> & { product_id: string };
   onSuccess?: () => void;
 }
 
@@ -43,8 +43,8 @@ export function EditAddDialog({ open, onClose, movement, onSuccess }: EditAddDia
           return;
         }
         const [prod, location] = await Promise.all([
-          getProductById(movement.product_id),
-          getStorageLocationById(movement.to_location_id),
+          getProductById(movement.product_id!),
+          getStorageLocationById(movement.to_location_id!),
         ]);
         const wh = await getWarehouseById(location.warehouse_id);
         setProduct(prod);

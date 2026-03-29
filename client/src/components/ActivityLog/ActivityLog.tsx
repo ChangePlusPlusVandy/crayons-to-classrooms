@@ -9,12 +9,18 @@ import {
   CircularProgress,
   Alert,
   Snackbar,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import UndoIcon from '@mui/icons-material/Undo';
 import EditIcon from '@mui/icons-material/Edit';
 import { activityLogStyles } from './ActivityLog.styles';
 import { getActivities, ActivityDisplay } from '../../api/activities';
+import { undoInventoryMovement } from '../../api/moveItem';
 import { EditAddDialog } from '../EditAddDialog/EditAddDialog';
 import { EditMoveDialog } from '../EditMoveDialog/EditMoveDialog';
 
@@ -27,7 +33,7 @@ const ACTION_COLORS: Record<string, string> = {
   DONATED: '#e91e63',
 };
 
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 4;
 
 function formatTimestamp(dateStr: string): string {
   const date = new Date(dateStr);
@@ -54,6 +60,16 @@ export default function ActivityLog() {
   const [loading, setLoading] = useState(true);
   const [editingMovement, setEditingMovement] = useState<ActivityDisplay | null>(null);
   const [showSuccessAlert, setShowSuccessAlert] = useState(false);
+  const [undoingId, setUndoingId] = useState<string | null>(null);
+  const [undoSnackbar, setUndoSnackbar] = useState<{
+    open: boolean;
+    message: string;
+    severity: 'success' | 'error';
+  }>({ open: false, message: '', severity: 'success' });
+  const [undoConfirmDialog, setUndoConfirmDialog] = useState<{
+    open: boolean;
+    activity: ActivityDisplay | null;
+  }>({ open: false, activity: null });
 
   useEffect(() => {
     async function fetchData() {
@@ -69,6 +85,45 @@ export default function ActivityLog() {
 
     fetchData();
   }, []);
+
+  const handleUndoClick = (activity: ActivityDisplay) => {
+    if (!activity.id) return;
+    if (activity.inventory_action !== 'MOVE' && activity.inventory_action !== 'ADD') {
+      setUndoSnackbar({
+        open: true,
+        message: `Cannot undo ${activity.inventory_action} actions`,
+        severity: 'error',
+      });
+      return;
+    }
+    setUndoConfirmDialog({ open: true, activity });
+  };
+
+  const handleUndoConfirm = async () => {
+    const activity = undoConfirmDialog.activity;
+    setUndoConfirmDialog({ open: false, activity: null });
+    if (!activity?.id) return;
+
+    setUndoingId(activity.id);
+    try {
+      await undoInventoryMovement(activity.id);
+      setUndoSnackbar({
+        open: true,
+        message: `Undid ${activity.inventory_action} for ${activity.product_name || 'item'}`,
+        severity: 'success',
+      });
+      const data = await getActivities(1, PAGE_SIZE);
+      setActivities(data.data);
+    } catch (err) {
+      setUndoSnackbar({
+        open: true,
+        message: err instanceof Error ? err.message : 'Failed to undo',
+        severity: 'error',
+      });
+    } finally {
+      setUndoingId(null);
+    }
+  };
 
   const handleEditClick = (activity: ActivityDisplay) => {
     if (activity.inventory_action === 'ADD' || activity.inventory_action === 'MOVE') {
@@ -109,6 +164,8 @@ export default function ActivityLog() {
                 const fromLabel = activity.from_location_name ?? undefined;
                 const toLabel = activity.to_location_name ?? undefined;
                 const productName = activity.product_name || 'Unknown Product';
+                const isUndoable =
+                  activity.inventory_action === 'MOVE' || activity.inventory_action === 'ADD';
 
                 return (
                   <Box key={activity.id} sx={activityLogStyles.activityItem}>
@@ -150,8 +207,14 @@ export default function ActivityLog() {
                       <IconButton
                         size="small"
                         aria-label={`Undo ${activity.inventory_action.toLowerCase()} for ${productName}`}
+                        onClick={() => handleUndoClick(activity)}
+                        disabled={!isUndoable || undoingId === activity.id}
                       >
-                        <UndoIcon fontSize="small" />
+                        {undoingId === activity.id ? (
+                          <CircularProgress size={16} />
+                        ) : (
+                          <UndoIcon fontSize="small" />
+                        )}
                       </IconButton>
                       {(activity.inventory_action === 'ADD' ||
                         activity.inventory_action === 'MOVE') && (
@@ -193,20 +256,20 @@ export default function ActivityLog() {
         </CardContent>
       </Card>
 
-      {editingMovement && editingMovement.inventory_action === 'ADD' && (
+      {editingMovement && editingMovement.inventory_action === 'ADD' && editingMovement.product_id && (
         <EditAddDialog
           open={!!editingMovement}
           onClose={handleEditClose}
-          movement={editingMovement}
+          movement={{ ...editingMovement, product_id: editingMovement.product_id }}
           onSuccess={handleEditSuccess}
         />
       )}
 
-      {editingMovement && editingMovement.inventory_action === 'MOVE' && (
+      {editingMovement && editingMovement.inventory_action === 'MOVE' && editingMovement.product_id && (
         <EditMoveDialog
           open={!!editingMovement}
           onClose={handleEditClose}
-          movement={editingMovement}
+          movement={{ ...editingMovement, product_id: editingMovement.product_id }}
           onSuccess={handleEditSuccess}
         />
       )}
@@ -221,6 +284,42 @@ export default function ActivityLog() {
           Edit applied successfully
         </Alert>
       </Snackbar>
+
+      <Snackbar
+        open={undoSnackbar.open}
+        autoHideDuration={4000}
+        onClose={() => setUndoSnackbar(prev => ({ ...prev, open: false }))}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert
+          onClose={() => setUndoSnackbar(prev => ({ ...prev, open: false }))}
+          severity={undoSnackbar.severity}
+          sx={{ width: '100%' }}
+        >
+          {undoSnackbar.message}
+        </Alert>
+      </Snackbar>
+
+      <Dialog
+        open={undoConfirmDialog.open}
+        onClose={() => setUndoConfirmDialog({ open: false, activity: null })}
+      >
+        <DialogTitle>Confirm Undo</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Undo this {undoConfirmDialog.activity?.inventory_action} for{' '}
+            {undoConfirmDialog.activity?.product_name || 'this item'}?
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setUndoConfirmDialog({ open: false, activity: null })}>
+            Cancel
+          </Button>
+          <Button onClick={handleUndoConfirm} color="primary" autoFocus>
+            Confirm
+          </Button>
+        </DialogActions>
+      </Dialog>
     </>
   );
 }
