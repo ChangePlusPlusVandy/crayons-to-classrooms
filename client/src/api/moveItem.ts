@@ -164,3 +164,22 @@ export async function moveItemsWithMovement(payload: {
   if (!response.ok) throw new Error('Failed to move items');
   return response.json();
 }
+
+export async function removeItemsWithMovement(payload: {
+  item_ids: string[];
+  movement: {
+    inventory_action: 'DONATED' | 'DISCARD';
+    from_location_id: string;
+    quantity: number;
+    performed_by: string;
+    note?: string;
+  };
+}): Promise<{ updatedCount: number; movement: InventoryMovement }> {
+  const response = await authFetch(`${API_BASE_URL}/inventory-movement/with-removal`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) throw new Error('Failed to remove items');
+  return response.json();
+}
