@@ -250,7 +250,7 @@ export const getItemsByName = async (req: Request, res: Response) => {
   }
 };
 /**
- * Retrieves all items currently at a specific location.
+ * Retrieves all active items currently at a specific location.
  *
  * @param {Request} req - Express request object with:
  *   - locationId: UUID of the location (in params)
