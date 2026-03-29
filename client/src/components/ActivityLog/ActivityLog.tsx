@@ -163,7 +163,14 @@ export default function ActivityLog() {
               {activities.map((activity) => {
                 const fromLabel = activity.from_location_name ?? undefined;
                 const toLabel = activity.to_location_name ?? undefined;
-                const productName = activity.product_name || 'Entire Pallet';
+                const productName =
+                  activity.product_name ||
+                  (!activity.product_id &&
+                  (activity.inventory_action === 'MOVE' ||
+                    activity.inventory_action === 'DONATED' ||
+                    activity.inventory_action === 'DISCARD')
+                    ? 'Entire Pallet'
+                    : 'Unknown item');
                 const isUndoable =
                   activity.inventory_action === 'MOVE' || activity.inventory_action === 'ADD';
 
