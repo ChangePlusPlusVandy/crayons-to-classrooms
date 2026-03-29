@@ -42,7 +42,7 @@ export function EditRemoveDialog({ open, onClose, movement, onSuccess }: EditRem
     setFetchError('');
 
     async function fetchData() {
-      if (movement.from_location_id == null) {
+      if (movement.from_location_id == null || movement.product_id == null) {
         setFetchError('Failed to load movement details');
         setLoading(false);
         return;
