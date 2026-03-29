@@ -38,6 +38,10 @@ export function EditAddDialog({ open, onClose, movement, onSuccess }: EditAddDia
 
     async function fetchData() {
       try {
+        if (!movement.product_id || !movement.to_location_id) {
+          setFetchError('Cannot edit: movement is missing product or location');
+          return;
+        }
         const [prod, location] = await Promise.all([
           getProductById(movement.product_id!),
           getStorageLocationById(movement.to_location_id!),
