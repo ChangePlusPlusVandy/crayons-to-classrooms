@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useAuth } from '../../context/AuthContext';
 import {
   Dialog,
   DialogTitle,
@@ -28,6 +29,7 @@ interface EditRemoveDialogProps {
 }
 
 export function EditRemoveDialog({ open, onClose, movement, onSuccess }: EditRemoveDialogProps) {
+  const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState('');
   const [warehouse, setWarehouse] = useState<Warehouse | null>(null);
@@ -75,7 +77,7 @@ export function EditRemoveDialog({ open, onClose, movement, onSuccess }: EditRem
       from_location_id: data.fromLocationId,
       product_id: data.productId,
       quantity: data.quantity,
-      performed_by: '3c53c4e6-dc90-4db4-b75b-a793fa454631', // TODO: Get user ID from auth context
+      performed_by: user!.id,
       note: data.notes || undefined,
     });
 

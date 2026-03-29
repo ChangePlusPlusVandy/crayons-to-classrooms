@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useAuth } from '../../context/AuthContext';
 import {
   Dialog,
   DialogTitle,
@@ -25,6 +26,7 @@ interface EditMoveDialogProps {
 }
 
 export function EditMoveDialog({ open, onClose, movement, onSuccess }: EditMoveDialogProps) {
+  const { user } = useAuth();
   const [submitError, setSubmitError] = useState('');
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState('');
@@ -105,7 +107,7 @@ export function EditMoveDialog({ open, onClose, movement, onSuccess }: EditMoveD
         to_location_id: data.destinationLocationId,
         product_id: data.itemGroup.product_id,
         quantity: data.quantity,
-        performed_by: '3c53c4e6-dc90-4db4-b75b-a793fa454631', // TODO: Get user ID from auth context
+        performed_by: user!.id,
         note: data.notes || undefined,
       });
 
