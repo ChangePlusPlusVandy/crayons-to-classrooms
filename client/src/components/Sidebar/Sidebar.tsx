@@ -18,9 +18,11 @@ import {
   Warning as WarningIcon,
   Analytics as AnalyticsIcon,
   Settings as SettingsIcon,
-  KeyboardArrowDown as KeyboardArrowDownIcon,
+  Logout as LogoutIcon,
+  PeopleAlt as PeopleAltIcon,
 } from '@mui/icons-material';
 import { sidebarStyles, drawerWidth } from './Sidebar.styles';
+import { useAuth } from '../../context/AuthContext';
 
 interface SidebarProps {
   mobileOpen: boolean;
@@ -33,6 +35,7 @@ const menuItems = [
   { text: 'Activity Log', icon: <TimelineIcon />, path: '/activity-log' },
   { text: 'Limbo Items', icon: <WarningIcon />, path: '/limbo-items' },
   { text: 'Analytics', icon: <AnalyticsIcon />, path: '/analytics' },
+  { text: 'Users', icon: <PeopleAltIcon />, path: '/users' },
   { text: 'Settings', icon: <SettingsIcon />, path: '/settings' },
 ];
 
@@ -40,6 +43,12 @@ export default function Sidebar({ mobileOpen, onDrawerToggle }: SidebarProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const { user, signOut } = useAuth();
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/login');
+  };
 
   // Sync selectedIndex with current route
   useEffect(() => {
@@ -90,14 +99,16 @@ export default function Sidebar({ mobileOpen, onDrawerToggle }: SidebarProps) {
 
       <Divider sx={{ bgcolor: 'rgba(255, 255, 255, 0.12)' }} />
 
-      {/* User Profile Section */}
+      {/* User Profile / Logout Section */}
       <Box sx={sidebarStyles.userSection}>
         <Box sx={{ flexGrow: 1 }}>
           <Typography variant="body2" sx={{ fontWeight: 600 }}>
-            Admin John Smith
+            {user?.email ?? 'Admin'}
           </Typography>
         </Box>
-        <KeyboardArrowDownIcon sx={{ color: 'rgba(255, 255, 255, 0.7)' }} />
+        <ListItemButton onClick={handleSignOut} sx={{ p: 0.5, borderRadius: 1, minWidth: 0 }}>
+          <LogoutIcon sx={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: 20 }} />
+        </ListItemButton>
       </Box>
     </Box>
   );

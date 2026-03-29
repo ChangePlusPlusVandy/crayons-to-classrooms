@@ -17,6 +17,7 @@ import {
   editMoveSchema,
   editRemoveSchema,
   createItemWithMovementSchema,
+  bulkCreateItemsWithMovementSchema,
   moveItemsWithMovementSchema,
   removeItemsWithMovementSchema,
 } from '../utils/inventoryMovementsModel.js';
@@ -99,12 +100,14 @@ export async function getAllMovementsDetailed(req: Request, res: Response): Prom
           p.name AS product_name,
           from_loc.location_code AS from_location_name,
           to_loc.location_code AS to_location_name,
-          u.name AS user_name
+          pu.name AS user_name,
+          au.email AS user_email
         FROM "inventory movement" im
         LEFT JOIN products p ON im.product_id = p.id
         LEFT JOIN storage_locations from_loc ON im.from_location_id = from_loc.id
         LEFT JOIN storage_locations to_loc ON im.to_location_id = to_loc.id
-        LEFT JOIN users u ON im.performed_by = u.id
+        LEFT JOIN public.users pu ON im.performed_by = pu.id
+        LEFT JOIN auth.users au ON pu.id = au.id
         ORDER BY im.performed_at DESC NULLS LAST
         LIMIT $1 OFFSET $2`,
         [limit, offset]
@@ -431,12 +434,18 @@ export async function createInventoryMovementCore(
   // Normalize to_location_id: undefined → null to avoid node-postgres invalid parameter errors
   const normalizedToLocationId = to_location_id ?? null;
 
-  const checks = [
-    db.query('SELECT id FROM items WHERE id = $1', [item_id]),
-    db.query('SELECT id FROM products WHERE id = $1', [product_id]),
-    db.query('SELECT id FROM storage_locations WHERE id = $1', [to_location_id]),
-    db.query('SELECT id FROM users WHERE id = $1', [performed_by]),
-  ];
+  // Check if item_id, product_id (if provided), from_location_id (if provided), to_location_id (if provided) exist in tables (in parallel)
+  const checks: Promise<any>[] = [db.query('SELECT id FROM items WHERE id = $1', [item_id])];
+
+  if (normalizedToLocationId) {
+    checks.push(
+      db.query('SELECT id FROM storage_locations WHERE id = $1', [normalizedToLocationId])
+    );
+  }
+
+  if (product_id) {
+    checks.push(db.query('SELECT id FROM products WHERE id = $1', [product_id]));
+  }
 
   // Only check from_location_id if it's provided (it's optional for ADD actions)
   if (normalizedFromLocationId) {
@@ -445,19 +454,20 @@ export async function createInventoryMovementCore(
     );
   }
 
-  const [itemCheck, productCheck, toLocationCheck, userCheck, fromLocationCheck] =
-    await Promise.all(checks);
+  const results = await Promise.all(checks);
+
+  let idx = 0;
+  const itemCheck = results[idx++];
+  const toLocationCheck = normalizedToLocationId ? results[idx++] : null;
+  const productCheck = product_id ? results[idx++] : null;
+  const fromLocationCheck = normalizedFromLocationId ? results[idx++] : null;
 
   if (itemCheck.rows.length === 0) {
     throw new ForeignKeyError('item_id');
   }
-  if (productCheck.rows.length === 0) {
+  if (productCheck && productCheck.rows.length === 0) {
     throw new ForeignKeyError('product_id');
   }
-  if (userCheck.rows.length === 0) {
-    throw new ForeignKeyError('performed_by user id');
-  }
-
   if (normalizedFromLocationId && fromLocationCheck && fromLocationCheck.rows.length === 0) {
     throw new ForeignKeyError('from_location_id');
   }
@@ -483,7 +493,7 @@ export async function createInventoryMovementCore(
     [
       inventory_action,
       item_id,
-      product_id,
+      product_id ?? null,
       normalizedFromLocationId,
       normalizedToLocationId,
       quantity,
@@ -659,6 +669,12 @@ export const createItemWithMovement = async (req: Request, res: Response) => {
       throw new Error('No items were created');
     }
 
+    // Always set fixture to null for ADD operations
+    await client.query(
+      'UPDATE item_info SET fixture = NULL, time_last_updated = NOW() WHERE name = $1',
+      [createdItems[0].name]
+    );
+
     const fullMovementData: CreateInventoryInput = {
       inventory_action: movementData.inventory_action,
       item_id: createdItems[0].id,
@@ -681,6 +697,85 @@ export const createItemWithMovement = async (req: Request, res: Response) => {
       return res.status(400).json({ error: error.message });
     }
     console.error('Error creating items with movement:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  } finally {
+    client.release();
+  }
+};
+
+/**
+ * Creates multiple items with their associated inventory movements atomically in a single transaction.
+ * Each entry in the array is processed identically to createItemWithMovement.
+ * If any entry fails, the entire batch is rolled back.
+ *
+ * @param {Request} req - Express request object with:
+ *   - entries: Array of { item, movement } pairs
+ * @param {Response} res - Express response object
+ * @returns {Promise<Response>} JSON object with { results: [{ items, movement }] } or error message
+ */
+export const bulkCreateItemsWithMovement = async (req: Request, res: Response) => {
+  let parsedData;
+  try {
+    parsedData = bulkCreateItemsWithMovementSchema.parse(req.body);
+  } catch (error) {
+    if (error instanceof ZodError) {
+      return handleValidationError(error, res);
+    }
+    return res.status(400).json({ error: 'Invalid request body' });
+  }
+
+  const { entries } = parsedData;
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const results: { items: any[]; movement: any }[] = [];
+
+    for (const entry of entries) {
+      const { item: itemData, movement: movementData } = entry;
+
+      if (movementData.quantity <= 0) {
+        throw new Error('Quantity must be greater than 0');
+      }
+
+      const createdItems = await createItemCore(itemData, movementData.quantity, client);
+
+      if (createdItems.length === 0) {
+        throw new Error('No items were created');
+      }
+
+      // Always set fixture to null for ADD operations
+      await client.query(
+        'UPDATE item_info SET fixture = NULL, time_last_updated = NOW() WHERE name = $1',
+        [createdItems[0].name]
+      );
+
+      const fullMovementData: CreateInventoryInput = {
+        inventory_action: movementData.inventory_action,
+        item_id: createdItems[0].id,
+        product_id: createdItems[0].product_id,
+        from_location_id: movementData.from_location_id,
+        to_location_id: movementData.to_location_id,
+        quantity: movementData.quantity,
+        performed_by: movementData.performed_by,
+        note: movementData.note,
+      };
+
+      const createdMovement = await createInventoryMovementCore(fullMovementData, client);
+
+      results.push({ items: createdItems, movement: createdMovement });
+    }
+
+    await client.query('COMMIT');
+
+    res.status(201).json({ results });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    if (error instanceof ForeignKeyError) {
+      return res.status(400).json({ error: error.message });
+    }
+    console.error('Error bulk creating items with movements:', error);
     res.status(500).json({ error: 'Internal server error' });
   } finally {
     client.release();
@@ -762,10 +857,15 @@ export const moveItemsWithMovement = async (req: Request, res: Response) => {
     client.release();
   }
 };
+
 /**
- * POST /api/inventory-movement/with-remove
- * Atomically updates item status to reflect the removal reason ('donated' for DONATED, 'defective' for DISCARD),
- * clears their location, and creates a corresponding DONATED/DISCARD movement record.
+ * Removes existing items (sets inactive, clears location) and creates an inventory movement record atomically.
+ * All item updates, item_info stock sync, and the movement record are wrapped in a single transaction.
+ *
+ * @param {Request} req - Express request object with nested body:
+ *   - item_ids: Array of UUIDs of items to remove
+ *   - movement: Object with movement fields (inventory_action, from_location_id, quantity, performed_by, note)
+ * @param {Response} res - Express response object
  * @returns {Promise<Response>} JSON object with { updatedCount, movement } or error message
  */
 export const removeItemsWithMovement = async (req: Request, res: Response) => {
@@ -805,9 +905,34 @@ export const removeItemsWithMovement = async (req: Request, res: Response) => {
     }
 
     if (updateResult.rowCount !== item_ids.length) {
-      throw new Error('Some items were not at the expected from_location_id');
+      throw new Error('Some items were not at the expected location or were already inactive');
     }
 
+    // Sync item_info stock: group by name and decrement
+    const countsByName: Record<string, number> = {};
+    for (const row of updateResult.rows) {
+      const name = (row as { name: string }).name;
+      countsByName[name] = (countsByName[name] || 0) + 1;
+    }
+
+    for (const [itemName, count] of Object.entries(countsByName)) {
+      await syncItemInfoStock(
+        itemName,
+        undefined, // productId
+        undefined, // category
+        undefined, // quantity
+        undefined, // value
+        undefined, // itemLimit
+        false, // limbo
+        null, // fixture
+        null, // locationCode
+        -count, // stockDelta - decrement by removed count
+        false, // createIfMissing
+        client
+      );
+    }
+
+    // Use the first item as the representative for the movement record
     const representativeItem = updateResult.rows[0];
 
     const fullMovementData: CreateInventoryInput = {
@@ -829,7 +954,7 @@ export const removeItemsWithMovement = async (req: Request, res: Response) => {
   } catch (error) {
     await client.query('ROLLBACK');
     if (error instanceof ForeignKeyError) {
-      return res.status(400).json({ error: (error as Error).message });
+      return res.status(400).json({ error: error.message });
     }
     console.error('Error removing items with movement:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -837,7 +962,6 @@ export const removeItemsWithMovement = async (req: Request, res: Response) => {
     client.release();
   }
 };
-
 
 export const editInventoryMovementAdd = async (req: Request, res: Response) => {
   const client = await pool.connect();
@@ -1209,6 +1333,7 @@ export const undoInventoryMovementCore = async (
         undefined, // quantity - don't update
         undefined, // value - don't update
         undefined, // itemLimit - don't update
+        undefined, // limbo - don't update
         fromLocation?.fixture ?? null,
         fromLocation?.location_code ?? null,
         0, // stockDelta - no change to stock count for MOVE
@@ -1271,6 +1396,7 @@ export const undoInventoryMovementCore = async (
         undefined, // quantity - don't update
         undefined, // value - don't update
         undefined, // itemLimit - don't update
+        undefined, // limbo - don't update
         null, // fixture - don't update
         null, // locationCode - don't update
         -deletedCount, // stockDelta - decrement by number of deleted items

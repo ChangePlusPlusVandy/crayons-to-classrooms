@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useAuth } from '../../context/AuthContext';
 import {
   Dialog,
   DialogTitle,
@@ -25,6 +26,7 @@ interface EditMoveDialogProps {
 }
 
 export function EditMoveDialog({ open, onClose, movement, onSuccess }: EditMoveDialogProps) {
+  const { user } = useAuth();
   const [submitError, setSubmitError] = useState('');
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState('');
@@ -32,7 +34,6 @@ export function EditMoveDialog({ open, onClose, movement, onSuccess }: EditMoveD
   const [sourceSlot, setSourceSlot] = useState<StorageLocation | null>(null);
   const [productName, setProductName] = useState('');
   const [destinationSlot, setDestinationSlot] = useState('');
-  const [destinationFixture, setDestinationFixture] = useState('');
 
   useEffect(() => {
     if (!open) return;
@@ -41,9 +42,13 @@ export function EditMoveDialog({ open, onClose, movement, onSuccess }: EditMoveD
 
     async function fetchData() {
       try {
+        if (!movement.product_id || !movement.from_location_id || !movement.to_location_id) {
+          setFetchError('Cannot edit: movement is missing product or location');
+          return;
+        }
         const [src, dest, prod] = await Promise.all([
-          getStorageLocationById(movement.from_location_id!),
-          getStorageLocationById(movement.to_location_id!),
+          getStorageLocationById(movement.from_location_id),
+          getStorageLocationById(movement.to_location_id),
           getProductById(movement.product_id),
         ]);
         const wh = await getWarehouseById(src.warehouse_id);
@@ -51,7 +56,6 @@ export function EditMoveDialog({ open, onClose, movement, onSuccess }: EditMoveD
         setSourceSlot(src);
         setProductName(prod.name);
         setDestinationSlot(dest.slot);
-        setDestinationFixture(dest.fixture || 'N/A');
       } catch {
         setFetchError('Failed to load movement details');
       } finally {
@@ -78,7 +82,7 @@ export function EditMoveDialog({ open, onClose, movement, onSuccess }: EditMoveD
           current_location_id: sourceSlotId,
           warehouse: warehouse!.id,
           name: productName,
-          product_id: movement.product_id,
+          product_id: movement.product_id ?? '',
           quantity: movement.quantity,
         });
       }
@@ -105,7 +109,7 @@ export function EditMoveDialog({ open, onClose, movement, onSuccess }: EditMoveD
         to_location_id: data.destinationLocationId,
         product_id: data.itemGroup.product_id,
         quantity: data.quantity,
-        performed_by: '3c53c4e6-dc90-4db4-b75b-a793fa454631', // TODO: Get user ID from auth context
+        performed_by: user!.id,
         note: data.notes || undefined,
       });
 
@@ -145,7 +149,6 @@ export function EditMoveDialog({ open, onClose, movement, onSuccess }: EditMoveD
               initialSourceSlot={sourceSlot}
               initialProductId={movement.product_id}
               initialDestinationSlot={destinationSlot}
-              initialDestinationFixture={destinationFixture}
               initialQuantity={movement.quantity}
               initialNotes={movement.note || ''}
               onSubmit={handleSubmit}

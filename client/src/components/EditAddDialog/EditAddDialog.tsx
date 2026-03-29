@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useAuth } from '../../context/AuthContext';
 import {
   Dialog,
   DialogTitle,
@@ -24,13 +25,13 @@ interface EditAddDialogProps {
 }
 
 export function EditAddDialog({ open, onClose, movement, onSuccess }: EditAddDialogProps) {
+  const { user } = useAuth();
   const [submitError, setSubmitError] = useState('');
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState('');
   const [product, setProduct] = useState<Product | null>(null);
   const [warehouse, setWarehouse] = useState<Warehouse | null>(null);
   const [slot, setSlot] = useState('');
-  const [fixture, setFixture] = useState('');
 
   useEffect(() => {
     if (!open) return;
@@ -39,15 +40,18 @@ export function EditAddDialog({ open, onClose, movement, onSuccess }: EditAddDia
 
     async function fetchData() {
       try {
+        if (!movement.product_id || !movement.to_location_id) {
+          setFetchError('Cannot edit: movement is missing product or location');
+          return;
+        }
         const [prod, location] = await Promise.all([
           getProductById(movement.product_id),
-          getStorageLocationById(movement.to_location_id!),
+          getStorageLocationById(movement.to_location_id),
         ]);
         const wh = await getWarehouseById(location.warehouse_id);
         setProduct(prod);
         setWarehouse(wh);
         setSlot(location.slot);
-        setFixture(location.fixture || 'None');
       } catch {
         setFetchError('Failed to load movement details');
       } finally {
@@ -75,7 +79,7 @@ export function EditAddDialog({ open, onClose, movement, onSuccess }: EditAddDia
           stock: 1,
           current_location_id: data.destinationLocationId,
           status: 'active',
-          created_by: '3c53c4e6-dc90-4db4-b75b-a793fa454631', // TODO: Get user ID from auth context
+          created_by: user!.id,
           warehouse: data.warehouse.id,
           category: data.product.category || undefined,
           item_limit: itemLimit || undefined,
@@ -88,7 +92,7 @@ export function EditAddDialog({ open, onClose, movement, onSuccess }: EditAddDia
           from_location_id: null,
           to_location_id: data.destinationLocationId,
           quantity: data.quantity,
-          performed_by: '3c53c4e6-dc90-4db4-b75b-a793fa454631', // TODO: Get user ID from auth context
+          performed_by: user!.id,
           note: data.notes || undefined,
         },
       });
@@ -128,12 +132,12 @@ export function EditAddDialog({ open, onClose, movement, onSuccess }: EditAddDia
               initialWarehouse={warehouse}
               initialProduct={product}
               initialSlot={slot}
-              initialFixture={fixture}
               initialQuantity={movement.quantity}
               initialNotes={movement.note || ''}
               onSubmit={handleSubmit}
               onCancel={onClose}
               submitLabel="Save Changes"
+              allowNewItem={false}
             />
           </>
         )}

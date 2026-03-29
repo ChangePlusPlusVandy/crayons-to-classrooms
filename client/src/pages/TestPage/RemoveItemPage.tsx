@@ -12,15 +12,20 @@ import {
 } from '@mui/material';
 
 import { getItems } from '../../api/items';
-import { removeItemsWithMovement } from '../../api/removeItem';
+import { getItemsByLocation, removeItemsWithMovement } from '../../api/moveItem';
+import { useAuth } from '../../context/AuthContext';
 import { Item } from '../../types/Item';
 import { Warehouse } from '../../types/Warehouse';
 import { RemoveItemCard, RemoveItemFormLabel } from './RemoveItemPage.styles';
 import { WarehouseSelector } from '../../components/WarehouseSelector/WarehouseSelector';
 import { getAllStorageLocations } from '../../api/storageLocation';
+import FormModeToggle, { FormMode } from '../../components/FormModeToggle/FormModeToggle';
+import PalletRemoveForm, {
+  PalletRemoveFormData,
+} from '../../components/PalletRemoveForm/PalletRemoveForm';
 
 type ItemGroupWithLocation = {
-  items: Item[]; // all DB rows for this item_info+location group
+  items: Item[]; // all DB rows for this name+location group
   name: string;
   itemInfoId: string;
   locationCode: string;
@@ -28,7 +33,9 @@ type ItemGroupWithLocation = {
 };
 
 export default function RemoveItemPage() {
+  const { user } = useAuth();
   const [items, setItems] = useState<Item[]>([]);
+  const [formKey, setFormKey] = useState(0);
   const [selectedWarehouse, setSelectedWarehouse] = useState<Warehouse | null>(null);
   // 'slot' and 'product' modes are not yet implemented — scoped to future sprints
   const removeByOptions: Array<'item' | 'product'> = ['item'];
@@ -51,6 +58,18 @@ export default function RemoveItemPage() {
   const [success, setSuccess] = useState('');
   const [groupOptions, setGroupOptions] = useState<ItemGroupWithLocation[]>([]);
 
+  const [mode, setMode] = useState<FormMode>('individual');
+
+  const selectedGroupLive = useMemo(() => {
+    if (!selectedGroup) return null;
+    return (
+      groupOptions.find(
+        (group) =>
+          group.name === selectedGroup.name && group.locationId === selectedGroup.locationId
+      ) ?? null
+    );
+  }, [groupOptions, selectedGroup]);
+
   // Load items
   useEffect(() => {
     async function loadData() {
@@ -68,12 +87,12 @@ export default function RemoveItemPage() {
 
   // Remove item handler (donate or delete/defective)
   const handleRemoveItem = async () => {
-    if (!selectedGroup || quantityToRemove === null || quantityToRemove <= 0) {
+    if (!selectedGroupLive || quantityToRemove === null || quantityToRemove <= 0) {
       setError('Please select an item and quantity to remove.');
       return;
     }
 
-    if (quantityToRemove > selectedGroup.items.length) {
+    if (quantityToRemove > selectedGroupLive.items.length) {
       setError('Quantity to remove exceeds available stock.');
       return;
     }
@@ -83,16 +102,15 @@ export default function RemoveItemPage() {
     setLoading(true);
 
     try {
-      const itemsToRemove = selectedGroup.items.slice(0, quantityToRemove);
-      const isFullRemoval = quantityToRemove === selectedGroup.items.length;
+      const itemsToRemove = selectedGroupLive.items.slice(0, quantityToRemove);
 
       await removeItemsWithMovement({
         item_ids: itemsToRemove.map((item) => item.id),
         movement: {
           inventory_action: removalAction,
-          from_location_id: selectedGroup.locationId,
+          from_location_id: selectedGroupLive.locationId,
           quantity: quantityToRemove,
-          performed_by: '3c53c4e6-dc90-4db4-b75b-a793fa454631', // Hardcoded user ID (matches Add/Move pages)
+          performed_by: user!.id,
           note: notes || undefined,
         },
       });
@@ -101,18 +119,15 @@ export default function RemoveItemPage() {
       const refreshedItems = await getItems();
       setItems(refreshedItems);
 
-      // Reset form
+      // Keep selection when possible so available count updates in-place
       setSelectedGroup(null);
-      setQuantityToRemove(0);
+      setQuantityToRemove(null);
       setRemovalAction('DONATED');
+      setSelectedProduct('');
       setNotes('');
 
       const actionLabel = removalAction === 'DONATED' ? 'donated' : 'marked as defective';
-      setSuccess(
-        isFullRemoval
-          ? `Item fully ${actionLabel}.`
-          : `${quantityToRemove} item(s) ${actionLabel}.`
-      );
+      setSuccess(`${quantityToRemove} item(s) ${actionLabel}.`);
     } catch (err) {
       console.error(err);
       setError('Failed to remove item.');
@@ -121,10 +136,56 @@ export default function RemoveItemPage() {
     }
   };
 
+  // Pallet remove handler
+  const handlePalletRemoveSubmit = async (data: PalletRemoveFormData) => {
+    const { sourceSlotId, removalAction: action, notes: palletNotes } = data;
+
+    setError('');
+    setSuccess('');
+
+    try {
+      const allItems = await getItemsByLocation(sourceSlotId);
+      const activeItems = allItems.filter((item) => item.status === 'active');
+
+      if (activeItems.length === 0) {
+        throw new Error('No active items found in the source slot.');
+      }
+
+      await removeItemsWithMovement({
+        item_ids: activeItems.map((item) => item.id),
+        movement: {
+          inventory_action: action,
+          from_location_id: sourceSlotId,
+          quantity: activeItems.length,
+          performed_by: user!.id,
+          note: palletNotes || undefined,
+        },
+      });
+
+      // Refresh items
+      const refreshedItems = await getItems();
+      setItems(refreshedItems);
+
+      const actionLabel = action === 'DONATED' ? 'donated' : 'marked as defective';
+      setSuccess(`${activeItems.length} item${activeItems.length > 1 ? 's' : ''} ${actionLabel}.`);
+      setFormKey((k) => k + 1);
+    } catch (err) {
+      console.error(err);
+      const message =
+        err instanceof Error ? err.message : 'Failed to remove pallet items. Please try again.';
+      setError(message);
+    }
+  };
+
   // Items in currently selected warehouse
   const itemsInSelectedWarehouse = useMemo(() => {
     if (!selectedWarehouse) return [];
-    return items.filter((item) => item.warehouse === selectedWarehouse.id);
+    return items.filter(
+      (item) =>
+        item.warehouse === selectedWarehouse.id &&
+        item.status === 'active' &&
+        Boolean(item.current_location_id)
+    );
   }, [items, selectedWarehouse]);
 
   useEffect(() => {
@@ -167,184 +228,225 @@ export default function RemoveItemPage() {
     buildGroupOptions();
   }, [itemsInSelectedWarehouse, selectedWarehouse]);
 
+  const handleModeChange = (newMode: FormMode) => {
+    setMode(newMode);
+    setFormKey((k) => k + 1);
+    setError('');
+    setSuccess('');
+  };
+
   return (
     <Container maxWidth="md" sx={{ py: 4 }}>
-      <Typography variant="h4" sx={{ mb: 3 }}>
-        Remove Item
-      </Typography>
+      <RemoveItemCard>
+        <Typography variant="h4" sx={{ mb: 3, textAlign: 'left' }}>
+          Remove Item
+        </Typography>
+        <FormModeToggle value={mode} onChange={handleModeChange} />
+        {error && (
+          <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
+            {error}
+          </Alert>
+        )}
+        {success && (
+          <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess('')}>
+            {success}
+          </Alert>
+        )}
 
-      {loading && (
-        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
-          <CircularProgress />
-        </Box>
-      )}
-
-      {!loading && (
-        <RemoveItemCard>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-            {error && <Alert severity="error">{error}</Alert>}
-            {success && <Alert severity="success">{success}</Alert>}
-            {/* Warehouse */}
-            <WarehouseSelector
-              value={selectedWarehouse}
-              onChange={(newWarehouse) => {
-                setSelectedWarehouse(newWarehouse);
-                setSelectedGroup(null);
-                setQuantityToRemove(0);
-                setError('');
-              }}
-              label="Warehouse"
-              placeholder="Select warehouse"
-              fullWidth
-            />
-            {/* Remove By */}{' '}
-            <FormControl>
-              <RemoveItemFormLabel htmlFor="remove-by-select">Remove By</RemoveItemFormLabel>
-              <Autocomplete
-                options={removeByOptions}
-                value={removeBy}
-                onChange={(_, newValue) => {
-                  if (newValue) {
-                    setRemoveBy(newValue);
-                  }
-                }}
-                getOptionLabel={(option) => option.charAt(0).toUpperCase() + option.slice(1)}
-                renderInput={(params) => (
-                  <TextField {...params} placeholder="Remove By" fullWidth />
-                )}
-              />
-            </FormControl>
-            {/* Removal Action */}
-            <FormControl>
-              <RemoveItemFormLabel htmlFor="removal-action-select">Removal Action</RemoveItemFormLabel>
-              <Autocomplete
-                options={removalActionOptions}
-                value={removalActionOptions.find((o) => o.value === removalAction) ?? removalActionOptions[0]}
-                onChange={(_, newValue) => {
-                  if (newValue) {
-                    setRemovalAction(newValue.value);
-                  }
-                }}
-                getOptionLabel={(option) => option.label}
-                isOptionEqualToValue={(option, value) => option.value === value.value}
-                disableClearable
-                renderInput={(params) => (
-                  <TextField {...params} placeholder="Select removal action" fullWidth />
-                )}
-              />
-            </FormControl>
-            {/* CONDITIONAL FIELDS */}
-            {/* Remove by ITEM */}{' '}
-            {removeBy === 'item' && (
-              <FormControl>
-                <RemoveItemFormLabel>Item Name</RemoveItemFormLabel>
-                <Autocomplete
-                  options={groupOptions}
-                  value={selectedGroup}
-                  onChange={(_, newValue) => setSelectedGroup(newValue)}
-                  isOptionEqualToValue={(a, b) =>
-                    a.itemInfoId === b.itemInfoId && a.locationId === b.locationId
-                  }
-                  getOptionLabel={(option) => option.name}
-                  renderOption={(props, option) => (
-                    <li {...props} key={`${option.itemInfoId}|${option.locationId}`}>
-                      <Box>
-                        <Typography fontWeight={500}>{option.name}</Typography>
-                        <Typography variant="body2" color="text.secondary">
-                          {option.locationCode}
-                        </Typography>
-                      </Box>
-                    </li>
-                  )}
-                  renderInput={(params) => (
-                    <TextField
-                      {...params}
-                      placeholder="Search by location or item name"
-                      fullWidth
-                    />
-                  )}
+        {mode === 'pallet' ? (
+          <PalletRemoveForm
+            key={formKey}
+            onSubmit={handlePalletRemoveSubmit}
+            onCancel={() => {
+              setFormKey((k) => k + 1);
+              setError('');
+              setSuccess('');
+            }}
+          />
+        ) : (
+          <>
+            {loading ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
+                <CircularProgress />
+              </Box>
+            ) : (
+              <Box key={formKey} sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                {/* Warehouse */}
+                <WarehouseSelector
+                  value={selectedWarehouse}
+                  onChange={(newWarehouse) => {
+                    setSelectedWarehouse(newWarehouse);
+                    setSelectedGroup(null);
+                    setQuantityToRemove(null);
+                    setError('');
+                  }}
+                  label="Warehouse"
+                  placeholder="Select warehouse"
+                  fullWidth
                 />
-              </FormControl>
-            )}{' '}
-            {/* Remove by PRODUCT */}{' '}
-            {removeBy === 'product' && (
-              <Autocomplete
-                options={productOptions}
-                value={selectedProduct || null}
-                onChange={(_, newValue) => {
-                  setSelectedProduct(newValue ?? '');
-                }}
-                freeSolo
-                renderInput={(params) => (
-                  <TextField {...params} label="Product" placeholder="Select product" fullWidth />
+                {/* Remove By */}
+                <FormControl>
+                  <RemoveItemFormLabel htmlFor="remove-by-select">Remove By</RemoveItemFormLabel>
+                  <Autocomplete
+                    options={removeByOptions}
+                    value={removeBy}
+                    onChange={(_, newValue) => {
+                      if (newValue) {
+                        setRemoveBy(newValue);
+                      }
+                    }}
+                    getOptionLabel={(option) => option.charAt(0).toUpperCase() + option.slice(1)}
+                    renderInput={(params) => (
+                      <TextField {...params} placeholder="Remove By" fullWidth />
+                    )}
+                  />
+                </FormControl>
+                {/* Removal Action */}
+                <FormControl>
+                  <RemoveItemFormLabel htmlFor="removal-action-select">
+                    Removal Action
+                  </RemoveItemFormLabel>
+                  <Autocomplete
+                    options={removalActionOptions}
+                    value={
+                      removalActionOptions.find((o) => o.value === removalAction) ??
+                      removalActionOptions[0]
+                    }
+                    onChange={(_, newValue) => {
+                      if (newValue) {
+                        setRemovalAction(newValue.value);
+                      }
+                    }}
+                    getOptionLabel={(option) => option.label}
+                    isOptionEqualToValue={(option, value) => option.value === value.value}
+                    disableClearable
+                    renderInput={(params) => (
+                      <TextField {...params} placeholder="Select removal action" fullWidth />
+                    )}
+                  />
+                </FormControl>
+                {/* CONDITIONAL FIELDS */}
+                {/* Remove by ITEM */}
+                {removeBy === 'item' && (
+                  <FormControl>
+                    <RemoveItemFormLabel>Item Name</RemoveItemFormLabel>
+                    <Autocomplete
+                      options={groupOptions}
+                      value={selectedGroupLive}
+                      onChange={(_, newValue) => setSelectedGroup(newValue)}
+                      isOptionEqualToValue={(a, b) =>
+                        a.name === b.name && a.locationId === b.locationId
+                      }
+                      getOptionLabel={(option) => option.name}
+                      renderOption={(props, option) => (
+                        <li {...props} key={`${option.name}|${option.locationId}`}>
+                          <Box>
+                            <Typography fontWeight={500}>{option.name}</Typography>
+                            <Typography variant="body2" color="text.secondary">
+                              {option.locationCode}
+                            </Typography>
+                          </Box>
+                        </li>
+                      )}
+                      renderInput={(params) => (
+                        <TextField
+                          {...params}
+                          placeholder="Search by location or item name"
+                          fullWidth
+                        />
+                      )}
+                    />
+                  </FormControl>
                 )}
-              />
+                {/* Remove by PRODUCT */}
+                {removeBy === 'product' && (
+                  <Autocomplete
+                    options={productOptions}
+                    value={selectedProduct || null}
+                    onChange={(_, newValue) => {
+                      setSelectedProduct(newValue ?? '');
+                    }}
+                    freeSolo
+                    renderInput={(params) => (
+                      <TextField
+                        {...params}
+                        label="Product"
+                        placeholder="Select product"
+                        fullWidth
+                      />
+                    )}
+                  />
+                )}
+                {/* Quantity to remove */}
+                <FormControl>
+                  <RemoveItemFormLabel htmlFor="quantity-select">
+                    Quantity To Remove
+                  </RemoveItemFormLabel>
+                  <TextField
+                    placeholder="Enter Quantity"
+                    type="number"
+                    value={quantityToRemove ?? ''}
+                    onChange={(e) => {
+                      if (!selectedGroupLive) return;
+
+                      const raw = e.target.value;
+
+                      if (raw === '') {
+                        setQuantityToRemove(null);
+                        return;
+                      }
+
+                      const val = Number(raw);
+                      setQuantityToRemove(
+                        Math.min(Math.max(val, 0), selectedGroupLive.items.length)
+                      );
+                    }}
+                    fullWidth
+                    inputProps={{ min: 0, max: selectedGroupLive?.items.length ?? 0 }}
+                    helperText={
+                      selectedGroupLive
+                        ? `Available: ${selectedGroupLive.items.length}`
+                        : 'Select an item first'
+                    }
+                    disabled={!selectedGroupLive}
+                  />
+                </FormControl>
+                {/* Notes */}
+                <TextField
+                  label="Notes"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  fullWidth
+                  multiline
+                  minRows={3}
+                />
+                {/* Buttons */}
+                <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
+                  <Button
+                    variant="outlined"
+                    onClick={() => {
+                      setSelectedGroup(null);
+                      setQuantityToRemove(null);
+                      setRemovalAction('DONATED');
+                      setSelectedProduct('');
+                      setNotes('');
+                      setError('');
+                      setSuccess('');
+                      setFormKey((k) => k + 1);
+                    }}
+                  >
+                    Cancel
+                  </Button>
+
+                  <Button variant="contained" color="error" onClick={handleRemoveItem}>
+                    {removalAction === 'DONATED' ? 'Donate Item' : 'Delete Item'}
+                  </Button>
+                </Box>
+              </Box>
             )}
-            {/* Quantity to remove */}
-            <FormControl>
-              <RemoveItemFormLabel htmlFor="quantity-select">
-                Quantity To Remove
-              </RemoveItemFormLabel>
-              <TextField
-                placeholder="Enter Quantity"
-                type="number"
-                value={quantityToRemove ?? ''}
-                onChange={(e) => {
-                  if (!selectedGroup) return;
-
-                  const raw = e.target.value;
-
-                  if (raw === '') {
-                    setQuantityToRemove(null);
-                    return;
-                  }
-
-                  const parsed = Math.floor(Number(raw));
-                  if (!Number.isFinite(parsed)) {
-                    setQuantityToRemove(null);
-                    return;
-                  }
-                  const clamped = Math.min(Math.max(parsed, 0), selectedGroup.items.length);
-                  setQuantityToRemove(clamped);
-                }}
-                fullWidth
-                inputProps={{ min: 0, max: selectedGroup?.items.length ?? 0 }}
-                helperText={
-                  selectedGroup ? `Available: ${selectedGroup.items.length}` : 'Select an item first'
-                }
-                disabled={!selectedGroup}
-              />
-            </FormControl>
-            {/* Notes */}
-            <TextField
-              label="Notes"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              fullWidth
-              multiline
-              minRows={3}
-            />
-            {/* Buttons */}
-            <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
-              <Button
-                variant="outlined"
-                onClick={() => {
-                  setSelectedGroup(null);
-                  setQuantityToRemove(0);
-                  setRemovalAction('DONATED');
-                  setNotes('');
-                }}
-              >
-                Cancel
-              </Button>
-
-              <Button variant="contained" color="error" onClick={handleRemoveItem}>
-                {removalAction === 'DONATED' ? 'Donate Item' : 'Delete Item'}
-              </Button>
-            </Box>
-          </Box>
-        </RemoveItemCard>
-      )}
+          </>
+        )}
+      </RemoveItemCard>
     </Container>
   );
 }

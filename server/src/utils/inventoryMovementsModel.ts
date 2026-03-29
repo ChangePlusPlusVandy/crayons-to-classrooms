@@ -33,12 +33,20 @@ export const performedDateParamSchema = z.object({
 });
 
 // Validates action types for inventory movements
-export const ActionParamSchema = z.enum(['ADD', 'MOVE', 'CHECKOUT', 'DISCARD', 'ADJUSTMENT', 'DONATED']);
+export const ActionParamSchema = z.enum([
+  'ADD',
+  'MOVE',
+  'CHECKOUT',
+  'DISCARD',
+  'ADJUSTMENT',
+  'DONATED',
+]);
 
 /**
- * Schema for inventory creation
- * Requires: inventory_action, item_id, product_id, to_location_id, quantity, performed_by
- * from_location_id is optional (null for ADD actions)
+ * Schema for inventory movement creation
+ * Requires: inventory_action, item_id, product_id, quantity, performed_by
+ * Optional: from_location_id (nullable — null for ADD actions),
+ *           to_location_id (nullable), note
  */
 export const createInventoryMovementSchema = z.object({
   inventory_action: ActionParamSchema,
@@ -157,6 +165,23 @@ export type CreateInventoryInput = z.infer<typeof createInventoryMovementSchema>
 export type UpdateInventoryInput = z.infer<typeof updateInventoryMovementSchema>;
 export type InventoryStatusType = z.infer<typeof actionQuerySchema>;
 export type CreateItemWithMovementInput = z.infer<typeof createItemWithMovementSchema>;
+
+export const bulkCreateItemsWithMovementSchema = z.object({
+  entries: z
+    .array(
+      z.object({
+        item: createItemSchema,
+        movement: movementFieldsSchema.extend({
+          inventory_action: z.literal('ADD'),
+        }),
+      })
+    )
+    .nonempty('At least one entry is required'),
+});
+
+export type BulkCreateItemsWithMovementInput = z.infer<typeof bulkCreateItemsWithMovementSchema>;
 export type MovementIdParamType = z.infer<typeof movementIdParamSchema>;
 export type MoveItemsWithMovementInput = z.infer<typeof moveItemsWithMovementSchema>;
+
+
 export type RemoveItemsWithMovementInput = z.infer<typeof removeItemsWithMovementSchema>;

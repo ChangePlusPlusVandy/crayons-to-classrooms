@@ -5,6 +5,7 @@ import {
   updateItemInfo,
   deleteItemInfo,
   getItemsInfoByName,
+  getLimboItems,
 } from '../controllers/itemInfoControllers.js';
 import express from 'express';
 
@@ -16,11 +17,12 @@ router.get('/name/:name', getItemsInfoByName);
 router.get('/', getItemsInfo);
 // create a new item
 router.post('/', createItemInfo);
+// get limbo items
+router.get('/limbo', getLimboItems);
 // get item by ID
 router.get('/:id', getItemInfoById);
 // update an existing item
 router.patch('/:id', updateItemInfo);
 // delete an item
 router.delete('/:id', deleteItemInfo);
-
 export default router;
