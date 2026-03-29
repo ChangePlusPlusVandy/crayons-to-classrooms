@@ -20,6 +20,7 @@ import {
   DialogActions,
   Card,
   Autocomplete,
+  Snackbar,
 } from '@mui/material';
 import { getLimboItems, ItemInfo } from '../../api/itemInfo';
 import { createItemWithMovement, getStorageLocations, getWarehouses } from '../../api/addItem';
@@ -51,6 +52,8 @@ export default function Limbo() {
   const [restockSlotCode, setRestockSlotCode] = useState('');
   const [restockError, setRestockError] = useState('');
   const [restockSubmitting, setRestockSubmitting] = useState(false);
+  const [restockSuccessOpen, setRestockSuccessOpen] = useState(false);
+  const [restockSuccessMessage, setRestockSuccessMessage] = useState('');
 
   const warehouseNameOptions = useMemo(
     () => [...warehouses].map((w) => w.name).sort((a, b) => a.localeCompare(b)),
@@ -116,17 +119,38 @@ export default function Limbo() {
 
   const filteredItems = useMemo(() => {
     const name = searchName.trim().toLowerCase();
-    const updatedAfterMs = updatedAfter ? new Date(updatedAfter).getTime() : null;
 
-    return items.filter((item) => {
+    /** Start of the selected local calendar day (inclusive): show items updated on or after this instant. */
+    let startOfSelectedDayMs: number | null = null;
+    if (updatedAfter) {
+      const parts = updatedAfter.split('-').map(Number);
+      if (parts.length === 3 && parts.every((n) => !Number.isNaN(n))) {
+        const [y, m, d] = parts;
+        startOfSelectedDayMs = new Date(y, m - 1, d, 0, 0, 0, 0).getTime();
+      }
+    }
+
+    const filtered = items.filter((item) => {
       const matchesName = !name || item.name.toLowerCase().includes(name);
       const itemUpdatedMs = item.time_last_updated
         ? new Date(item.time_last_updated).getTime()
         : null;
-      const matchesUpdatedAfter =
-        updatedAfterMs === null || (itemUpdatedMs !== null && itemUpdatedMs >= updatedAfterMs);
 
-      return matchesName && matchesUpdatedAfter;
+      const matchesChangesAfter =
+        startOfSelectedDayMs === null ||
+        (itemUpdatedMs !== null && itemUpdatedMs >= startOfSelectedDayMs);
+
+      return matchesName && matchesChangesAfter;
+    });
+
+    return filtered.sort((a, b) => {
+      const ta = a.time_last_updated ? new Date(a.time_last_updated).getTime() : Number.NEGATIVE_INFINITY;
+      const tb = b.time_last_updated ? new Date(b.time_last_updated).getTime() : Number.NEGATIVE_INFINITY;
+      const byTime = tb - ta;
+      if (Number.isNaN(byTime) || byTime === 0) {
+        return a.name.localeCompare(b.name);
+      }
+      return byTime;
     });
   }, [items, searchName, updatedAfter]);
 
@@ -238,7 +262,16 @@ export default function Limbo() {
 
       const refreshed = await getLimboItems();
       setItems(refreshed);
+
+      const successQty = restockQuantity;
+      const successName = restockItem.name;
       closeRestockDialog();
+      setRestockSuccessMessage(
+        successQty === 1
+          ? `Successfully restocked “${successName}”.`
+          : `Successfully restocked ${successQty} units of “${successName}”.`
+      );
+      setRestockSuccessOpen(true);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to restock item.';
       setRestockError(message);
@@ -248,8 +281,7 @@ export default function Limbo() {
   };
 
   const rowsInTable = filteredItems.length;
-  // Dummy metric placeholder (backend not implemented yet)
-  const resolvedLast7DaysDummy = 0;
+
 
   return (
     <Container maxWidth="lg" sx={limboStyles.container}>
@@ -291,32 +323,6 @@ export default function Limbo() {
                 Total Limbo Items - {rowsInTable}
               </Typography>
             </Box>
-
-            <Box
-              sx={{
-                ...limboStyles.metricsBoxBase,
-                ...limboStyles.metricsBoxGreen,
-              }}
-            >
-              <Typography
-                variant="body2"
-                sx={{
-                  color: '#1F2937',
-                  fontFamily: 'Inter, sans-serif',
-                  fontWeight: 500,
-                  fontStyle: 'normal',
-                  fontSize: 14,
-                  lineHeight: '21px',
-                  letterSpacing: '-0.15px',
-                  width: '149.9609375px',
-                  height: '21px',
-                  opacity: 1,
-                  overflow: 'hidden',
-                }}
-              >
-                Resolved (Last 7 Days) - {resolvedLast7DaysDummy}
-              </Typography>
-            </Box>
           </Box>
 
           {/* Search bars (above the table shadow) */}
@@ -350,7 +356,7 @@ export default function Limbo() {
 
               <Box sx={limboStyles.searchTimeArea}>
                 <TextField
-                  label="Filter by Updated Time"
+                  label="Changes after"
                   type="date"
                   value={updatedAfter}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
@@ -639,6 +645,25 @@ export default function Limbo() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <Snackbar
+        open={restockSuccessOpen}
+        autoHideDuration={6000}
+        onClose={(_e, reason) => {
+          if (reason === 'clickaway') return;
+          setRestockSuccessOpen(false);
+        }}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert
+          onClose={() => setRestockSuccessOpen(false)}
+          severity="success"
+          variant="filled"
+          sx={{ width: '100%', alignItems: 'center' }}
+        >
+          {restockSuccessMessage}
+        </Alert>
+      </Snackbar>
     </Container>
   );
 }
