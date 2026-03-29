@@ -75,7 +75,7 @@ export async function editRemoveMovementTransaction(
     note?: string;
   }
 ): Promise<{ movement: InventoryMovement }> {
-  const response = await fetch(`${API_BASE_URL}/inventory-movement/${movementId}/edit-remove`, {
+  const response = await authFetch(`${API_BASE_URL}/inventory-movement/${movementId}/edit-remove`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
