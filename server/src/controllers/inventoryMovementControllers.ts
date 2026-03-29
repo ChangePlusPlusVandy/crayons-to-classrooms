@@ -97,8 +97,8 @@ export async function getAllMovementsDetailed(req: Request, res: Response): Prom
           im.performed_at,
           im.inventory_action,
           p.name AS product_name,
-          from_loc.location_code AS from_location_name,
-          to_loc.location_code AS to_location_name,
+          from_loc.slot AS from_location_name,
+          to_loc.slot AS to_location_name,
           pu.name AS user_name,
           au.email AS user_email
         FROM "inventory movement" im

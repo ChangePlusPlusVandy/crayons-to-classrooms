@@ -130,14 +130,6 @@ export default function PalletAddForm({
     [products, localNewProducts]
   );
 
-  // Derive available fixtures from storage locations
-  const availableFixtures = useMemo(() => {
-    const fixtures = storageLocations
-      .map((loc) => loc.fixture)
-      .filter((f): f is string => !!f && f.trim() !== '');
-    return Array.from(new Set(fixtures)).sort((a, b) => a.localeCompare(b));
-  }, [storageLocations]);
-
   // Derive available categories from products
   const availableCategories = useMemo(() => {
     const fromProducts = allProducts
@@ -187,10 +179,8 @@ export default function PalletAddForm({
       return;
     }
 
-    // Resolve destination: prefer location with null/empty fixture, fall back to first match
-    const slotLocations = warehouseLocations.filter((loc) => loc.slot === selectedSlot);
     const destinationLocation =
-      slotLocations.find((loc) => !loc.fixture || loc.fixture.trim() === '') ?? slotLocations[0] ?? null;
+      warehouseLocations.find((loc) => loc.slot === selectedSlot) ?? null;
 
     if (!destinationLocation) {
       setError('Could not find a location for the selected slot.');
@@ -446,7 +436,6 @@ export default function PalletAddForm({
         }}
         onConfirm={handleNewItemConfirm}
         products={allProducts}
-        availableFixtures={availableFixtures}
         availableCategories={availableCategories}
         initialData={editingRow?.isNewProduct ? editingRow.newProductData ?? null : null}
       />
