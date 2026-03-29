@@ -166,6 +166,7 @@ export default function ActivityLog() {
                 const productName =
                   activity.product_name ||
                   (!activity.product_id &&
+                  activity.quantity > 1 &&
                   (activity.inventory_action === 'MOVE' ||
                     activity.inventory_action === 'DONATED' ||
                     activity.inventory_action === 'DISCARD')
