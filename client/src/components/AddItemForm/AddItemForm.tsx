@@ -204,8 +204,10 @@ export default function AddItemForm({
   };
 
   const handleSubmit = async () => {
-    // Find the destination location based on slot (first matching location)
-    const destinationLocation = warehouseLocations.find((loc) => loc.slot === selectedSlot);
+    // Resolve destination: prefer location with null/empty fixture, fall back to first match
+    const slotLocations = warehouseLocations.filter((loc) => loc.slot === selectedSlot);
+    const destinationLocation =
+      slotLocations.find((loc) => !loc.fixture || loc.fixture.trim() === '') ?? slotLocations[0] ?? null;
 
     // Validation
     if (!selectedWarehouse) {
