@@ -33,6 +33,54 @@ export async function getLimboItems(): Promise<ItemInfo[]> {
   return z.array(ItemInfoSchema).parse(data);
 }
 
+export async function getOutOfStockItems(): Promise<ItemInfo[]> {
+  const response = await authFetch(`${API_BASE_URL}/item-info/out-of-stock`);
+  if (response.status === 404) {
+    // No out of stock items found; return empty list instead of treating as an error.
+    return [];
+  }
+  if (!response.ok) throw new Error('Failed to fetch out of stock items');
+  const data = await response.json();
+  return z.array(ItemInfoSchema).parse(data);
+}
+
+/** PATCH /item-info/:id — body must include at least one allowed field (server-validated). */
+export async function patchItemInfo(
+  id: string,
+  body: { limbo: boolean }
+): Promise<ItemInfo> {
+  const response = await authFetch(`${API_BASE_URL}/item-info/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) {
+    let message = 'Failed to update item';
+    try {
+      const err = (await response.json()) as { error?: string };
+      if (err.error) message = err.error;
+    } catch {
+      /* ignore */
+    }
+    throw new Error(message);
+  }
+  const data = await response.json();
+  return ItemInfoSchema.parse(data);
+}
+
+export async function deleteItemInfo(id: string): Promise<void> {
+  const response = await authFetch(`${API_BASE_URL}/item-info/${id}`, { method: 'DELETE' });
+  if (!response.ok) {
+    let message = 'Failed to delete item';
+    try {
+      const err = (await response.json()) as { error?: string };
+      if (err.error) message = err.error;
+    } catch {
+      /* ignore */
+    }
+    throw new Error(message);
+  }
+}
 export const InventoryStatsSchema = z.object({
   total_skus: z.number(),
   stocked_skus: z.number(),
