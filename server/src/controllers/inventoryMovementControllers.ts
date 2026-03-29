@@ -434,7 +434,9 @@ export async function createInventoryMovementCore(
   const normalizedToLocationId = to_location_id ?? null;
 
   // Check if item_id, product_id (if provided), from_location_id (if provided), to_location_id (if provided) exist in tables (in parallel)
-  const checks: Promise<any>[] = [db.query('SELECT id FROM items WHERE id = $1', [item_id])];
+  const checks: Promise<any>[] = [
+    db.query('SELECT id, name FROM items WHERE id = $1', [item_id]),
+  ];
 
   if (normalizedToLocationId) {
     checks.push(
@@ -449,7 +451,7 @@ export async function createInventoryMovementCore(
   // Only check from_location_id if it's provided (it's optional for ADD actions)
   if (normalizedFromLocationId) {
     checks.push(
-      db.query('SELECT id FROM storage_locations WHERE id = $1', [normalizedFromLocationId])
+      db.query('SELECT id, location_code FROM storage_locations WHERE id = $1', [normalizedFromLocationId])
     );
   }
 
@@ -501,7 +503,35 @@ export async function createInventoryMovementCore(
     ]
   );
 
-  return newInventoryAction.rows[0];
+  const createdMovement = newInventoryAction.rows[0];
+
+  const REMOVE_ACTIONS = ['CHECKOUT', 'DISCARD', 'DONATED'];
+  if (REMOVE_ACTIONS.includes(inventory_action)) {
+    const itemName = itemCheck.rows[0].name as string;
+
+    const fromLocationCode = fromLocationCheck?.rows[0]?.location_code ?? null;
+
+    // Capture the return value to detect missing item_info rows
+    const syncedId = await syncItemInfoStock(
+      itemName,
+      undefined,        // productId — don't update
+      undefined,        // category — don't update
+      undefined,        // quantity — don't update
+      undefined,        // value — don't update
+      undefined,        // itemLimit — don't update
+      undefined,        // limbo — don't update
+      null,             // fixture — don't update (COALESCE keeps existing)
+      fromLocationCode, // update last_known_location_code if we have it
+      -quantity,        // decrement stock
+      false,            // don't create if missing
+      db
+    );
+    if (!syncedId) {
+      console.warn(`[createInventoryMovementCore] item_info row not found for item "${itemName}" during ${inventory_action} — stock not decremented`);
+    }
+  }
+
+  return createdMovement;
 }
 
 /**
@@ -525,11 +555,19 @@ export async function createInventoryMovementCore(
  * @throws {500} Internal server error if validation or creation fails
  */
 export const createInventoryMovement = async (req: Request, res: Response) => {
+  const client = await pool.connect();
+  let began = false;
   try {
     const data: CreateInventoryInput = createInventoryMovementSchema.parse(req.body);
-    const createdMovement = await createInventoryMovementCore(data);
+    await client.query('BEGIN');
+    began = true;
+    const createdMovement = await createInventoryMovementCore(data, client);
+    await client.query('COMMIT');
     res.status(201).json(createdMovement);
   } catch (error) {
+    if (began) {
+      await client.query('ROLLBACK').catch(() => {});
+    }
     if (error instanceof ZodError) {
       return handleValidationError(error, res);
     }
@@ -538,6 +576,8 @@ export const createInventoryMovement = async (req: Request, res: Response) => {
     }
     console.error('Error creating inventory movement:', error);
     res.status(500).json({ error: 'Internal server error' });
+  } finally {
+    client.release();
   }
 };
 

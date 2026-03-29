@@ -16,11 +16,12 @@ import { ItemGroup } from '../../types/Item';
 import { Warehouse } from '../../types/Warehouse';
 import { StorageLocation } from '../../types/StorageLocation';
 import { getProductById, getStorageLocationById, getWarehouseById } from '../../api/addItem';
+import { supabase } from '../../supabaseClient';
 
 interface EditMoveDialogProps {
   open: boolean;
   onClose: () => void;
-  movement: InventoryMovement;
+  movement: Omit<InventoryMovement, 'product_id'> & { product_id: string };
   onSuccess?: () => void;
 }
 
@@ -45,9 +46,9 @@ export function EditMoveDialog({ open, onClose, movement, onSuccess }: EditMoveD
           return;
         }
         const [src, dest, prod] = await Promise.all([
-          getStorageLocationById(movement.from_location_id),
-          getStorageLocationById(movement.to_location_id),
-          getProductById(movement.product_id),
+          getStorageLocationById(movement.from_location_id!),
+          getStorageLocationById(movement.to_location_id!),
+          getProductById(movement.product_id!),
         ]);
         const wh = await getWarehouseById(src.warehouse_id);
         setWarehouse(wh);
@@ -80,7 +81,7 @@ export function EditMoveDialog({ open, onClose, movement, onSuccess }: EditMoveD
           current_location_id: sourceSlotId,
           warehouse: warehouse!.id,
           name: productName,
-          product_id: movement.product_id ?? '',
+          product_id: movement.product_id!,
           quantity: movement.quantity,
         });
       }
@@ -102,12 +103,16 @@ export function EditMoveDialog({ open, onClose, movement, onSuccess }: EditMoveD
     setSubmitError('');
 
     try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const userId = sessionData.session?.user.id;
+      if (!userId) throw new Error('Not authenticated');
+
       await editMoveMovementTransaction(movement.id!, {
         from_location_id: data.sourceSlot.id,
         to_location_id: data.destinationLocationId,
         product_id: data.itemGroup.product_id,
         quantity: data.quantity,
-        performed_by: 'b4974f63-ee89-42a1-bdb3-ce9df255c682', // TODO: Get user ID from auth context
+        performed_by: userId,
         note: data.notes || undefined,
       });
 
