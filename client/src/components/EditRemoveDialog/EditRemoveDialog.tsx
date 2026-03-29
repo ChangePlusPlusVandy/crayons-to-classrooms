@@ -111,7 +111,7 @@ export function EditRemoveDialog({ open, onClose, movement, onSuccess }: EditRem
           <RemoveItemForm
             initialWarehouse={warehouse}
             initialSourceLocation={sourceLocation}
-            initialProductId={movement.product_id}
+            initialProductId={movement.product_id ?? ''}
             initialRemovalAction={
               (movement.inventory_action as 'DONATED' | 'DISCARD') ?? 'DONATED'
             }
