@@ -90,6 +90,24 @@ export async function getItemInfoDetails(id: string): Promise<ItemInfoDetails> {
   return response.json();
 }
 
+export interface UpdateItemInfoRequest {
+  category?: string;
+  item_limit?: number;
+  fixture?: string;
+}
+
+export async function updateItemInfo(
+  id: string,
+  data: UpdateItemInfoRequest
+): Promise<void> {
+  const response = await authFetch(`${API_BASE_URL}/item-info/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) throw new Error('Failed to update item info');
+}
+
 export async function getItemInfoCategories(): Promise<string[]> {
   const response = await authFetch(`${API_BASE_URL}/item-info/categories`);
   if (!response.ok) throw new Error('Failed to fetch categories');

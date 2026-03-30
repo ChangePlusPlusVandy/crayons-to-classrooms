@@ -30,6 +30,7 @@ import {
   ItemInfoWarehouseLocation,
 } from '../../api/itemInfo';
 import { itemDetailsStyles as styles } from './ItemDetailsDialog.styles';
+import { EditItemInfoDialog } from '../EditItemInfoDialog/EditItemInfoDialog';
 
 interface ItemDetailsDialogProps {
   open: boolean;
@@ -41,9 +42,10 @@ export function ItemDetailsDialog({ open, onClose, itemId }: ItemDetailsDialogPr
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [details, setDetails] = useState<ItemInfoDetails | null>(null);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
 
-  useEffect(() => {
-    if (!open || !itemId) return;
+  const fetchDetails = () => {
+    if (!itemId) return;
     setLoading(true);
     setError('');
 
@@ -51,6 +53,11 @@ export function ItemDetailsDialog({ open, onClose, itemId }: ItemDetailsDialogPr
       .then(setDetails)
       .catch(() => setError('Failed to load item details'))
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    if (!open || !itemId) return;
+    fetchDetails();
   }, [open, itemId]);
 
   return (
@@ -168,12 +175,20 @@ export function ItemDetailsDialog({ open, onClose, itemId }: ItemDetailsDialogPr
         <Button
           variant="contained"
           startIcon={<EditOutlinedIcon />}
-          disabled
+          disabled={loading || !!error || !details}
+          onClick={() => setEditDialogOpen(true)}
           sx={{ textTransform: 'none' }}
         >
           Edit
         </Button>
       </DialogActions>
+
+      <EditItemInfoDialog
+        open={editDialogOpen}
+        onClose={() => setEditDialogOpen(false)}
+        onSaved={fetchDetails}
+        itemInfo={details}
+      />
     </Dialog>
   );
 }

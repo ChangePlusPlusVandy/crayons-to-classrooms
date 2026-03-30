@@ -393,7 +393,7 @@ export const updateItemInfo = async (req: Request, res: Response) => {
       values.push(value);
     }
 
-    setClauses.push(`updated_at = NOW()`);
+    setClauses.push(`time_last_updated = NOW()`);
 
     const sql = `
       UPDATE item_info
