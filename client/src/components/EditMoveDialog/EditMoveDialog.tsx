@@ -15,7 +15,9 @@ import { InventoryMovement } from '../../types/InventoryMovement';
 import { ItemGroup } from '../../types/Item';
 import { Warehouse } from '../../types/Warehouse';
 import { StorageLocation } from '../../types/StorageLocation';
-import { getProductById, getStorageLocationById, getWarehouseById } from '../../api/addItem';
+import { getStorageLocationById, getWarehouseById } from '../../api/addItem';
+import { getItemById } from '../../api/items';
+import { getItemInfoById } from '../../api/itemInfo';
 
 interface EditMoveDialogProps {
   open: boolean;
@@ -44,15 +46,20 @@ export function EditMoveDialog({ open, onClose, movement, onSuccess }: EditMoveD
           setFetchError('Cannot edit: movement is missing product or location');
           return;
         }
-        const [src, dest, prod] = await Promise.all([
+        const [src, dest, itemRow] = await Promise.all([
           getStorageLocationById(movement.from_location_id!),
           getStorageLocationById(movement.to_location_id!),
-          getProductById(movement.product_id!),
+          getItemById(movement.item_id),
         ]);
+        let name = itemRow.name;
+        if (itemRow.item_info) {
+          const info = await getItemInfoById(itemRow.item_info);
+          name = info.name;
+        }
         const wh = await getWarehouseById(src.warehouse_id);
         setWarehouse(wh);
         setSourceSlot(src);
-        setProductName(prod.name);
+        setProductName(name);
         setDestinationSlot(dest.slot);
       } catch {
         setFetchError('Failed to load movement details');
@@ -62,7 +69,7 @@ export function EditMoveDialog({ open, onClose, movement, onSuccess }: EditMoveD
     }
 
     fetchData();
-  }, [open, movement.product_id, movement.from_location_id, movement.to_location_id]);
+  }, [open, movement.item_id, movement.from_location_id, movement.to_location_id]);
 
   // Simulate post-undo state: adjust item group quantities based on what
   // the undo of the original movement would do to item locations

@@ -12,9 +12,10 @@ import CloseIcon from '@mui/icons-material/Close';
 import AddItemForm, { AddItemFormData } from '../AddItemForm/AddItemForm';
 import { editAddMovementTransaction } from '../../api/editMovement';
 import { InventoryMovement } from '../../types/InventoryMovement';
-import { Product } from '../../types/Product';
+import { getItemInfoAll, getItemInfoById, ItemInfo } from '../../api/itemInfo';
 import { Warehouse } from '../../types/Warehouse';
-import { getProductById, getStorageLocationById, getWarehouseById } from '../../api/addItem';
+import { getStorageLocationById, getWarehouseById } from '../../api/addItem';
+import { getItemById } from '../../api/items';
 
 interface EditAddDialogProps {
   open: boolean;
@@ -27,7 +28,7 @@ export function EditAddDialog({ open, onClose, movement, onSuccess }: EditAddDia
   const [submitError, setSubmitError] = useState('');
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState('');
-  const [product, setProduct] = useState<Product | null>(null);
+  const [initialItemInfo, setInitialItemInfo] = useState<ItemInfo | null>(null);
   const [warehouse, setWarehouse] = useState<Warehouse | null>(null);
   const [slot, setSlot] = useState('');
 
@@ -38,16 +39,30 @@ export function EditAddDialog({ open, onClose, movement, onSuccess }: EditAddDia
 
     async function fetchData() {
       try {
-        if (!movement.product_id || !movement.to_location_id) {
-          setFetchError('Cannot edit: movement is missing product or location');
+        if (!movement.product_id || !movement.to_location_id || !movement.item_id) {
+          setFetchError('Cannot edit: movement is missing product, location, or item');
           return;
         }
-        const [prod, location] = await Promise.all([
-          getProductById(movement.product_id!),
+        const [itemRow, location] = await Promise.all([
+          getItemById(movement.item_id),
           getStorageLocationById(movement.to_location_id!),
         ]);
+        let itemInfo: ItemInfo | null = null;
+        if (itemRow.item_info) {
+          itemInfo = await getItemInfoById(itemRow.item_info);
+        } else {
+          const allInfo = await getItemInfoAll();
+          itemInfo =
+            allInfo.find(
+              (ii) => ii.product_id === movement.product_id && ii.name === itemRow.name
+            ) ?? null;
+        }
+        if (!itemInfo) {
+          setFetchError('Could not resolve item_info for this movement.');
+          return;
+        }
         const wh = await getWarehouseById(location.warehouse_id);
-        setProduct(prod);
+        setInitialItemInfo(itemInfo);
         setWarehouse(wh);
         setSlot(location.slot);
       } catch {
@@ -58,30 +73,29 @@ export function EditAddDialog({ open, onClose, movement, onSuccess }: EditAddDia
     }
 
     fetchData();
-  }, [open, movement.product_id, movement.to_location_id]);
+  }, [open, movement.product_id, movement.to_location_id, movement.item_id]);
 
   const handleSubmit = async (data: AddItemFormData) => {
-    const itemLimit =
-      typeof data.product.item_limit === 'string'
-        ? parseInt(data.product.item_limit, 10)
-        : data.product.item_limit;
+    const { itemInfo } = data;
+    const itemLimit = itemInfo.item_limit ?? undefined;
 
     setSubmitError('');
 
     try {
       await editAddMovementTransaction(movement.id!, {
         item: {
-          name: data.product.name,
-          product_id: data.product.id,
+          name: itemInfo.name,
+          item_info: itemInfo.id,
+          product_id: itemInfo.product_id || undefined,
           quantity: 1,
           stock: 1,
           current_location_id: data.destinationLocationId,
           status: 'active',
           created_by: 'b4974f63-ee89-42a1-bdb3-ce9df255c682', // TODO: Get user ID from auth context
           warehouse: data.warehouse.id,
-          category: data.product.category || undefined,
-          item_limit: itemLimit || undefined,
-          value: data.product.value,
+          category: itemInfo.category || undefined,
+          item_limit: itemLimit,
+          value: itemInfo.value ?? 0,
           limbo: false,
           notes: data.notes || undefined,
         },
@@ -128,7 +142,7 @@ export function EditAddDialog({ open, onClose, movement, onSuccess }: EditAddDia
             )}
             <AddItemForm
               initialWarehouse={warehouse}
-              initialProduct={product}
+              initialItemInfo={initialItemInfo}
               initialSlot={slot}
               initialQuantity={movement.quantity}
               initialNotes={movement.note || ''}

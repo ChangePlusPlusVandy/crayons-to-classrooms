@@ -1,5 +1,7 @@
 export type Item = {
   id: string;
+  /** FK to item_info when present */
+  item_info?: string | null;
   product_id: string;
   quantity: number;
   current_location_id: string;

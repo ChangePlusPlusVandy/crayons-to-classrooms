@@ -12,13 +12,14 @@ import {
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import { Product } from '../../types/Product';
+import { ItemInfo } from '../../api/itemInfo';
 import { AddItemFormLabel } from '../AddItemForm/AddItemForm.styles';
 import { NewProductData } from './PalletAddForm';
 
 interface NewItemDialogProps {
   open: boolean;
   onClose: () => void;
-  onConfirm: (data: NewProductData, placeholderProduct: Product) => void;
+  onConfirm: (data: NewProductData, placeholderItemInfo: ItemInfo) => void;
   products: Product[];
   availableCategories: string[];
   initialData?: NewProductData | null;
@@ -158,19 +159,23 @@ export default function NewItemDialog({
       fixture: undefined,
     };
 
-    const placeholderProduct: Product = {
+    const placeholderItemInfo: ItemInfo = {
       id: `temp-${crypto.randomUUID()}`,
-      created_at: '',
       name: trimmedName,
-      description: null,
-      unit_of_measure: null,
-      value: typeof value === 'number' ? value : 0,
-      item_limit: typeof limit === 'number' ? limit : 0,
-      category: category || '',
-      total_count: 0,
+      product_id: isPendingSubcategory ? null : subcategoryProduct?.id || null,
+      category: category || null,
+      quantity: null,
+      value: typeof value === 'number' ? value : null,
+      item_limit: typeof limit === 'number' ? limit : null,
+      stock: 0,
+      fixture: null,
+      last_known_location_code: null,
+      time_last_updated: null,
+      notes: null,
+      limbo: false,
     };
 
-    onConfirm(data, placeholderProduct);
+    onConfirm(data, placeholderItemInfo);
   };
 
   return (

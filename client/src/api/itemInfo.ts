@@ -4,15 +4,42 @@ import { authFetch } from './authFetch';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
 
+/** node-postgres often returns int/bigint/numeric as strings; accept both. */
+const pgInt = z.union([z.number(), z.string(), z.null()]).transform((v) => {
+  if (v === null) return 0;
+  const n = typeof v === 'string' ? parseInt(v, 10) : v;
+  return Number.isFinite(n) ? n : 0;
+});
+
+const pgIntNullable = z
+  .union([z.number(), z.string(), z.null()])
+  .optional()
+  .transform((v) => {
+    if (v === undefined || v === null) return null;
+    const n = typeof v === 'string' ? parseInt(v, 10) : v;
+    return Number.isFinite(n) ? n : null;
+  });
+
+const pgDecimalNullable = z
+  .union([z.number(), z.string(), z.null()])
+  .optional()
+  .transform((v) => {
+    if (v === undefined || v === null) return null;
+    const n = typeof v === 'string' ? parseFloat(v) : v;
+    return Number.isFinite(n) ? n : null;
+  });
+
 export const ItemInfoSchema = z.object({
   id: z.string(),
-  name: z.string(),
+  name: z.string().nullable().transform((v) => v ?? ''),
+  /** Joined from products when present; for display only. */
+  product_name: z.string().nullable().optional(),
   product_id: z.string().nullable().optional(),
   category: z.string().nullable().optional(),
-  quantity: z.number().nullable().optional(),
-  value: z.number().nullable().optional(),
-  item_limit: z.number().nullable().optional(),
-  stock: z.number(),
+  quantity: pgIntNullable,
+  value: pgDecimalNullable,
+  item_limit: pgIntNullable,
+  stock: pgInt,
   fixture: z.string().nullable().optional(),
   last_known_location_code: z.string().nullable().optional(),
   time_last_updated: z.string().nullable().optional(),
@@ -21,6 +48,23 @@ export const ItemInfoSchema = z.object({
 });
 
 export type ItemInfo = z.infer<typeof ItemInfoSchema>;
+
+export async function getItemInfoAll(): Promise<ItemInfo[]> {
+  const response = await authFetch(`${API_BASE_URL}/item-info`);
+  if (response.status === 404) {
+    return [];
+  }
+  if (!response.ok) throw new Error('Failed to fetch item info');
+  const data = await response.json();
+  return z.array(ItemInfoSchema).parse(data);
+}
+
+export async function getItemInfoById(id: string): Promise<ItemInfo> {
+  const response = await authFetch(`${API_BASE_URL}/item-info/${id}`);
+  if (!response.ok) throw new Error('Failed to fetch item info');
+  const data = await response.json();
+  return ItemInfoSchema.parse(data);
+}
 
 export async function getLimboItems(): Promise<ItemInfo[]> {
   const response = await authFetch(`${API_BASE_URL}/item-info/limbo`);

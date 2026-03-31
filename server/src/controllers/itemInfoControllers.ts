@@ -53,7 +53,12 @@ const handleValidationError = (error: unknown, res: Response) => {
  */
 export const getItemsInfo = async (req: Request, res: Response) => {
   try {
-    const items = await pool.query('SELECT * FROM item_info');
+    const items = await pool.query(`
+      SELECT ii.*, p.name AS product_name
+      FROM item_info ii
+      LEFT JOIN products p ON p.id = ii.product_id
+      ORDER BY ii.name
+    `);
 
     if (!countRows(items.rows, res)) {
       return;
@@ -80,7 +85,13 @@ export const getItemInfoById = async (req: Request, res: Response) => {
   try {
     const { id } = itemInfoIdParamSchema.parse(req.params);
 
-    const item = await pool.query('SELECT * FROM item_info WHERE id = $1', [id]);
+    const item = await pool.query(
+      `SELECT ii.*, p.name AS product_name
+       FROM item_info ii
+       LEFT JOIN products p ON p.id = ii.product_id
+       WHERE ii.id = $1`,
+      [id]
+    );
 
     if (!countRows(item.rows, res)) {
       return;

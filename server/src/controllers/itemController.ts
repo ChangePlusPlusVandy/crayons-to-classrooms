@@ -377,8 +377,8 @@ export async function createItemCore(
   db: DbClient = pool
 ): Promise<any[]> {
   const {
-    name,
-    product_id,
+    name: bodyName,
+    product_id: bodyProductId,
     current_location_id,
     fixture,
     created_by,
@@ -386,22 +386,45 @@ export async function createItemCore(
     stock,
     status,
     warehouse,
-    category,
-    item_limit,
-    value,
+    category: bodyCategory,
+    item_limit: bodyItemLimit,
+    value: bodyValue,
     limbo,
     notes,
+    item_info: bodyItemInfoId,
   } = data;
 
-  // Check if product_id, warehouse exist in tables
-  // Only check current_location_id and product_id if provided
+  let insertName = bodyName;
+  let insertProductId = bodyProductId ?? null;
+  let insertCategory = bodyCategory ?? null;
+  let insertItemLimit = bodyItemLimit ?? null;
+  let insertValue = bodyValue ?? 0;
+  let insertItemInfoId: string | null = null;
+
+  if (bodyItemInfoId) {
+    const infoRes = await db.query(
+      'SELECT id, name, product_id, category, value, item_limit FROM item_info WHERE id = $1',
+      [bodyItemInfoId]
+    );
+    if (infoRes.rows.length === 0) {
+      throw new ForeignKeyError('item_info');
+    }
+    const row = infoRes.rows[0];
+    insertItemInfoId = row.id;
+    insertName = row.name;
+    insertProductId = row.product_id ?? null;
+    insertCategory = row.category ?? null;
+    insertItemLimit = row.item_limit ?? null;
+    insertValue = row.value != null ? Number(row.value) : 0;
+  }
+
   const validationPromises: Promise<any>[] = [
     db.query('SELECT id FROM warehouse WHERE id = $1', [warehouse]),
   ];
 
-  if (product_id) {
+  if (insertProductId) {
     validationPromises.push(
-      db.query('SELECT id FROM products WHERE id = $1', [product_id])
+      db.query('SELECT id FROM products WHERE id = $1', [insertProductId])
     );
   }
 
@@ -419,7 +442,7 @@ export async function createItemCore(
   }
   resultIdx++;
 
-  if (product_id) {
+  if (insertProductId) {
     if (validationResults[resultIdx].rows.length === 0) {
       throw new ForeignKeyError('product_id');
     }
@@ -431,53 +454,67 @@ export async function createItemCore(
   }
 
   const newItems = await db.query(
-    'INSERT INTO items (name, product_id, quantity, stock, current_location_id, status, created_by, warehouse, category, item_limit, limbo, value, notes, created_at, updated_at) SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW(), NOW() FROM generate_series(1, $14) RETURNING *',
+    'INSERT INTO items (name, product_id, quantity, stock, current_location_id, status, created_by, warehouse, category, item_limit, limbo, value, notes, item_info, created_at, updated_at) SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW(), NOW() FROM generate_series(1, $15) RETURNING *',
     [
-      name,
-      product_id ?? null,
+      insertName,
+      insertProductId,
       quantity,
       stock ?? null,
       current_location_id ?? null,
       status,
       created_by,
       warehouse,
-      category ?? null,
-      item_limit ?? null,
+      insertCategory ?? null,
+      insertItemLimit ?? null,
       limbo ?? false,
-      value ?? 0,
+      insertValue,
       notes ?? null,
+      insertItemInfoId,
       count,
     ]
   );
 
   const { locationCode } = await getLocationInfo(current_location_id ?? null, db);
   const fixtureOverride = fixture ?? null;
-  const itemInfoId = await syncItemInfoStock(
-    name,
-    product_id ?? undefined,
-    category ?? 'UNKNOWN',
-    quantity,
-    value,
-    item_limit,
-    limbo ?? false,
-    fixtureOverride,
-    locationCode,
-    count,
-    true,
-    db
-  );
-  let createdItem = newItems.rows[0];
-  if (itemInfoId) {
-    const updatedItem = await pool.query(
-      'UPDATE items SET item_info = $1, updated_at = NOW() WHERE id = $2 RETURNING *',
-      [itemInfoId, createdItem.id]
+
+  if (insertItemInfoId) {
+    await db.query(
+      `UPDATE item_info SET stock = stock + $1,
+        fixture = COALESCE($2, fixture),
+        last_known_location_code = COALESCE($3, last_known_location_code),
+        time_last_updated = NOW()
+       WHERE id = $4`,
+      [count, fixtureOverride ?? null, locationCode ?? null, insertItemInfoId]
     );
-    if (updatedItem.rows[0]) {
-      createdItem = updatedItem.rows[0];
+  } else {
+    const syncedItemInfoId = await syncItemInfoStock(
+      insertName,
+      insertProductId ?? undefined,
+      insertCategory ?? 'UNKNOWN',
+      quantity,
+      insertValue,
+      insertItemLimit ?? undefined,
+      limbo ?? false,
+      fixtureOverride,
+      locationCode,
+      count,
+      true,
+      db
+    );
+    if (syncedItemInfoId) {
+      await db.query(
+        'UPDATE items SET item_info = $1, updated_at = NOW() WHERE id = ANY($2::uuid[])',
+        [syncedItemInfoId, newItems.rows.map((r: { id: string }) => r.id)]
+      );
     }
   }
 
-  return newItems.rows;
+  const ids = newItems.rows.map((r: { id: string }) => r.id);
+  const refreshed = await db.query(
+    'SELECT * FROM items WHERE id = ANY($1::uuid[]) ORDER BY created_at',
+    [ids]
+  );
+  return refreshed.rows;
 }
 
 /**

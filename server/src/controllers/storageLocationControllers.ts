@@ -227,13 +227,6 @@ export async function deleteStorageLocation(req: Request, res: Response) {
   }
 }
 
-// function computeLocationCode(slot: string, fixture?: string | null): string {
-//   if (fixture) {
-//     return `${slot}${fixture}`;
-//   }
-//   return slot;
-// }
-
 function computeLocationCode(slot: string): string {
   return slot;
 }
