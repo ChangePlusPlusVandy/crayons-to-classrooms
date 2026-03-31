@@ -154,6 +154,27 @@ export const getLimboItems = async (req: Request, res: Response) => {
 };
 
 /**
+ * Retrieves all item_info rows with zero stock and limbo = FALSE.
+ *
+ * @param {Request} req - Express request object
+ * @param {Response} res - Express response object
+ * @returns {Promise<Response>} JSON array of items with stock = 0 and limbo = FALSE or error message
+ * @throws {500} Internal server error if database query fails
+ */
+export const getOutOfStockItems = async (req: Request, res: Response) => {
+  try {
+    const items = await pool.query('SELECT * FROM item_info WHERE limbo = FALSE AND stock = 0');
+    if (!countRows(items.rows, res)) {
+      return;
+    }
+    res.json(items.rows);
+  } catch (error) {
+    console.error('Error fetching out of stock items:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+/**
  * Creates a new item in the database.
  *
  * @param {Request} req - Express request object with:
@@ -227,11 +248,11 @@ export const createItemInfo = async (req: Request, res: Response) => {
 /**
  * Updates an existing item in the database.
  * Only updates fields that are provided in the request body.
- * Allowed fields: name, product_id, category, quantity, value, item_limit, stock, fixture, last_known_location_code, time_last_updated, notes.
+ * Allowed fields: name, product_id, category, quantity, value, item_limit, limbo, stock, fixture, last_known_location_code, time_last_updated, notes.
  *
  * @param {Request} req - Express request object with:
  *   - id: UUID of the item to update (in params)
- *   - Updatable fields in body (name, product_id, category, quantity, value, item_limit, stock, fixture, last_known_location_code, time_last_updated, notes)
+ *   - Updatable fields in body (name, product_id, category, quantity, value, item_limit, limbo, stock, fixture, last_known_location_code, time_last_updated, notes)
  * @param {Response} res - Express response object
  * @returns {Promise<Response>} JSON object of the updated item or error message
  * @throws {400} No updatable fields provided if request body is empty or contains no allowed fields
@@ -261,7 +282,10 @@ export const updateItemInfo = async (req: Request, res: Response) => {
       values.push(key === 'value' && val != null ? Math.round(val as number) : val);
     }
 
-    setClauses.push(`updated_at = NOW()`);
+    // item_info uses time_last_updated (not updated_at); other controllers update the same column.
+    if (!Object.prototype.hasOwnProperty.call(validatedData, 'time_last_updated')) {
+      setClauses.push(`time_last_updated = NOW()`);
+    }
 
     const sql = `
       UPDATE item_info

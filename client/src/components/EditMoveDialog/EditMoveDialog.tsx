@@ -18,6 +18,7 @@ import { StorageLocation } from '../../types/StorageLocation';
 import { getStorageLocationById, getWarehouseById } from '../../api/addItem';
 import { getItemById } from '../../api/items';
 import { getItemInfoById } from '../../api/itemInfo';
+import { supabase } from '../../supabaseClient';
 
 interface EditMoveDialogProps {
   open: boolean;
@@ -109,12 +110,16 @@ export function EditMoveDialog({ open, onClose, movement, onSuccess }: EditMoveD
     setSubmitError('');
 
     try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const userId = sessionData.session?.user.id;
+      if (!userId) throw new Error('Not authenticated');
+
       await editMoveMovementTransaction(movement.id!, {
         from_location_id: data.sourceSlot.id,
         to_location_id: data.destinationLocationId,
         product_id: data.itemGroup.product_id,
         quantity: data.quantity,
-        performed_by: 'b4974f63-ee89-42a1-bdb3-ce9df255c682', // TODO: Get user ID from auth context
+        performed_by: userId,
         note: data.notes || undefined,
       });
 

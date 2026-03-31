@@ -16,6 +16,7 @@ import { getItemInfoAll, getItemInfoById, ItemInfo } from '../../api/itemInfo';
 import { Warehouse } from '../../types/Warehouse';
 import { getStorageLocationById, getWarehouseById } from '../../api/addItem';
 import { getItemById } from '../../api/items';
+import { supabase } from '../../supabaseClient';
 
 interface EditAddDialogProps {
   open: boolean;
@@ -82,6 +83,11 @@ export function EditAddDialog({ open, onClose, movement, onSuccess }: EditAddDia
     setSubmitError('');
 
     try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const userId = sessionData.session?.user.id;
+
+      if (!userId) throw new Error('Not authenticated');
+
       await editAddMovementTransaction(movement.id!, {
         item: {
           name: itemInfo.name,
@@ -91,7 +97,7 @@ export function EditAddDialog({ open, onClose, movement, onSuccess }: EditAddDia
           stock: 1,
           current_location_id: data.destinationLocationId,
           status: 'active',
-          created_by: 'b4974f63-ee89-42a1-bdb3-ce9df255c682', // TODO: Get user ID from auth context
+          created_by: userId,
           warehouse: data.warehouse.id,
           category: itemInfo.category || undefined,
           item_limit: itemLimit,
@@ -104,7 +110,7 @@ export function EditAddDialog({ open, onClose, movement, onSuccess }: EditAddDia
           from_location_id: null,
           to_location_id: data.destinationLocationId,
           quantity: data.quantity,
-          performed_by: 'b4974f63-ee89-42a1-bdb3-ce9df255c682', // TODO: Get user ID from auth context
+          performed_by: userId,
           note: data.notes || undefined,
         },
       });
