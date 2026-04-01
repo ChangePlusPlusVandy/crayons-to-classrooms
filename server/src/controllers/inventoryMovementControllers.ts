@@ -432,9 +432,7 @@ export async function createInventoryMovementCore(
   const normalizedToLocationId = to_location_id ?? null;
 
   // Check if item_id, product_id (if provided), from_location_id (if provided), to_location_id (if provided) exist in tables (in parallel)
-  const checks: Promise<any>[] = [
-    db.query('SELECT id FROM items WHERE id = $1', [item_id]),
-  ];
+  const checks: Promise<any>[] = [db.query('SELECT id FROM items WHERE id = $1', [item_id])];
 
   if (normalizedToLocationId) {
     checks.push(

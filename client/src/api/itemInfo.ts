@@ -47,9 +47,7 @@ export async function browseItemsInfo(
   if (params.category) searchParams.set('category', params.category);
   if (params.stock_status) searchParams.set('stock_status', params.stock_status);
 
-  const response = await authFetch(
-    `${API_BASE_URL}/item-info/browse?${searchParams.toString()}`
-  );
+  const response = await authFetch(`${API_BASE_URL}/item-info/browse?${searchParams.toString()}`);
   if (!response.ok) throw new Error('Failed to fetch items');
   return response.json();
 }
@@ -95,10 +93,7 @@ export interface UpdateItemInfoRequest {
   fixture?: string;
 }
 
-export async function updateItemInfo(
-  id: string,
-  data: UpdateItemInfoRequest
-): Promise<void> {
+export async function updateItemInfo(id: string, data: UpdateItemInfoRequest): Promise<void> {
   const response = await authFetch(`${API_BASE_URL}/item-info/${id}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
@@ -112,4 +107,3 @@ export async function getItemInfoCategories(): Promise<string[]> {
   if (!response.ok) throw new Error('Failed to fetch categories');
   return response.json();
 }
-

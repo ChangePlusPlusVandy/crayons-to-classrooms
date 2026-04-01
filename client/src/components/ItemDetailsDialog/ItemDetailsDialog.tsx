@@ -24,11 +24,7 @@ import LocationOnOutlinedIcon from '@mui/icons-material/LocationOnOutlined';
 import ViewInArOutlinedIcon from '@mui/icons-material/ViewInArOutlined';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
-import {
-  getItemInfoDetails,
-  ItemInfoDetails,
-  ItemInfoWarehouseLocation,
-} from '../../api/itemInfo';
+import { getItemInfoDetails, ItemInfoDetails, ItemInfoWarehouseLocation } from '../../api/itemInfo';
 import { itemDetailsStyles as styles } from './ItemDetailsDialog.styles';
 import { EditItemInfoDialog } from '../EditItemInfoDialog/EditItemInfoDialog';
 
@@ -58,6 +54,7 @@ export function ItemDetailsDialog({ open, onClose, itemId }: ItemDetailsDialogPr
   useEffect(() => {
     if (!open || !itemId) return;
     fetchDetails();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, itemId]);
 
   return (
@@ -125,28 +122,33 @@ export function ItemDetailsDialog({ open, onClose, itemId }: ItemDetailsDialogPr
                 Locations
               </Box>
               {details.warehouse_locations.length === 0 ? (
-                <Typography sx={styles.emptyState}>
-                  No location data available
-                </Typography>
+                <Typography sx={styles.emptyState}>No location data available</Typography>
               ) : (
                 details.warehouse_locations.map((wh: ItemInfoWarehouseLocation) => (
                   <Box key={wh.warehouse_id} sx={{ mb: 2 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                      <Typography sx={styles.warehouseHeader}>
-                        {wh.warehouse_name}
-                      </Typography>
+                      <Typography sx={styles.warehouseHeader}>{wh.warehouse_name}</Typography>
                     </Box>
                     {wh.locations.length === 0 ? (
-                      <Typography sx={styles.emptyState}>
-                        No assigned locations
-                      </Typography>
+                      <Typography sx={styles.emptyState}>No assigned locations</Typography>
                     ) : (
                       <TableContainer>
-                        <Table size="small" sx={{ tableLayout: 'fixed', '& td, & th': { py: 0.5, px: 1 } }}>
+                        <Table
+                          size="small"
+                          sx={{ tableLayout: 'fixed', '& td, & th': { py: 0.5, px: 1 } }}
+                        >
                           <TableHead>
                             <TableRow>
-                              <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem', width: '50%' }}>Location</TableCell>
-                              <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem', width: '50%' }}>Fixture</TableCell>
+                              <TableCell
+                                sx={{ fontWeight: 600, fontSize: '0.75rem', width: '50%' }}
+                              >
+                                Location
+                              </TableCell>
+                              <TableCell
+                                sx={{ fontWeight: 600, fontSize: '0.75rem', width: '50%' }}
+                              >
+                                Fixture
+                              </TableCell>
                             </TableRow>
                           </TableHead>
                           <TableBody>

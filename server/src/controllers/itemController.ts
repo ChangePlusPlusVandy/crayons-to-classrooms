@@ -397,9 +397,7 @@ export async function createItemCore(
   ];
 
   if (product_id) {
-    validationPromises.push(
-      db.query('SELECT id FROM products WHERE id = $1', [product_id])
-    );
+    validationPromises.push(db.query('SELECT id FROM products WHERE id = $1', [product_id]));
   }
 
   if (current_location_id) {

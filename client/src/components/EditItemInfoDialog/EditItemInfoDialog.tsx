@@ -14,11 +14,7 @@ import {
   Stack,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
-import {
-  updateItemInfo,
-  getItemInfoCategories,
-  ItemInfoDetails,
-} from '../../api/itemInfo';
+import { updateItemInfo, getItemInfoCategories, ItemInfoDetails } from '../../api/itemInfo';
 import { EditItemFormLabel } from './EditItemInfoDialog.styles';
 
 interface EditItemInfoDialogProps {
@@ -28,12 +24,7 @@ interface EditItemInfoDialogProps {
   itemInfo: ItemInfoDetails | null;
 }
 
-export function EditItemInfoDialog({
-  open,
-  onClose,
-  onSaved,
-  itemInfo,
-}: EditItemInfoDialogProps) {
+export function EditItemInfoDialog({ open, onClose, onSaved, itemInfo }: EditItemInfoDialogProps) {
   const [category, setCategory] = useState<string | null>(null);
   const [limit, setLimit] = useState<number | ''>('');
   const [categories, setCategories] = useState<string[]>([]);
@@ -80,7 +71,9 @@ export function EditItemInfoDialog({
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pb: 0 }}>
+      <DialogTitle
+        sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pb: 0 }}
+      >
         Edit Item Info
         <IconButton aria-label="close" onClick={onClose} size="small">
           <CloseIcon />
@@ -128,12 +121,16 @@ export function EditItemInfoDialog({
               slotProps={{ htmlInput: { min: 0, step: 1 } }}
             />
           </FormControl>
-
         </Stack>
       </DialogContent>
 
       <DialogActions sx={{ px: 3, pb: 2, pt: 1, gap: 1 }}>
-        <Button onClick={onClose} variant="outlined" sx={{ textTransform: 'none' }} disabled={saving}>
+        <Button
+          onClick={onClose}
+          variant="outlined"
+          sx={{ textTransform: 'none' }}
+          disabled={saving}
+        >
           Cancel
         </Button>
         <Button

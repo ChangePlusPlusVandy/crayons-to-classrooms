@@ -27,11 +27,7 @@ import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import FilterListIcon from '@mui/icons-material/FilterList';
 import { useNavigate } from 'react-router-dom';
-import {
-  browseItemsInfo,
-  getItemInfoCategories,
-  ItemInfoBrowseItem,
-} from '../../api/itemInfo';
+import { browseItemsInfo, getItemInfoCategories, ItemInfoBrowseItem } from '../../api/itemInfo';
 import { getWarehouses } from '../../api/warehouse';
 import { Warehouse } from '../../types/Warehouse';
 import { ItemDetailsDialog } from '../../components/ItemDetailsDialog/ItemDetailsDialog';
@@ -88,15 +84,12 @@ export default function Inventory() {
         search: search || undefined,
         warehouse: warehouseFilter || undefined,
         category: categoryFilter || undefined,
-        stock_status:
-          (stockStatusFilter as 'in_stock' | 'out_of_stock') || undefined,
+        stock_status: (stockStatusFilter as 'in_stock' | 'out_of_stock') || undefined,
       });
       setItems(result.data);
       setTotal(result.total);
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : 'Failed to fetch inventory'
-      );
+      setError(err instanceof Error ? err.message : 'Failed to fetch inventory');
     } finally {
       setLoading(false);
     }
@@ -216,12 +209,8 @@ export default function Inventory() {
             <Table size="small" sx={inventoryStyles.table}>
               <TableHead sx={inventoryStyles.tableHead}>
                 <TableRow>
-                  <TableCell sx={inventoryStyles.tableHeadCell}>
-                    Item(s)
-                  </TableCell>
-                  <TableCell sx={inventoryStyles.tableHeadCell}>
-                    Status
-                  </TableCell>
+                  <TableCell sx={inventoryStyles.tableHeadCell}>Item(s)</TableCell>
+                  <TableCell sx={inventoryStyles.tableHeadCell}>Status</TableCell>
                   <TableCell sx={inventoryStyles.tableHeadCell} align="right">
                     Actions
                   </TableCell>
@@ -230,20 +219,14 @@ export default function Inventory() {
               <TableBody>
                 {items.length === 0 ? (
                   <TableRow>
-                    <TableCell
-                      colSpan={3}
-                      align="center"
-                      sx={inventoryStyles.tableCell}
-                    >
+                    <TableCell colSpan={3} align="center" sx={inventoryStyles.tableCell}>
                       No items found.
                     </TableCell>
                   </TableRow>
                 ) : (
                   items.map((item) => (
                     <TableRow key={item.id} sx={inventoryStyles.tableRow}>
-                      <TableCell sx={inventoryStyles.tableCell}>
-                        {item.name}
-                      </TableCell>
+                      <TableCell sx={inventoryStyles.tableCell}>{item.name}</TableCell>
                       <TableCell sx={inventoryStyles.tableCell}>
                         <Chip
                           label={item.in_stock ? 'In Stock' : 'Not In Inventory'}
@@ -269,7 +252,9 @@ export default function Inventory() {
                           size="small"
                           color="error"
                           startIcon={<DeleteOutlineIcon />}
-                          onClick={() => navigate('/remove-item', { state: { itemName: item.name } })}
+                          onClick={() =>
+                            navigate('/remove-item', { state: { itemName: item.name } })
+                          }
                           sx={{ textTransform: 'none' }}
                         >
                           Delete
@@ -283,13 +268,13 @@ export default function Inventory() {
           </TableContainer>
 
           <TablePagination
-              component="div"
-              count={total}
-              page={page - 1}
-              onPageChange={(_, newPage) => setPage(newPage + 1)}
-              rowsPerPage={PAGE_SIZE}
-              rowsPerPageOptions={[PAGE_SIZE]}
-            />
+            component="div"
+            count={total}
+            page={page - 1}
+            onPageChange={(_, newPage) => setPage(newPage + 1)}
+            rowsPerPage={PAGE_SIZE}
+            rowsPerPageOptions={[PAGE_SIZE]}
+          />
         </>
       )}
 

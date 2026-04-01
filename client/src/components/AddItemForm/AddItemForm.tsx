@@ -84,7 +84,9 @@ export default function AddItemForm({
   const [isNewItemMode, setIsNewItemMode] = useState(false);
   const [newItemName, setNewItemName] = useState('');
   const [newItemCategory, setNewItemCategory] = useState<string | null>(null);
-  const [selectedSubcategoryProduct, setSelectedSubcategoryProduct] = useState<Product | null>(null);
+  const [selectedSubcategoryProduct, setSelectedSubcategoryProduct] = useState<Product | null>(
+    null
+  );
   const [newItemLimit, setNewItemLimit] = useState<number | ''>('');
   const [newItemValue, setNewItemValue] = useState<number | ''>('');
   const [newItemPackSize, setNewItemPackSize] = useState<number | ''>('');
@@ -539,7 +541,9 @@ export default function AddItemForm({
               filterOptions={(options, state) => {
                 const searchTerm = state.inputValue.toLowerCase().trim();
                 if (!searchTerm) return options;
-                return options.filter((product) => product.name?.toLowerCase().includes(searchTerm));
+                return options.filter((product) =>
+                  product.name?.toLowerCase().includes(searchTerm)
+                );
               }}
               renderOption={(props, option, state) => {
                 const { key, ...otherProps } = props;
