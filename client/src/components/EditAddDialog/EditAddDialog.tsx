@@ -15,6 +15,7 @@ import { InventoryMovement } from '../../types/InventoryMovement';
 import { Product } from '../../types/Product';
 import { Warehouse } from '../../types/Warehouse';
 import { getProductById, getStorageLocationById, getWarehouseById } from '../../api/addItem';
+import { useAuth } from '../../context/AuthContext';
 
 interface EditAddDialogProps {
   open: boolean;
@@ -24,6 +25,7 @@ interface EditAddDialogProps {
 }
 
 export function EditAddDialog({ open, onClose, movement, onSuccess }: EditAddDialogProps) {
+  const { user } = useAuth();
   const [submitError, setSubmitError] = useState('');
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState('');
@@ -73,7 +75,7 @@ export function EditAddDialog({ open, onClose, movement, onSuccess }: EditAddDia
           stock: 1,
           current_location_id: data.destinationLocationId,
           status: 'active',
-          created_by: 'b4974f63-ee89-42a1-bdb3-ce9df255c682', // TODO: Get user ID from auth context
+          created_by: user!.id,
           warehouse: data.warehouse.id,
           category: data.product.category || undefined,
           item_limit: itemLimit || undefined,
@@ -86,7 +88,7 @@ export function EditAddDialog({ open, onClose, movement, onSuccess }: EditAddDia
           from_location_id: null,
           to_location_id: data.destinationLocationId,
           quantity: data.quantity,
-          performed_by: 'b4974f63-ee89-42a1-bdb3-ce9df255c682', // TODO: Get user ID from auth context
+          performed_by: user!.id,
           note: data.notes || undefined,
         },
       });

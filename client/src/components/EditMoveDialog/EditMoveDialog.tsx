@@ -16,6 +16,7 @@ import { ItemGroup } from '../../types/Item';
 import { Warehouse } from '../../types/Warehouse';
 import { StorageLocation } from '../../types/StorageLocation';
 import { getProductById, getStorageLocationById, getWarehouseById } from '../../api/addItem';
+import { useAuth } from '../../context/AuthContext';
 
 interface EditMoveDialogProps {
   open: boolean;
@@ -25,6 +26,7 @@ interface EditMoveDialogProps {
 }
 
 export function EditMoveDialog({ open, onClose, movement, onSuccess }: EditMoveDialogProps) {
+  const { user } = useAuth();
   const [submitError, setSubmitError] = useState('');
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState('');
@@ -105,7 +107,7 @@ export function EditMoveDialog({ open, onClose, movement, onSuccess }: EditMoveD
         to_location_id: data.destinationLocationId,
         product_id: data.itemGroup.product_id,
         quantity: data.quantity,
-        performed_by: 'b4974f63-ee89-42a1-bdb3-ce9df255c682', // TODO: Get user ID from auth context
+        performed_by: user!.id,
         note: data.notes || undefined,
       });
 
