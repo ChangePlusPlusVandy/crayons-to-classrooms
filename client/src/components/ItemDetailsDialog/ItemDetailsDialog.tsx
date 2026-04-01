@@ -106,6 +106,10 @@ export function ItemDetailsDialog({ open, onClose, itemId }: ItemDetailsDialogPr
                   }}
                 />
               </Box>
+              <Box sx={styles.fieldGroup}>
+                <Box sx={styles.fieldLabel}>Stock</Box>
+                <Typography sx={styles.fieldValue}>{details.stock}</Typography>
+              </Box>
               {details.category && (
                 <Box sx={styles.fieldGroup}>
                   <Box sx={styles.fieldLabel}>Category</Box>
@@ -130,9 +134,6 @@ export function ItemDetailsDialog({ open, onClose, itemId }: ItemDetailsDialogPr
                     <Box sx={{ display: 'flex', alignItems: 'center' }}>
                       <Typography sx={styles.warehouseHeader}>
                         {wh.warehouse_name}
-                      </Typography>
-                      <Typography sx={styles.itemCount}>
-                        ({wh.item_count} {wh.item_count === 1 ? 'item' : 'items'})
                       </Typography>
                     </Box>
                     {wh.locations.length === 0 ? (

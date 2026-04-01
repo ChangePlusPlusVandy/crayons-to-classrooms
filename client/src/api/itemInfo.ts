@@ -57,7 +57,6 @@ export async function browseItemsInfo(
 export interface ItemInfoWarehouseLocation {
   warehouse_id: string;
   warehouse_name: string;
-  item_count: number;
   locations: {
     location_code: string;
     aisle: string;

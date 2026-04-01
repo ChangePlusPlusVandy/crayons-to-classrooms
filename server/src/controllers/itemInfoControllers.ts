@@ -82,32 +82,27 @@ export const getItemsInfoPaginated = async (req: Request, res: Response) => {
     }
 
     if (stock_status === 'in_stock') {
-      conditions.push(
-        `EXISTS (SELECT 1 FROM items i WHERE i.name = ii.name AND i.status = 'active')`
-      );
+      if (warehouse) {
+        conditions.push(
+          `EXISTS (SELECT 1 FROM items i WHERE i.name = ii.name AND i.status = 'active')`
+        );
+      } else {
+        conditions.push(`ii.stock > 0`);
+      }
     } else if (stock_status === 'out_of_stock') {
-      conditions.push(
-        `NOT EXISTS (SELECT 1 FROM items i WHERE i.name = ii.name AND i.status = 'active')`
-      );
+      if (warehouse) {
+        conditions.push(
+          `NOT EXISTS (SELECT 1 FROM items i WHERE i.name = ii.name AND i.status = 'active')`
+        );
+      } else {
+        conditions.push(`ii.stock = 0`);
+      }
     }
 
-    const whereClause =
-      conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : '';
+    const whereClause = conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : '';
 
-    // TODO: Can this be done without the complicated correlated subquery and json? Is item_info table even needed or do it all in items?
     const dataQuery = `
-      SELECT
-        ii.*,
-        COALESCE(
-          (SELECT json_agg(DISTINCT jsonb_build_object('id', w.id, 'name', w.name))
-           FROM items i
-           JOIN warehouse w ON i.warehouse = w.id
-           WHERE i.name = ii.name),
-          '[]'::json
-        ) AS warehouses,
-        EXISTS (
-          SELECT 1 FROM items i WHERE i.name = ii.name AND i.status = 'active'
-        ) AS in_stock
+      SELECT ii.*
       FROM item_info ii
       ${whereClause}
       ORDER BY ii.name ASC
@@ -128,9 +123,44 @@ export const getItemsInfoPaginated = async (req: Request, res: Response) => {
     ]);
 
     const total = parseInt(countResult.rows[0].count, 10);
+    const itemNames = dataResult.rows.map((row: { name: string }) => row.name);
+
+    // Fetch warehouses and in-stock status as separate simple queries
+    const [warehouseResult, inStockResult] = await Promise.all([
+      pool.query(
+        `SELECT DISTINCT i.name AS item_name, w.id, w.name
+         FROM items i
+         JOIN warehouse w ON i.warehouse = w.id
+         WHERE i.name = ANY($1)`,
+        [itemNames]
+      ),
+      pool.query(
+        `SELECT DISTINCT name
+         FROM items
+         WHERE name = ANY($1) AND status = 'active'`,
+        [itemNames]
+      ),
+    ]);
+
+    // Build lookup maps
+    const warehousesByName = new Map<string, { id: string; name: string }[]>();
+    for (const row of warehouseResult.rows) {
+      const list = warehousesByName.get(row.item_name) || [];
+      list.push({ id: row.id, name: row.name });
+      warehousesByName.set(row.item_name, list);
+    }
+
+    const inStockNames = new Set(inStockResult.rows.map((row: { name: string }) => row.name));
+
+    // Combine results
+    const data = dataResult.rows.map((row: { name: string; stock: number }) => ({
+      ...row,
+      warehouses: warehousesByName.get(row.name) || [],
+      in_stock: warehouse ? inStockNames.has(row.name) : row.stock > 0,
+    }));
 
     res.json({
-      data: dataResult.rows,
+      data,
       total,
       page,
       limit,
@@ -209,50 +239,67 @@ export const getItemInfoDetails = async (req: Request, res: Response) => {
   try {
     const { id } = itemInfoIdParamSchema.parse(req.params);
 
-    //TODO: stop doing coalesce
-    const result = await pool.query(
-      `SELECT
-        ii.*,
-        COALESCE(
-          (SELECT json_agg(wh_data)
-           FROM (
-             SELECT
-               w.id   AS warehouse_id,
-               w.name AS warehouse_name,
-               COALESCE(
-                 json_agg(
-                   DISTINCT jsonb_build_object(
-                     'location_code', sl.location_code,
-                     'aisle', sl.aisle,
-                     'slot', sl.slot,
-                     'fixture', sl.fixture
-                   )
-                 ) FILTER (WHERE sl.id IS NOT NULL),
-                 '[]'::json
-               ) AS locations,
-               COUNT(i.id)::int AS item_count
-             FROM items i
-             JOIN warehouse w ON i.warehouse::uuid = w.id
-             LEFT JOIN storage_locations sl ON i.current_location_id::uuid = sl.id
-             WHERE i.name = ii.name AND i.status = 'active'
-             GROUP BY w.id, w.name
-           ) wh_data
-          ),
-          '[]'::json
-        ) AS warehouse_locations,
-        EXISTS (
-          SELECT 1 FROM items i WHERE i.name = ii.name AND i.status = 'active'
-        ) AS in_stock
-      FROM item_info ii
-      WHERE ii.id = $1`,
-      [id]
-    );
+    // 1. Get the item_info row
+    const itemResult = await pool.query(`SELECT * FROM item_info WHERE id = $1`, [id]);
 
-    if (!countRows(result.rows, res)) {
+    if (!countRows(itemResult.rows, res)) {
       return;
     }
 
-    res.json(result.rows[0]);
+    const itemInfo = itemResult.rows[0];
+
+    // 2. Get warehouse + location data as flat rows
+    const locationResult = await pool.query(
+      `SELECT DISTINCT
+         w.id AS warehouse_id,
+         w.name AS warehouse_name,
+         sl.location_code, sl.aisle, sl.slot, sl.fixture
+       FROM items i
+       JOIN warehouse w ON i.warehouse::uuid = w.id
+       LEFT JOIN storage_locations sl ON i.current_location_id::uuid = sl.id
+       WHERE i.name = $1 AND i.status = 'active'`,
+      [itemInfo.name]
+    );
+
+    // 3. Group flat rows by warehouse in JS
+    const warehouseMap = new Map<
+      string,
+      {
+        warehouse_id: string;
+        warehouse_name: string;
+        locations: { location_code: string; aisle: string; slot: string; fixture: string }[];
+      }
+    >();
+
+    for (const row of locationResult.rows) {
+      const existing = warehouseMap.get(row.warehouse_id);
+      const location = row.location_code
+        ? {
+            location_code: row.location_code,
+            aisle: row.aisle,
+            slot: row.slot,
+            fixture: row.fixture,
+          }
+        : null;
+
+      if (existing) {
+        if (location) existing.locations.push(location);
+      } else {
+        warehouseMap.set(row.warehouse_id, {
+          warehouse_id: row.warehouse_id,
+          warehouse_name: row.warehouse_name,
+          locations: location ? [location] : [],
+        });
+      }
+    }
+
+    const warehouse_locations = Array.from(warehouseMap.values());
+
+    res.json({
+      ...itemInfo,
+      warehouse_locations,
+      in_stock: itemInfo.stock > 0,
+    });
   } catch (error) {
     if (error instanceof ZodError) {
       return handleValidationError(error, res);
