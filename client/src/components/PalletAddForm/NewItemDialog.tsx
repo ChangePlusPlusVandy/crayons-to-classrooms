@@ -20,7 +20,6 @@ interface NewItemDialogProps {
   onClose: () => void;
   onConfirm: (data: NewProductData, placeholderProduct: Product) => void;
   products: Product[];
-  availableFixtures: string[];
   availableCategories: string[];
   initialData?: NewProductData | null;
 }
@@ -30,7 +29,6 @@ export default function NewItemDialog({
   onClose,
   onConfirm,
   products,
-  availableFixtures,
   availableCategories,
   initialData = null,
 }: NewItemDialogProps) {
@@ -40,7 +38,7 @@ export default function NewItemDialog({
   const [limit, setLimit] = useState<number | ''>('');
   const [value, setValue] = useState<number | ''>('');
   const [packSize, setPackSize] = useState<number | ''>('');
-  const [fixture, setFixture] = useState<string | null>(null);
+
 
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
   const [subcategoryDialogOpen, setSubcategoryDialogOpen] = useState(false);
@@ -61,7 +59,7 @@ export default function NewItemDialog({
         setLimit(initialData.limit ?? '');
         setValue(initialData.value ?? '');
         setPackSize(initialData.packSize ?? '');
-        setFixture(initialData.fixture || null);
+
 
         if (initialData.newSubcategoryName) {
           // Recreate a pending placeholder for display
@@ -93,7 +91,7 @@ export default function NewItemDialog({
         setLimit('');
         setValue('');
         setPackSize('');
-        setFixture(null);
+
         setPendingSubcategories([]);
       }
       setError('');
@@ -157,7 +155,7 @@ export default function NewItemDialog({
       limit: typeof limit === 'number' ? limit : undefined,
       value: typeof value === 'number' ? value : undefined,
       packSize: typeof packSize === 'number' ? packSize : undefined,
-      fixture: fixture || undefined,
+      fixture: undefined,
     };
 
     const placeholderProduct: Product = {
@@ -324,19 +322,6 @@ export default function NewItemDialog({
               />
             </FormControl>
 
-            {/* Fixture */}
-            <FormControl fullWidth>
-              <AddItemFormLabel>Fixture</AddItemFormLabel>
-              <Autocomplete
-                options={availableFixtures}
-                value={fixture}
-                onChange={(_, newValue) => setFixture(newValue)}
-                renderInput={(params) => (
-                  <TextField {...params} placeholder="Select a fixture (optional)" size="small" />
-                )}
-                size="small"
-              />
-            </FormControl>
           </Stack>
         </DialogContent>
         <DialogActions>
