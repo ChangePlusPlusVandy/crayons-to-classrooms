@@ -120,7 +120,7 @@ export default function AddItemForm({
         setItemInfoList(itemInfoData);
         setStorageLocations(locationsData);
         if (initialItemInfoId && !initialItemInfo) {
-          const match = itemInfoData.find((info) => info.id === initialItemInfoId);
+          const match = itemInfoData.find((info) => info.id === initialItemInfoId && !!info.product_id);
           if (match) setSelectedItemInfo(match);
         }
       } catch (err) {
@@ -132,6 +132,12 @@ export default function AddItemForm({
 
     fetchInitialData();
   }, [initialItemInfoId, initialItemInfo]);
+
+  // Exclude item_info rows without a product_id — downstream flows
+  // (undo, edit, grouping) require a non-null product_id on movements.
+  const selectableItemInfoList = useMemo(() => {
+    return itemInfoList.filter((info) => !!info.product_id);
+  }, [itemInfoList]);
 
   // Compute warehouseLocations for form submission
   const warehouseLocations = useMemo(() => {
@@ -521,7 +527,7 @@ export default function AddItemForm({
           <>
             <Autocomplete
               id="item-name-select"
-              options={itemInfoList}
+              options={selectableItemInfoList}
               getOptionLabel={(option) => option.name || 'Unknown'}
               filterOptions={(options, state) => {
                 const searchTerm = state.inputValue.toLowerCase().trim();
