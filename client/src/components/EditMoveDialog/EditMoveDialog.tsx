@@ -17,7 +17,6 @@ import { Warehouse } from '../../types/Warehouse';
 import { StorageLocation } from '../../types/StorageLocation';
 import { getStorageLocationById, getWarehouseById } from '../../api/addItem';
 import { getItemById } from '../../api/items';
-import { getItemInfoById } from '../../api/itemInfo';
 import { supabase } from '../../supabaseClient';
 
 interface EditMoveDialogProps {
@@ -52,15 +51,10 @@ export function EditMoveDialog({ open, onClose, movement, onSuccess }: EditMoveD
           getStorageLocationById(movement.to_location_id!),
           getItemById(movement.item_id),
         ]);
-        let name = itemRow.name;
-        if (itemRow.item_info) {
-          const info = await getItemInfoById(itemRow.item_info);
-          name = info.name;
-        }
         const wh = await getWarehouseById(src.warehouse_id);
         setWarehouse(wh);
         setSourceSlot(src);
-        setProductName(name);
+        setProductName(itemRow.name);
         setDestinationSlot(dest.slot);
       } catch {
         setFetchError('Failed to load movement details');

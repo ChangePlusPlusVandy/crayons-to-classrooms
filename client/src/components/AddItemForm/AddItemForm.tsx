@@ -50,6 +50,7 @@ export interface AddItemFormData {
 interface AddItemFormProps {
   initialWarehouse?: Warehouse | null;
   initialItemInfo?: ItemInfo | null;
+  initialItemInfoId?: string;
   initialSlot?: string | null;
   initialQuantity?: number | '';
   initialNotes?: string;
@@ -62,6 +63,7 @@ interface AddItemFormProps {
 export default function AddItemForm({
   initialWarehouse = null,
   initialItemInfo = null,
+  initialItemInfoId,
   initialSlot = null,
   initialQuantity = '',
   initialNotes = '',
@@ -117,6 +119,10 @@ export default function AddItemForm({
         setProducts(productsData);
         setItemInfoList(itemInfoData);
         setStorageLocations(locationsData);
+        if (initialItemInfoId && !initialItemInfo) {
+          const match = itemInfoData.find((info) => info.id === initialItemInfoId);
+          if (match) setSelectedItemInfo(match);
+        }
       } catch (err) {
         setError('Failed to load initial data. Please refresh the page.');
       } finally {

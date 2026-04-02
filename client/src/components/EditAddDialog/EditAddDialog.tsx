@@ -12,7 +12,6 @@ import CloseIcon from '@mui/icons-material/Close';
 import AddItemForm, { AddItemFormData } from '../AddItemForm/AddItemForm';
 import { editAddMovementTransaction } from '../../api/editMovement';
 import { InventoryMovement } from '../../types/InventoryMovement';
-import { getItemInfoAll, getItemInfoById, ItemInfo } from '../../api/itemInfo';
 import { Warehouse } from '../../types/Warehouse';
 import { getStorageLocationById, getWarehouseById } from '../../api/addItem';
 import { getItemById } from '../../api/items';
@@ -29,7 +28,7 @@ export function EditAddDialog({ open, onClose, movement, onSuccess }: EditAddDia
   const [submitError, setSubmitError] = useState('');
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState('');
-  const [initialItemInfo, setInitialItemInfo] = useState<ItemInfo | null>(null);
+  const [initialItemInfoId, setInitialItemInfoId] = useState<string | undefined>(undefined);
   const [warehouse, setWarehouse] = useState<Warehouse | null>(null);
   const [slot, setSlot] = useState('');
 
@@ -48,12 +47,8 @@ export function EditAddDialog({ open, onClose, movement, onSuccess }: EditAddDia
           getItemById(movement.item_id),
           getStorageLocationById(movement.to_location_id!),
         ]);
-        let itemInfo: ItemInfo | null = null;
-        if (itemRow.item_info) {
-          itemInfo = await getItemInfoById(itemRow.item_info);
-        }
         const wh = await getWarehouseById(location.warehouse_id);
-        setInitialItemInfo(itemInfo);
+        setInitialItemInfoId(itemRow.item_info || undefined);
         setWarehouse(wh);
         setSlot(location.slot);
       } catch {
@@ -138,7 +133,7 @@ export function EditAddDialog({ open, onClose, movement, onSuccess }: EditAddDia
             )}
             <AddItemForm
               initialWarehouse={warehouse}
-              initialItemInfo={initialItemInfo}
+              initialItemInfoId={initialItemInfoId}
               initialSlot={slot}
               initialQuantity={movement.quantity}
               initialNotes={movement.note || ''}
