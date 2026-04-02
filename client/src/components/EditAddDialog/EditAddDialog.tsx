@@ -51,16 +51,6 @@ export function EditAddDialog({ open, onClose, movement, onSuccess }: EditAddDia
         let itemInfo: ItemInfo | null = null;
         if (itemRow.item_info) {
           itemInfo = await getItemInfoById(itemRow.item_info);
-        } else {
-          const allInfo = await getItemInfoAll();
-          itemInfo =
-            allInfo.find(
-              (ii) => ii.product_id === movement.product_id && ii.name === itemRow.name
-            ) ?? null;
-        }
-        if (!itemInfo) {
-          setFetchError('Could not resolve item_info for this movement.');
-          return;
         }
         const wh = await getWarehouseById(location.warehouse_id);
         setInitialItemInfo(itemInfo);
