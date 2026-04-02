@@ -131,7 +131,7 @@ export default function AddItemForm({
     }
 
     fetchInitialData();
-  }, []);
+  }, [initialItemInfoId, initialItemInfo]);
 
   // Compute warehouseLocations for form submission
   const warehouseLocations = useMemo(() => {
