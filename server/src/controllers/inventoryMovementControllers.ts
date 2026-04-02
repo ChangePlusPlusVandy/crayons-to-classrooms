@@ -96,12 +96,14 @@ export async function getAllMovementsDetailed(req: Request, res: Response): Prom
           im.note,
           im.performed_at,
           im.inventory_action,
-          p.name AS product_name,
+          COALESCE(ii.name, i.name, p.name) AS product_name,
           from_loc.slot AS from_location_name,
           to_loc.slot AS to_location_name,
           pu.name AS user_name,
           au.email AS user_email
         FROM "inventory movement" im
+        LEFT JOIN items i ON im.item_id = i.id
+        LEFT JOIN item_info ii ON i.item_info = ii.id
         LEFT JOIN products p ON im.product_id = p.id
         LEFT JOIN storage_locations from_loc ON im.from_location_id = from_loc.id
         LEFT JOIN storage_locations to_loc ON im.to_location_id = to_loc.id
@@ -709,10 +711,18 @@ export const createItemWithMovement = async (req: Request, res: Response) => {
     }
 
     // Always set fixture to null for ADD operations
-    await client.query(
-      'UPDATE item_info SET fixture = NULL, time_last_updated = NOW() WHERE name = $1',
-      [createdItems[0].name]
-    );
+    const firstCreated = createdItems[0];
+    if (firstCreated.item_info) {
+      await client.query(
+        'UPDATE item_info SET fixture = NULL, time_last_updated = NOW() WHERE id = $1',
+        [firstCreated.item_info]
+      );
+    } else {
+      await client.query(
+        'UPDATE item_info SET fixture = NULL, time_last_updated = NOW() WHERE name = $1',
+        [firstCreated.name]
+      );
+    }
 
     const fullMovementData: CreateInventoryInput = {
       inventory_action: movementData.inventory_action,
@@ -785,10 +795,18 @@ export const bulkCreateItemsWithMovement = async (req: Request, res: Response) =
       }
 
       // Always set fixture to null for ADD operations
-      await client.query(
-        'UPDATE item_info SET fixture = NULL, time_last_updated = NOW() WHERE name = $1',
-        [createdItems[0].name]
-      );
+      const firstRow = createdItems[0];
+      if (firstRow.item_info) {
+        await client.query(
+          'UPDATE item_info SET fixture = NULL, time_last_updated = NOW() WHERE id = $1',
+          [firstRow.item_info]
+        );
+      } else {
+        await client.query(
+          'UPDATE item_info SET fixture = NULL, time_last_updated = NOW() WHERE name = $1',
+          [firstRow.name]
+        );
+      }
 
       const fullMovementData: CreateInventoryInput = {
         inventory_action: movementData.inventory_action,

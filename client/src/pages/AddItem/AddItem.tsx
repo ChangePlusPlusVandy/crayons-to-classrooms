@@ -44,20 +44,18 @@ export default function AddItem() {
         });
         productId = newProduct.id;
       } else {
-        const { product } = data;
-        productId = product.id;
-        productName = product.name;
-        productValue = product.value;
-        productCategory = product.category || undefined;
-        productItemLimit =
-          typeof product.item_limit === 'string'
-            ? parseInt(product.item_limit, 10)
-            : product.item_limit;
+        const { itemInfo } = data;
+        productId = itemInfo.product_id || undefined;
+        productName = itemInfo.name;
+        productValue = itemInfo.value ?? undefined;
+        productCategory = itemInfo.category || undefined;
+        productItemLimit = itemInfo.item_limit ?? undefined;
       }
 
       await createItemWithMovement({
         item: {
           name: productName,
+          ...(data.isNewProduct ? {} : { item_info: data.itemInfo.id }),
           product_id: productId,
           quantity: packSize,
           stock: packSize,
@@ -129,19 +127,18 @@ export default function AddItem() {
             packSize = item.newProductData.packSize;
           }
         } else {
-          productId = item.product.id;
-          productName = item.product.name;
-          productValue = item.product.value;
-          productCategory = item.product.category || undefined;
-          productItemLimit =
-            typeof item.product.item_limit === 'string'
-              ? parseInt(item.product.item_limit, 10) || undefined
-              : item.product.item_limit || undefined;
+          const { itemInfo } = item;
+          productId = itemInfo.product_id || undefined;
+          productName = itemInfo.name;
+          productValue = itemInfo.value ?? undefined;
+          productCategory = itemInfo.category || undefined;
+          productItemLimit = itemInfo.item_limit ?? undefined;
         }
 
         return {
           item: {
             name: productName,
+            ...(!item.isNewProduct && item.itemInfo.id ? { item_info: item.itemInfo.id } : {}),
             product_id: productId,
             quantity: packSize,
             stock: packSize,
