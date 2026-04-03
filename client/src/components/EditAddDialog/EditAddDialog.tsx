@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useAuth } from '../../context/AuthContext';
+import { supabase } from '../../supabaseClient';
 import {
   Dialog,
   DialogTitle,
@@ -25,7 +25,6 @@ interface EditAddDialogProps {
 }
 
 export function EditAddDialog({ open, onClose, movement, onSuccess }: EditAddDialogProps) {
-  const { user } = useAuth();
   const [submitError, setSubmitError] = useState('');
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState('');
@@ -71,6 +70,11 @@ export function EditAddDialog({ open, onClose, movement, onSuccess }: EditAddDia
     setSubmitError('');
 
     try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const userId = sessionData.session?.user.id;
+
+      if (!userId) throw new Error('Not authenticated');
+
       await editAddMovementTransaction(movement.id!, {
         item: {
           name: data.product.name,
@@ -79,7 +83,7 @@ export function EditAddDialog({ open, onClose, movement, onSuccess }: EditAddDia
           stock: 1,
           current_location_id: data.destinationLocationId,
           status: 'active',
-          created_by: user!.id,
+          created_by: userId,
           warehouse: data.warehouse.id,
           category: data.product.category || undefined,
           item_limit: itemLimit || undefined,
@@ -92,7 +96,7 @@ export function EditAddDialog({ open, onClose, movement, onSuccess }: EditAddDia
           from_location_id: null,
           to_location_id: data.destinationLocationId,
           quantity: data.quantity,
-          performed_by: user!.id,
+          performed_by: userId,
           note: data.notes || undefined,
         },
       });

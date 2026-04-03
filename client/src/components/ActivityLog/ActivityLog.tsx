@@ -264,23 +264,27 @@ export default function ActivityLog() {
         </CardContent>
       </Card>
 
-      {editingMovement && editingMovement.inventory_action === 'ADD' && editingMovement.product_id && (
-        <EditAddDialog
-          open={!!editingMovement}
-          onClose={handleEditClose}
-          movement={{ ...editingMovement, product_id: editingMovement.product_id }}
-          onSuccess={handleEditSuccess}
-        />
-      )}
+      {editingMovement &&
+        editingMovement.inventory_action === 'ADD' &&
+        editingMovement.product_id && (
+          <EditAddDialog
+            open={!!editingMovement}
+            onClose={handleEditClose}
+            movement={{ ...editingMovement, product_id: editingMovement.product_id }}
+            onSuccess={handleEditSuccess}
+          />
+        )}
 
-      {editingMovement && editingMovement.inventory_action === 'MOVE' && editingMovement.product_id && (
-        <EditMoveDialog
-          open={!!editingMovement}
-          onClose={handleEditClose}
-          movement={{ ...editingMovement, product_id: editingMovement.product_id }}
-          onSuccess={handleEditSuccess}
-        />
-      )}
+      {editingMovement &&
+        editingMovement.inventory_action === 'MOVE' &&
+        editingMovement.product_id && (
+          <EditMoveDialog
+            open={!!editingMovement}
+            onClose={handleEditClose}
+            movement={{ ...editingMovement, product_id: editingMovement.product_id }}
+            onSuccess={handleEditSuccess}
+          />
+        )}
 
       {editingMovement &&
         (editingMovement.inventory_action === 'DONATED' ||
@@ -307,11 +311,11 @@ export default function ActivityLog() {
       <Snackbar
         open={undoSnackbar.open}
         autoHideDuration={4000}
-        onClose={() => setUndoSnackbar(prev => ({ ...prev, open: false }))}
+        onClose={() => setUndoSnackbar((prev) => ({ ...prev, open: false }))}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       >
         <Alert
-          onClose={() => setUndoSnackbar(prev => ({ ...prev, open: false }))}
+          onClose={() => setUndoSnackbar((prev) => ({ ...prev, open: false }))}
           severity={undoSnackbar.severity}
           sx={{ width: '100%' }}
         >

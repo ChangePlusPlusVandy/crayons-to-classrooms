@@ -66,7 +66,7 @@ export function EditRemoveDialog({ open, onClose, movement, onSuccess }: EditRem
           locationId: location.id,
           productId: movement.product_id,
           itemInfoId: movement.product_id,
-          items: Array.from({ length: movement.quantity }, () => ({} as Item)),
+          items: Array.from({ length: movement.quantity }, () => ({}) as Item),
         });
       } catch {
         setFetchError('Failed to load movement details');
@@ -112,9 +112,7 @@ export function EditRemoveDialog({ open, onClose, movement, onSuccess }: EditRem
             initialWarehouse={warehouse}
             initialSourceLocation={sourceLocation}
             initialProductId={movement.product_id ?? ''}
-            initialRemovalAction={
-              (movement.inventory_action as 'DONATED' | 'DISCARD') ?? 'DONATED'
-            }
+            initialRemovalAction={(movement.inventory_action as 'DONATED' | 'DISCARD') ?? 'DONATED'}
             initialQuantity={movement.quantity}
             initialNotes={movement.note || ''}
             initialGroup={initialGroup}

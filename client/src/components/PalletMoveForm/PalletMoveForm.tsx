@@ -11,11 +11,7 @@ import {
   Typography,
 } from '@mui/material';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
-import {
-  getStorageLocations,
-  getItemsByLocation,
-  groupItemsByLocation,
-} from '../../api/moveItem';
+import { getStorageLocations, getItemsByLocation, groupItemsByLocation } from '../../api/moveItem';
 import { Warehouse } from '../../types/Warehouse';
 import { StorageLocation } from '../../types/StorageLocation';
 import { ItemGroup } from '../../types/Item';
@@ -113,7 +109,9 @@ export default function PalletMoveForm({
     // Resolve destination: prefer location with null/empty fixture, fall back to first match
     const slotLocations = warehouseLocations.filter((loc) => loc.slot === selectedDestinationSlot);
     const destinationLocation =
-      slotLocations.find((loc) => !loc.fixture || loc.fixture.trim() === '') ?? slotLocations[0] ?? null;
+      slotLocations.find((loc) => !loc.fixture || loc.fixture.trim() === '') ??
+      slotLocations[0] ??
+      null;
 
     if (!selectedWarehouse) {
       setError('Please select a warehouse.');

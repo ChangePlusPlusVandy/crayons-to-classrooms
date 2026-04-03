@@ -290,7 +290,9 @@ export default function MoveItemForm({
     // Resolve destination: prefer location with null/empty fixture, fall back to first match
     const slotLocations = warehouseLocations.filter((loc) => loc.slot === selectedDestinationSlot);
     const destinationLocation =
-      slotLocations.find((loc) => !loc.fixture || loc.fixture.trim() === '') ?? slotLocations[0] ?? null;
+      slotLocations.find((loc) => !loc.fixture || loc.fixture.trim() === '') ??
+      slotLocations[0] ??
+      null;
 
     // Validation
     if (!selectedWarehouse) {

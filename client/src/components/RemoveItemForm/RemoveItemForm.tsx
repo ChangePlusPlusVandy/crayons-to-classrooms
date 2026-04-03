@@ -106,6 +106,14 @@ export default function RemoveItemForm({
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
 
+  const maxRemovable = useMemo(() => {
+    if (!selectedGroup) return 0;
+    // initialGroup is a placeholder with fake items representing already-removed items.
+    // When it's the active selection, there are 0 real active items at the location.
+    const activeCount = selectedGroup === initialGroup ? 0 : selectedGroup.items.length;
+    return activeCount + (initialQuantity ?? 0);
+  }, [selectedGroup, initialQuantity, initialGroup]);
+
   // Load all items once
   useEffect(() => {
     async function loadData() {
@@ -178,7 +186,13 @@ export default function RemoveItemForm({
     };
 
     buildGroupOptions();
-  }, [itemsInSelectedWarehouse, selectedWarehouse, initialSourceLocation, initialProductId, initialGroup]);
+  }, [
+    itemsInSelectedWarehouse,
+    selectedWarehouse,
+    initialSourceLocation,
+    initialProductId,
+    initialGroup,
+  ]);
 
   const handleSubmit = async () => {
     if (!selectedGroup || quantityToRemove === null || quantityToRemove <= 0) return;
@@ -240,7 +254,9 @@ export default function RemoveItemForm({
         <RemoveItemFormLabel>Removal Action</RemoveItemFormLabel>
         <Autocomplete
           options={removalActionOptions}
-          value={removalActionOptions.find((o) => o.value === removalAction) ?? removalActionOptions[0]}
+          value={
+            removalActionOptions.find((o) => o.value === removalAction) ?? removalActionOptions[0]
+          }
           onChange={(_, newValue) => {
             if (newValue) setRemovalAction(newValue.value);
           }}
@@ -263,7 +279,9 @@ export default function RemoveItemForm({
             setSelectedGroup(newValue);
             setQuantityToRemove(null);
           }}
-          isOptionEqualToValue={(a, b) => a.itemInfoId === b.itemInfoId && a.locationId === b.locationId}
+          isOptionEqualToValue={(a, b) =>
+            a.itemInfoId === b.itemInfoId && a.locationId === b.locationId
+          }
           getOptionLabel={(option) => option.name}
           renderOption={(props, option) => (
             <li {...props} key={`${option.itemInfoId}|${option.locationId}`}>
@@ -300,14 +318,12 @@ export default function RemoveItemForm({
               setQuantityToRemove(null);
               return;
             }
-            const clamped = Math.min(Math.max(parsed, 0), selectedGroup.items.length);
+            const clamped = Math.min(Math.max(parsed, 0), maxRemovable);
             setQuantityToRemove(clamped);
           }}
           fullWidth
-          inputProps={{ min: 0, max: selectedGroup?.items.length ?? 0 }}
-          helperText={
-            selectedGroup ? `Available: ${selectedGroup.items.length}` : 'Select an item first'
-          }
+          inputProps={{ min: 0, max: maxRemovable }}
+          helperText={selectedGroup ? `Available: ${maxRemovable}` : 'Select an item first'}
           disabled={!selectedGroup}
         />
       </FormControl>

@@ -1,6 +1,10 @@
 import { useState } from 'react';
 import { Container, Typography, Paper, Alert } from '@mui/material';
-import { createItemWithMovement, bulkCreateItemsWithMovement, createProduct } from '../../api/addItem';
+import {
+  createItemWithMovement,
+  bulkCreateItemsWithMovement,
+  createProduct,
+} from '../../api/addItem';
 import AddItemForm, { AddItemFormData } from '../../components/AddItemForm/AddItemForm';
 import PalletAddForm, { PalletAddFormData } from '../../components/PalletAddForm/PalletAddForm';
 import FormModeToggle, { FormMode } from '../../components/FormModeToggle/FormModeToggle';
@@ -125,7 +129,10 @@ export default function AddItem() {
           productValue = item.newProductData.value;
           productCategory = item.newProductData.category || undefined;
           productItemLimit = item.newProductData.limit;
-          if (typeof item.newProductData.packSize === 'number' && item.newProductData.packSize >= 1) {
+          if (
+            typeof item.newProductData.packSize === 'number' &&
+            item.newProductData.packSize >= 1
+          ) {
             packSize = item.newProductData.packSize;
           }
         } else {
