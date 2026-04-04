@@ -228,7 +228,7 @@ export default function ActivityLog() {
                         size="small"
                         aria-label={`Undo ${activity.inventory_action.toLowerCase()} for ${productName}`}
                         onClick={() => handleUndoClick(activity)}
-                        disabled={!isUndoable || undoingId === activity.id}
+                        disabled={!isUndoable || !!undoingId}
                       >
                         {undoingId === activity.id ? (
                           <CircularProgress size={16} />
