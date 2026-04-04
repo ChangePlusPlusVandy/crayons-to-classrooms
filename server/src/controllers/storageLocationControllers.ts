@@ -108,7 +108,7 @@ export async function getStorageLocationBySlot(req: Request, res: Response) {
 // POST storage location
 export async function createStorageLocation(req: Request, res: Response) {
   try {
-    const { aisle, slot, fixture, active, extra_info, warehouse_id }: CreateStorageLocationInput =
+    const { aisle, slot, active, extra_info, warehouse_id }: CreateStorageLocationInput =
       createStorageLocationSchema.parse(req.body);
 
     // Check if warehouse_id exists in warehouse table
@@ -119,11 +119,11 @@ export async function createStorageLocation(req: Request, res: Response) {
       return res.status(400).json({ error: 'Invalid warehouse_id' });
     }
 
-    const computedLocationCode = computeLocationCode(slot, fixture);
+    const computedLocationCode = computeLocationCode(slot);
 
     const result = await pool.query(
       'INSERT INTO storage_locations (aisle, slot, fixture, location_code, active, extra_info, warehouse_id) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *;',
-      [aisle || null, slot, fixture || null, computedLocationCode, active, extra_info, warehouse_id]
+      [aisle || null, slot, null, computedLocationCode, active, extra_info, warehouse_id]
     );
 
     res.status(201).json(result.rows[0]);
@@ -162,14 +162,10 @@ export async function updateStorageLocation(req: Request, res: Response) {
       ...validatedData,
     };
 
-    if (validatedData.slot !== undefined || validatedData.fixture !== undefined) {
+    if (validatedData.slot !== undefined) {
       const currentSlot =
         validatedData.slot !== undefined ? validatedData.slot : currentLocation.rows[0].slot;
-      const currentFixture =
-        validatedData.fixture !== undefined
-          ? validatedData.fixture
-          : currentLocation.rows[0].fixture;
-      updateData.location_code = computeLocationCode(currentSlot, currentFixture);
+      updateData.location_code = computeLocationCode(currentSlot);
     }
 
     // Build dynamic UPDATE query (like itemController)
@@ -231,9 +227,6 @@ export async function deleteStorageLocation(req: Request, res: Response) {
   }
 }
 
-function computeLocationCode(slot: string, fixture?: string | null): string {
-  if (fixture) {
-    return `${slot}${fixture}`;
-  }
+function computeLocationCode(slot: string): string {
   return slot;
 }

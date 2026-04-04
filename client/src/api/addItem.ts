@@ -67,6 +67,7 @@ export async function getInventoryMovements(): Promise<InventoryMovement[]> {
 
 export async function createItem(itemData: {
   name: string;
+  item_info?: string;
   product_id?: string;
   quantity: number;
   stock: number;
@@ -125,6 +126,7 @@ export async function createProduct(payload: {
 export async function createItemWithMovement(payload: {
   item: {
     name: string;
+    item_info?: string;
     product_id?: string;
     quantity: number;
     stock: number;
@@ -162,6 +164,7 @@ export async function bulkCreateItemsWithMovement(payload: {
   entries: Array<{
     item: {
       name: string;
+      item_info?: string;
       product_id?: string;
       quantity: number;
       stock: number;

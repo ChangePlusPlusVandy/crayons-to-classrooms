@@ -48,6 +48,8 @@ export const ItemStatus = z.enum([
  */
 export const createItemSchema = z.object({
   name: z.string().min(1, 'Name is required').max(255, 'Name must be less than 255 characters'),
+  /** When set, item rows link to this item_info; name/product/category/value/limit are taken from that row. */
+  item_info: uuidSchema.optional(),
   product_id: uuidSchema.optional(),
   current_location_id: uuidSchema.optional(),
   fixture: z.string().optional(),

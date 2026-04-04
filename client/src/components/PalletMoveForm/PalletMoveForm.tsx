@@ -151,10 +151,8 @@ export default function PalletMoveForm({
   };
 
   const handleSubmit = async () => {
-    // Resolve destination: prefer location with null/empty fixture, fall back to first match
-    const slotLocations = warehouseLocations.filter((loc) => loc.slot === selectedDestinationSlot);
     const destinationLocation =
-      slotLocations.find((loc) => !loc.fixture || loc.fixture.trim() === '') ?? slotLocations[0] ?? null;
+      warehouseLocations.find((loc) => loc.slot === selectedDestinationSlot) ?? null;
 
     if (!selectedWarehouse) {
       setError('Please select a warehouse.');
