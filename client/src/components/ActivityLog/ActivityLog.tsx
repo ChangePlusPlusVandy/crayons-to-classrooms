@@ -103,10 +103,10 @@ export default function ActivityLog() {
       return;
     }
 
-    if (activity.inventory_action !== 'MOVE' && activity.inventory_action !== 'ADD' && activity.inventory_action !== 'REMOVE') {
+    if (activity.inventory_action !== 'MOVE' && activity.inventory_action !== 'ADD' && activity.inventory_action !== 'DONATED' && activity.inventory_action !== 'DISCARD') {
       setSnackbar({
         open: true,
-        message: `Cannot undo ${activity.inventory_action} actions. Only MOVE, ADD, and REMOVE can be undone.`,
+        message: `Cannot undo ${activity.inventory_action} actions. Only MOVE, ADD, DONATED, and DISCARD can be undone.`,
         severity: 'error',
       });
       return;
@@ -185,7 +185,7 @@ export default function ActivityLog() {
                 const toLabel = activity.to_location_name ?? undefined;
                 const productName = activity.product_name || 'Unknown Product';
                 const isUndoable =
-                  activity.inventory_action === 'MOVE' || activity.inventory_action === 'ADD' || activity.inventory_action === 'REMOVE';
+                  activity.inventory_action === 'MOVE' || activity.inventory_action === 'ADD' || activity.inventory_action === 'DONATED' || activity.inventory_action === 'DISCARD';
 
                 return (
                   <Box key={activity.id} sx={activityLogStyles.activityItem}>

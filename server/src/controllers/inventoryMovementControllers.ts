@@ -1296,9 +1296,50 @@ export const undoInventoryMovementCore = async (
         db
       );
     }
+  } else if (inventoryMovement.inventory_action === 'DONATED' || inventoryMovement.inventory_action === 'DISCARD') {
+    // Get item info for stock sync
+    const itemResult = await db.query(
+      'SELECT name FROM items WHERE id = $1',
+      [inventoryMovement.item_id]
+    );
+
+    if (itemResult.rows.length === 0) {
+      throw new UndoConflictError('Cannot undo: original item not found');
+    }
+
+    const itemName = itemResult.rows[0].name as string;
+
+    // Get from_location details for item_info update
+    let fromLocation = null;
+    if (inventoryMovement.from_location_id) {
+      const fromLocationResult = await db.query(
+        'SELECT location_code, fixture FROM storage_locations WHERE id = $1',
+        [inventoryMovement.from_location_id]
+      );
+      fromLocation = fromLocationResult.rows[0];
+    }
+
+    // Increment item_info stock back (reverse the decrement that happened during removal)
+    await syncItemInfoStock(
+      itemName,
+      undefined, // productId - don't update
+      undefined, // category - don't update
+      undefined, // quantity - don't update
+      undefined, // value - don't update
+      undefined, // itemLimit - don't update
+      undefined, // limbo - don't update
+      fromLocation?.fixture ?? null,
+      fromLocation?.location_code ?? null,
+      inventoryMovement.quantity, // stockDelta - increment by quantity to reverse the removal
+      false, // createIfMissing - don't create new item_info
+      db
+    );
+
+    // Delete movement record
+    await db.query('DELETE FROM "inventory movement" WHERE id = $1', [id]);
   } else {
     throw new UndoConflictError(
-      'Undo operation is only supported for MOVE and ADD inventory actions'
+      'Undo operation is only supported for MOVE, ADD, DONATED, and DISCARD inventory actions'
     );
   }
 };
