@@ -12,15 +12,15 @@ import {
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import { Product } from '../../types/Product';
+import { ItemInfo } from '../../api/itemInfo';
 import { AddItemFormLabel } from '../AddItemForm/AddItemForm.styles';
 import { NewProductData } from './PalletAddForm';
 
 interface NewItemDialogProps {
   open: boolean;
   onClose: () => void;
-  onConfirm: (data: NewProductData, placeholderProduct: Product) => void;
+  onConfirm: (data: NewProductData, placeholderItemInfo: ItemInfo) => void;
   products: Product[];
-  availableFixtures: string[];
   availableCategories: string[];
   initialData?: NewProductData | null;
 }
@@ -30,7 +30,6 @@ export default function NewItemDialog({
   onClose,
   onConfirm,
   products,
-  availableFixtures,
   availableCategories,
   initialData = null,
 }: NewItemDialogProps) {
@@ -40,7 +39,7 @@ export default function NewItemDialog({
   const [limit, setLimit] = useState<number | ''>('');
   const [value, setValue] = useState<number | ''>('');
   const [packSize, setPackSize] = useState<number | ''>('');
-  const [fixture, setFixture] = useState<string | null>(null);
+
 
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
   const [subcategoryDialogOpen, setSubcategoryDialogOpen] = useState(false);
@@ -61,7 +60,7 @@ export default function NewItemDialog({
         setLimit(initialData.limit ?? '');
         setValue(initialData.value ?? '');
         setPackSize(initialData.packSize ?? '');
-        setFixture(initialData.fixture || null);
+
 
         if (initialData.newSubcategoryName) {
           // Recreate a pending placeholder for display
@@ -93,7 +92,7 @@ export default function NewItemDialog({
         setLimit('');
         setValue('');
         setPackSize('');
-        setFixture(null);
+
         setPendingSubcategories([]);
       }
       setError('');
@@ -157,22 +156,26 @@ export default function NewItemDialog({
       limit: typeof limit === 'number' ? limit : undefined,
       value: typeof value === 'number' ? value : undefined,
       packSize: typeof packSize === 'number' ? packSize : undefined,
-      fixture: fixture || undefined,
+      fixture: undefined,
     };
 
-    const placeholderProduct: Product = {
+    const placeholderItemInfo: ItemInfo = {
       id: `temp-${crypto.randomUUID()}`,
-      created_at: '',
       name: trimmedName,
-      description: null,
-      unit_of_measure: null,
-      value: typeof value === 'number' ? value : 0,
-      item_limit: typeof limit === 'number' ? limit : 0,
-      category: category || '',
-      total_count: 0,
+      product_id: isPendingSubcategory ? null : subcategoryProduct?.id || null,
+      category: category || null,
+      quantity: null,
+      value: typeof value === 'number' ? value : null,
+      item_limit: typeof limit === 'number' ? limit : null,
+      stock: 0,
+      fixture: null,
+      last_known_location_code: null,
+      time_last_updated: null,
+      notes: null,
+      limbo: false,
     };
 
-    onConfirm(data, placeholderProduct);
+    onConfirm(data, placeholderItemInfo);
   };
 
   return (
@@ -324,19 +327,6 @@ export default function NewItemDialog({
               />
             </FormControl>
 
-            {/* Fixture */}
-            <FormControl fullWidth>
-              <AddItemFormLabel>Fixture</AddItemFormLabel>
-              <Autocomplete
-                options={availableFixtures}
-                value={fixture}
-                onChange={(_, newValue) => setFixture(newValue)}
-                renderInput={(params) => (
-                  <TextField {...params} placeholder="Select a fixture (optional)" size="small" />
-                )}
-                size="small"
-              />
-            </FormControl>
           </Stack>
         </DialogContent>
         <DialogActions>
