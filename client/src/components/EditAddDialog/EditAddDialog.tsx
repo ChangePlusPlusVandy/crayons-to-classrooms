@@ -12,14 +12,15 @@ import CloseIcon from '@mui/icons-material/Close';
 import AddItemForm, { AddItemFormData } from '../AddItemForm/AddItemForm';
 import { editAddMovementTransaction } from '../../api/editMovement';
 import { InventoryMovement } from '../../types/InventoryMovement';
-import { Product } from '../../types/Product';
 import { Warehouse } from '../../types/Warehouse';
-import { getProductById, getStorageLocationById, getWarehouseById } from '../../api/addItem';
+import { getStorageLocationById, getWarehouseById } from '../../api/addItem';
+import { getItemById } from '../../api/items';
+import { supabase } from '../../supabaseClient';
 
 interface EditAddDialogProps {
   open: boolean;
   onClose: () => void;
-  movement: InventoryMovement;
+  movement: Omit<InventoryMovement, 'product_id'> & { product_id: string };
   onSuccess?: () => void;
 }
 
@@ -27,7 +28,7 @@ export function EditAddDialog({ open, onClose, movement, onSuccess }: EditAddDia
   const [submitError, setSubmitError] = useState('');
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState('');
-  const [product, setProduct] = useState<Product | null>(null);
+  const [initialItemInfoId, setInitialItemInfoId] = useState<string | undefined>(undefined);
   const [warehouse, setWarehouse] = useState<Warehouse | null>(null);
   const [slot, setSlot] = useState('');
 
@@ -38,12 +39,16 @@ export function EditAddDialog({ open, onClose, movement, onSuccess }: EditAddDia
 
     async function fetchData() {
       try {
-        const [prod, location] = await Promise.all([
-          getProductById(movement.product_id),
+        if (!movement.product_id || !movement.to_location_id || !movement.item_id) {
+          setFetchError('Cannot edit: movement is missing product, location, or item');
+          return;
+        }
+        const [itemRow, location] = await Promise.all([
+          getItemById(movement.item_id),
           getStorageLocationById(movement.to_location_id!),
         ]);
         const wh = await getWarehouseById(location.warehouse_id);
-        setProduct(prod);
+        setInitialItemInfoId(itemRow.item_info || undefined);
         setWarehouse(wh);
         setSlot(location.slot);
       } catch {
@@ -54,30 +59,34 @@ export function EditAddDialog({ open, onClose, movement, onSuccess }: EditAddDia
     }
 
     fetchData();
-  }, [open, movement.product_id, movement.to_location_id]);
+  }, [open, movement.product_id, movement.to_location_id, movement.item_id]);
 
   const handleSubmit = async (data: AddItemFormData) => {
-    const itemLimit =
-      typeof data.product.item_limit === 'string'
-        ? parseInt(data.product.item_limit, 10)
-        : data.product.item_limit;
+    const { itemInfo } = data;
+    const itemLimit = itemInfo.item_limit ?? undefined;
 
     setSubmitError('');
 
     try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const userId = sessionData.session?.user.id;
+
+      if (!userId) throw new Error('Not authenticated');
+
       await editAddMovementTransaction(movement.id!, {
         item: {
-          name: data.product.name,
-          product_id: data.product.id,
+          name: itemInfo.name,
+          item_info: itemInfo.id,
+          product_id: itemInfo.product_id || undefined,
           quantity: 1,
           stock: 1,
           current_location_id: data.destinationLocationId,
           status: 'active',
-          created_by: 'b4974f63-ee89-42a1-bdb3-ce9df255c682', // TODO: Get user ID from auth context
+          created_by: userId,
           warehouse: data.warehouse.id,
-          category: data.product.category || undefined,
-          item_limit: itemLimit || undefined,
-          value: data.product.value,
+          category: itemInfo.category || undefined,
+          item_limit: itemLimit,
+          value: itemInfo.value ?? 0,
           limbo: false,
           notes: data.notes || undefined,
         },
@@ -86,7 +95,7 @@ export function EditAddDialog({ open, onClose, movement, onSuccess }: EditAddDia
           from_location_id: null,
           to_location_id: data.destinationLocationId,
           quantity: data.quantity,
-          performed_by: 'b4974f63-ee89-42a1-bdb3-ce9df255c682', // TODO: Get user ID from auth context
+          performed_by: userId,
           note: data.notes || undefined,
         },
       });
@@ -124,13 +133,14 @@ export function EditAddDialog({ open, onClose, movement, onSuccess }: EditAddDia
             )}
             <AddItemForm
               initialWarehouse={warehouse}
-              initialProduct={product}
+              initialItemInfoId={initialItemInfoId}
               initialSlot={slot}
               initialQuantity={movement.quantity}
               initialNotes={movement.note || ''}
               onSubmit={handleSubmit}
               onCancel={onClose}
               submitLabel="Save Changes"
+              allowNewItem={false}
             />
           </>
         )}

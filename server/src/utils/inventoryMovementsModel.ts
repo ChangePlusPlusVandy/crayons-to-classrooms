@@ -43,9 +43,10 @@ export const ActionParamSchema = z.enum([
 ]);
 
 /**
- * Schema for inventory creation
- * Requires: inventory_action, item_id, product_id, to_location_id, quantity, performed_by
- * from_location_id is optional (null for ADD actions)
+ * Schema for inventory movement creation
+ * Requires: inventory_action, item_id, product_id, quantity, performed_by
+ * Optional: from_location_id (nullable — null for ADD actions),
+ *           to_location_id (nullable), note
  */
 export const createInventoryMovementSchema = z.object({
   inventory_action: ActionParamSchema,
@@ -134,5 +135,37 @@ export type CreateInventoryInput = z.infer<typeof createInventoryMovementSchema>
 export type UpdateInventoryInput = z.infer<typeof updateInventoryMovementSchema>;
 export type InventoryStatusType = z.infer<typeof actionQuerySchema>;
 export type CreateItemWithMovementInput = z.infer<typeof createItemWithMovementSchema>;
+
+export const bulkCreateItemsWithMovementSchema = z.object({
+  entries: z
+    .array(
+      z.object({
+        item: createItemSchema,
+        movement: movementFieldsSchema.extend({
+          inventory_action: z.literal('ADD'),
+        }),
+      })
+    )
+    .nonempty('At least one entry is required'),
+});
+
+export type BulkCreateItemsWithMovementInput = z.infer<typeof bulkCreateItemsWithMovementSchema>;
 export type MovementIdParamType = z.infer<typeof movementIdParamSchema>;
 export type MoveItemsWithMovementInput = z.infer<typeof moveItemsWithMovementSchema>;
+
+/**
+ * Schema for the combined remove-items-with-movement request body.
+ * item_ids are the existing items to deactivate; movement records the action.
+ */
+export const removeItemsWithMovementSchema = z.object({
+  item_ids: z.array(uuidSchema).nonempty('At least one item_id is required'),
+  movement: z.object({
+    inventory_action: z.enum(['DONATED', 'DISCARD']),
+    from_location_id: uuidSchema,
+    quantity: z.number().int().positive('Quantity must be a positive integer'),
+    performed_by: uuidSchema,
+    note: z.string().optional(),
+  }),
+});
+
+export type RemoveItemsWithMovementInput = z.infer<typeof removeItemsWithMovementSchema>;

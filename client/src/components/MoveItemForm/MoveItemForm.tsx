@@ -24,7 +24,6 @@ import {
 } from './MoveItemForm.styles';
 import { WarehouseSelector } from '../WarehouseSelector/WarehouseSelector';
 import { SlotSelector } from '../SlotSelector/SlotSelector';
-import { FixtureSelector } from '../FixtureSelector/FixtureSelector';
 
 export interface MoveItemFormData {
   warehouse: Warehouse;
@@ -40,7 +39,6 @@ interface MoveItemFormProps {
   initialSourceSlot?: StorageLocation | null;
   initialProductId?: string | null;
   initialDestinationSlot?: string | null;
-  initialDestinationFixture?: string | null;
   initialQuantity?: number;
   initialNotes?: string;
   onSubmit: (data: MoveItemFormData) => Promise<void>;
@@ -54,7 +52,6 @@ export default function MoveItemForm({
   initialSourceSlot = null,
   initialProductId = null,
   initialDestinationSlot = null,
-  initialDestinationFixture = null,
   initialQuantity,
   initialNotes = '',
   onSubmit,
@@ -73,7 +70,6 @@ export default function MoveItemForm({
   const [selectedDestinationSlot, setSelectedDestinationSlot] = useState<string | null>(
     initialDestinationSlot
   );
-  const [selectedFixture, setSelectedFixture] = useState<string | null>(initialDestinationFixture);
   const [notes, setNotes] = useState(initialNotes);
   const [quantityToMove, setQuantityToMove] = useState<number>(initialQuantity ?? 0);
   const [loading, setLoading] = useState(true);
@@ -291,12 +287,8 @@ export default function MoveItemForm({
   };
 
   const handleSubmit = async () => {
-    const destinationLocation = warehouseLocations.find((loc) => {
-      if (selectedFixture === 'N/A') {
-        return loc.slot === selectedDestinationSlot && (!loc.fixture || loc.fixture.trim() === '');
-      }
-      return loc.slot === selectedDestinationSlot && loc.fixture === selectedFixture;
-    });
+    const destinationLocation =
+      warehouseLocations.find((loc) => loc.slot === selectedDestinationSlot) ?? null;
 
     // Validation
     if (!selectedWarehouse) {
@@ -319,8 +311,8 @@ export default function MoveItemForm({
       setError(`Cannot move more than ${selectedItemGroup.quantity} available.`);
       return;
     }
-    if (!selectedDestinationSlot || !selectedFixture) {
-      setError('Please select a destination slot and fixture.');
+    if (!selectedDestinationSlot) {
+      setError('Please select a destination slot.');
       return;
     }
 
@@ -382,7 +374,6 @@ export default function MoveItemForm({
           setItemGroupsInSourceSlot([]);
           setSelectedItemGroup(null);
           setSelectedDestinationSlot(null);
-          setSelectedFixture(null);
           setQuantityToMove(0);
           setError('');
         }}
@@ -496,52 +487,36 @@ export default function MoveItemForm({
       <Box sx={{ display: 'flex', justifyContent: 'center', my: 2 }}>
         <ArrowDownwardIcon aria-hidden="true" sx={{ fontSize: '2rem', color: 'text.secondary' }} />
       </Box>
-      <Stack spacing={0}>
-        <SlotSelector
-          value={selectedDestinationSlot}
-          onChange={(newSlot) => {
-            setSelectedDestinationSlot(newSlot);
-            setSelectedFixture(null);
-            setError('');
+      <SlotSelector
+        value={selectedDestinationSlot}
+        onChange={(newSlot) => {
+          setSelectedDestinationSlot(newSlot);
+          setError('');
+        }}
+        warehouse={selectedWarehouse}
+        storageLocations={storageLocations}
+        label="Destination Slot"
+        placeholder="Select destination slot"
+      >
+        <Button
+          startIcon={<AddIcon />}
+          sx={{
+            justifyContent: 'flex-start',
+            textTransform: 'none',
+            color: 'primary.main',
+            marginTop: 0,
+            '&:hover': {
+              backgroundColor: 'transparent',
+            },
           }}
-          warehouse={selectedWarehouse}
-          storageLocations={storageLocations}
-          label="Destination Slot"
-          placeholder="Select destination slot"
+          onClick={() => {
+            // Does nothing for now
+          }}
+          disabled={!selectedWarehouse}
         >
-          <Button
-            startIcon={<AddIcon />}
-            sx={{
-              justifyContent: 'flex-start',
-              textTransform: 'none',
-              color: 'primary.main',
-              marginTop: 0,
-              '&:hover': {
-                backgroundColor: 'transparent',
-              },
-            }}
-            onClick={() => {
-              // Does nothing for now
-            }}
-            disabled={!selectedWarehouse}
-          >
-            New Slot
-          </Button>
-        </SlotSelector>
-
-        <FixtureSelector
-          value={selectedFixture}
-          onChange={(newFixture) => {
-            setSelectedFixture(newFixture);
-            setError('');
-          }}
-          slot={selectedDestinationSlot}
-          warehouse={selectedWarehouse}
-          storageLocations={storageLocations}
-          nullFixtureLabel="N/A"
-          autoSelectNull
-        />
-      </Stack>
+          New Slot
+        </Button>
+      </SlotSelector>
       <FormControl fullWidth>
         <MoveItemFormLabel htmlFor="notes-input">Notes</MoveItemFormLabel>
         <TextField
@@ -569,8 +544,7 @@ export default function MoveItemForm({
             !selectedSourceSlot ||
             !selectedItemGroup ||
             !isQuantityValid() ||
-            !selectedDestinationSlot ||
-            !selectedFixture
+            !selectedDestinationSlot
           }
         >
           {submitting ? <CircularProgress size={24} /> : submitLabel}

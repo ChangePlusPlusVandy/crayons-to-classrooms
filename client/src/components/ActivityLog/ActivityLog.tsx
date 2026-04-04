@@ -33,7 +33,7 @@ const ACTION_COLORS: Record<string, string> = {
   DONATED: '#e91e63',
 };
 
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 4;
 
 function formatTimestamp(dateStr: string): string {
   const date = new Date(dateStr);
@@ -103,7 +103,6 @@ export default function ActivityLog() {
       return;
     }
 
-    // Only MOVE and ADD can be undone
     if (activity.inventory_action !== 'MOVE' && activity.inventory_action !== 'ADD') {
       setSnackbar({
         open: true,
@@ -113,7 +112,6 @@ export default function ActivityLog() {
       return;
     }
 
-    // Show confirmation dialog
     setUndoConfirmDialog({ open: true, activity });
   };
 
@@ -131,7 +129,6 @@ export default function ActivityLog() {
         message: `Successfully undid ${activity.inventory_action} for ${activity.product_name || 'item'}`,
         severity: 'success',
       });
-      // Refresh the activities list
       await fetchActivities();
     } catch (err) {
       setSnackbar({
@@ -187,6 +184,8 @@ export default function ActivityLog() {
                 const fromLabel = activity.from_location_name ?? undefined;
                 const toLabel = activity.to_location_name ?? undefined;
                 const productName = activity.product_name || 'Unknown Product';
+                const isUndoable =
+                  activity.inventory_action === 'MOVE' || activity.inventory_action === 'ADD';
 
                 return (
                   <Box key={activity.id} sx={activityLogStyles.activityItem}>
@@ -229,7 +228,7 @@ export default function ActivityLog() {
                         size="small"
                         aria-label={`Undo ${activity.inventory_action.toLowerCase()} for ${productName}`}
                         onClick={() => handleUndoClick(activity)}
-                        disabled={undoingId === activity.id}
+                        disabled={!isUndoable || undoingId === activity.id}
                       >
                         {undoingId === activity.id ? (
                           <CircularProgress size={16} />
@@ -277,20 +276,20 @@ export default function ActivityLog() {
         </CardContent>
       </Card>
 
-      {editingMovement && editingMovement.inventory_action === 'ADD' && (
+      {editingMovement && editingMovement.inventory_action === 'ADD' && editingMovement.product_id && (
         <EditAddDialog
           open={!!editingMovement}
           onClose={handleEditClose}
-          movement={editingMovement}
+          movement={{ ...editingMovement, product_id: editingMovement.product_id }}
           onSuccess={handleEditSuccess}
         />
       )}
 
-      {editingMovement && editingMovement.inventory_action === 'MOVE' && (
+      {editingMovement && editingMovement.inventory_action === 'MOVE' && editingMovement.product_id && (
         <EditMoveDialog
           open={!!editingMovement}
           onClose={handleEditClose}
-          movement={editingMovement}
+          movement={{ ...editingMovement, product_id: editingMovement.product_id }}
           onSuccess={handleEditSuccess}
         />
       )}

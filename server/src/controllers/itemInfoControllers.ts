@@ -53,7 +53,12 @@ const handleValidationError = (error: unknown, res: Response) => {
  */
 export const getItemsInfo = async (req: Request, res: Response) => {
   try {
-    const items = await pool.query('SELECT * FROM item_info');
+    const items = await pool.query(`
+      SELECT ii.*, p.name AS product_name
+      FROM item_info ii
+      LEFT JOIN products p ON p.id = ii.product_id
+      ORDER BY ii.name
+    `);
 
     if (!countRows(items.rows, res)) {
       return;
@@ -80,7 +85,13 @@ export const getItemInfoById = async (req: Request, res: Response) => {
   try {
     const { id } = itemInfoIdParamSchema.parse(req.params);
 
-    const item = await pool.query('SELECT * FROM item_info WHERE id = $1', [id]);
+    const item = await pool.query(
+      `SELECT ii.*, p.name AS product_name
+       FROM item_info ii
+       LEFT JOIN products p ON p.id = ii.product_id
+       WHERE ii.id = $1`,
+      [id]
+    );
 
     if (!countRows(item.rows, res)) {
       return;
@@ -121,6 +132,47 @@ export const getItemsInfoByName = async (req: Request, res: Response) => {
     res.status(500).json({ error: 'Internal server error' });
   }
 };
+/**
+ * Retrieves items that are in limbo.
+ *
+ * @param {Request} req - Express request object
+ * @param {Response} res - Express response object
+ * @returns {Promise<Response>} JSON array of items in limbo or error message
+ * @throws {500} Internal server error if database query fails
+ */
+export const getLimboItems = async (req: Request, res: Response) => {
+  try {
+    const items = await pool.query('SELECT * FROM item_info WHERE limbo = TRUE AND stock = 0');
+    if (!countRows(items.rows, res)) {
+      return;
+    }
+    res.json(items.rows);
+  } catch (error) {
+    console.error('Error fetching limbo items:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+/**
+ * Retrieves all item_info rows with zero stock and limbo = FALSE.
+ *
+ * @param {Request} req - Express request object
+ * @param {Response} res - Express response object
+ * @returns {Promise<Response>} JSON array of items with stock = 0 and limbo = FALSE or error message
+ * @throws {500} Internal server error if database query fails
+ */
+export const getOutOfStockItems = async (req: Request, res: Response) => {
+  try {
+    const items = await pool.query('SELECT * FROM item_info WHERE limbo = FALSE AND stock = 0');
+    if (!countRows(items.rows, res)) {
+      return;
+    }
+    res.json(items.rows);
+  } catch (error) {
+    console.error('Error fetching out of stock items:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
 
 /**
  * Creates a new item in the database.
@@ -132,6 +184,7 @@ export const getItemsInfoByName = async (req: Request, res: Response) => {
  *   - quantity: Quantity number (in body, optional)
  *   - value: Value number (in body, optional)
  *   - item_limit: Limit number (in body, optional)
+ *   - limbo: Limbo boolean, defaults to false (in body, optional)
  *   - stock: total stock of the item (in body, required)
  *   - fixture: fixture of the item (in body, optional)
  *   - last_known_location_code: last known location code of the item (in body, required)
@@ -151,6 +204,7 @@ export const createItemInfo = async (req: Request, res: Response) => {
       value,
       item_limit,
       stock,
+      limbo,
       fixture,
       last_known_location_code,
       time_last_updated,
@@ -164,14 +218,15 @@ export const createItemInfo = async (req: Request, res: Response) => {
     }
 
     const newItemInfo = await pool.query(
-      'INSERT INTO item_info (name, product_id, category, quantity, value, item_limit, stock, fixture, last_known_location_code, time_last_updated, notes) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *',
+      'INSERT INTO item_info (name, product_id, category, quantity, value, item_limit, limbo, stock, fixture, last_known_location_code, time_last_updated, notes) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *',
       [
         name,
         product_id,
         category,
         quantity,
-        value,
+        value != null ? Math.round(value) : null,
         item_limit,
+        limbo,
         stock,
         fixture,
         last_known_location_code,
@@ -193,11 +248,11 @@ export const createItemInfo = async (req: Request, res: Response) => {
 /**
  * Updates an existing item in the database.
  * Only updates fields that are provided in the request body.
- * Allowed fields: name, product_id, category, quantity, value, item_limit, stock, fixture, last_known_location_code, time_last_updated, notes.
+ * Allowed fields: name, product_id, category, quantity, value, item_limit, limbo, stock, fixture, last_known_location_code, time_last_updated, notes.
  *
  * @param {Request} req - Express request object with:
  *   - id: UUID of the item to update (in params)
- *   - Updatable fields in body (name, product_id, category, quantity, value, item_limit, stock, fixture, last_known_location_code, time_last_updated, notes)
+ *   - Updatable fields in body (name, product_id, category, quantity, value, item_limit, limbo, stock, fixture, last_known_location_code, time_last_updated, notes)
  * @param {Response} res - Express response object
  * @returns {Promise<Response>} JSON object of the updated item or error message
  * @throws {400} No updatable fields provided if request body is empty or contains no allowed fields
@@ -222,12 +277,15 @@ export const updateItemInfo = async (req: Request, res: Response) => {
     const values: any[] = [];
     let idx = 1;
 
-    for (const [key, value] of Object.entries(validatedData)) {
+    for (const [key, val] of Object.entries(validatedData)) {
       setClauses.push(`${key} = $${idx++}`);
-      values.push(value);
+      values.push(key === 'value' && val != null ? Math.round(val as number) : val);
     }
 
-    setClauses.push(`updated_at = NOW()`);
+    // item_info uses time_last_updated (not updated_at); other controllers update the same column.
+    if (!Object.prototype.hasOwnProperty.call(validatedData, 'time_last_updated')) {
+      setClauses.push(`time_last_updated = NOW()`);
+    }
 
     const sql = `
       UPDATE item_info
@@ -286,6 +344,37 @@ export const deleteItemInfo = async (req: Request, res: Response) => {
       return handleValidationError(error, res);
     }
     console.error('Error deleting item:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+export const getInventoryStats = async (req: Request, res: Response) => {
+  try {
+    const [skuResult, slotResult] = await Promise.all([
+      pool.query(`
+        SELECT
+          COUNT(*) AS total_skus,
+          COALESCE(SUM(CASE WHEN stock > 0 THEN 1 ELSE 0 END), 0) AS stocked_skus
+        FROM item_info
+      `),
+      pool.query(`
+        SELECT
+          COUNT(DISTINCT sl.id) AS total_slots,
+          COUNT(DISTINCT sl.id) FILTER (WHERE i.id IS NOT NULL) AS occupied_slots
+        FROM storage_locations sl
+        LEFT JOIN items i ON sl.id = i.current_location_id::uuid
+        WHERE sl.active = true
+      `),
+    ]);
+
+    res.json({
+      total_skus: Number(skuResult.rows[0].total_skus),
+      stocked_skus: Number(skuResult.rows[0].stocked_skus),
+      total_slots: Number(slotResult.rows[0].total_slots),
+      occupied_slots: Number(slotResult.rows[0].occupied_slots),
+    });
+  } catch (error) {
+    console.error('Error fetching inventory stats:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };

@@ -15,12 +15,14 @@ import { InventoryMovement } from '../../types/InventoryMovement';
 import { ItemGroup } from '../../types/Item';
 import { Warehouse } from '../../types/Warehouse';
 import { StorageLocation } from '../../types/StorageLocation';
-import { getProductById, getStorageLocationById, getWarehouseById } from '../../api/addItem';
+import { getStorageLocationById, getWarehouseById } from '../../api/addItem';
+import { getItemById } from '../../api/items';
+import { supabase } from '../../supabaseClient';
 
 interface EditMoveDialogProps {
   open: boolean;
   onClose: () => void;
-  movement: InventoryMovement;
+  movement: Omit<InventoryMovement, 'product_id'> & { product_id: string };
   onSuccess?: () => void;
 }
 
@@ -32,7 +34,6 @@ export function EditMoveDialog({ open, onClose, movement, onSuccess }: EditMoveD
   const [sourceSlot, setSourceSlot] = useState<StorageLocation | null>(null);
   const [productName, setProductName] = useState('');
   const [destinationSlot, setDestinationSlot] = useState('');
-  const [destinationFixture, setDestinationFixture] = useState('');
 
   useEffect(() => {
     if (!open) return;
@@ -41,17 +42,20 @@ export function EditMoveDialog({ open, onClose, movement, onSuccess }: EditMoveD
 
     async function fetchData() {
       try {
-        const [src, dest, prod] = await Promise.all([
+        if (!movement.product_id || !movement.from_location_id || !movement.to_location_id) {
+          setFetchError('Cannot edit: movement is missing product or location');
+          return;
+        }
+        const [src, dest, itemRow] = await Promise.all([
           getStorageLocationById(movement.from_location_id!),
           getStorageLocationById(movement.to_location_id!),
-          getProductById(movement.product_id),
+          getItemById(movement.item_id),
         ]);
         const wh = await getWarehouseById(src.warehouse_id);
         setWarehouse(wh);
         setSourceSlot(src);
-        setProductName(prod.name);
+        setProductName(itemRow.name);
         setDestinationSlot(dest.slot);
-        setDestinationFixture(dest.fixture || 'N/A');
       } catch {
         setFetchError('Failed to load movement details');
       } finally {
@@ -60,7 +64,7 @@ export function EditMoveDialog({ open, onClose, movement, onSuccess }: EditMoveD
     }
 
     fetchData();
-  }, [open, movement.product_id, movement.from_location_id, movement.to_location_id]);
+  }, [open, movement.item_id, movement.product_id, movement.from_location_id, movement.to_location_id]);
 
   // Simulate post-undo state: adjust item group quantities based on what
   // the undo of the original movement would do to item locations
@@ -78,7 +82,7 @@ export function EditMoveDialog({ open, onClose, movement, onSuccess }: EditMoveD
           current_location_id: sourceSlotId,
           warehouse: warehouse!.id,
           name: productName,
-          product_id: movement.product_id,
+          product_id: movement.product_id!,
           quantity: movement.quantity,
         });
       }
@@ -100,12 +104,16 @@ export function EditMoveDialog({ open, onClose, movement, onSuccess }: EditMoveD
     setSubmitError('');
 
     try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const userId = sessionData.session?.user.id;
+      if (!userId) throw new Error('Not authenticated');
+
       await editMoveMovementTransaction(movement.id!, {
         from_location_id: data.sourceSlot.id,
         to_location_id: data.destinationLocationId,
         product_id: data.itemGroup.product_id,
         quantity: data.quantity,
-        performed_by: 'b4974f63-ee89-42a1-bdb3-ce9df255c682', // TODO: Get user ID from auth context
+        performed_by: userId,
         note: data.notes || undefined,
       });
 
@@ -145,7 +153,6 @@ export function EditMoveDialog({ open, onClose, movement, onSuccess }: EditMoveD
               initialSourceSlot={sourceSlot}
               initialProductId={movement.product_id}
               initialDestinationSlot={destinationSlot}
-              initialDestinationFixture={destinationFixture}
               initialQuantity={movement.quantity}
               initialNotes={movement.note || ''}
               onSubmit={handleSubmit}
