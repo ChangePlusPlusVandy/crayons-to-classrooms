@@ -86,7 +86,9 @@ export default function MoveItem() {
         },
       });
 
-      setSuccess(`${activeItems.length} item${activeItems.length > 1 ? 's' : ''} moved successfully!`);
+      setSuccess(
+        `${activeItems.length} item${activeItems.length > 1 ? 's' : ''} moved successfully!`
+      );
       setFormKey((k) => k + 1);
     } catch (err: unknown) {
       console.error('Error moving pallet:', err);

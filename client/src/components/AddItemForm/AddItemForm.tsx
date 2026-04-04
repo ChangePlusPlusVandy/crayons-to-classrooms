@@ -14,11 +14,7 @@ import {
   DialogActions,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
-import {
-  getProducts,
-  getStorageLocations,
-  createProduct,
-} from '../../api/addItem';
+import { getProducts, getStorageLocations, createProduct } from '../../api/addItem';
 import { createStorageLocation } from '../../api/storageLocation';
 import { getItemInfoAll, ItemInfo } from '../../api/itemInfo';
 import { Warehouse } from '../../types/Warehouse';
@@ -93,11 +89,12 @@ export default function AddItemForm({
   const [isNewItemMode, setIsNewItemMode] = useState(false);
   const [newItemName, setNewItemName] = useState('');
   const [newItemCategory, setNewItemCategory] = useState<string | null>(null);
-  const [selectedSubcategoryProduct, setSelectedSubcategoryProduct] = useState<Product | null>(null);
+  const [selectedSubcategoryProduct, setSelectedSubcategoryProduct] = useState<Product | null>(
+    null
+  );
   const [newItemLimit, setNewItemLimit] = useState<number | ''>('');
   const [newItemValue, setNewItemValue] = useState<number | ''>('');
   const [newItemPackSize, setNewItemPackSize] = useState<number | ''>('');
-
 
   // Category/subcategory dialog states
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
@@ -129,7 +126,9 @@ export default function AddItemForm({
         setItemInfoList(itemInfoData);
         setStorageLocations(locationsData);
         if (initialItemInfoId && !initialItemInfo) {
-          const match = itemInfoData.find((info) => info.id === initialItemInfoId && !!info.product_id);
+          const match = itemInfoData.find(
+            (info) => info.id === initialItemInfoId && !!info.product_id
+          );
           if (match) setSelectedItemInfo(match);
         }
       } catch (err) {
@@ -218,8 +217,7 @@ export default function AddItemForm({
   };
 
   const handleSubmit = async () => {
-    const destinationLocation =
-      warehouseLocations.find((loc) => loc.slot === selectedSlot) ?? null;
+    const destinationLocation = warehouseLocations.find((loc) => loc.slot === selectedSlot) ?? null;
 
     // Validation
     if (!selectedWarehouse) {
@@ -573,7 +571,9 @@ export default function AddItemForm({
               filterOptions={(options, state) => {
                 const searchTerm = state.inputValue.toLowerCase().trim();
                 if (!searchTerm) return options;
-                return options.filter((item) => item.name?.toLowerCase().includes(searchTerm));
+                return options.filter((product) =>
+                  product.name?.toLowerCase().includes(searchTerm)
+                );
               }}
               renderOption={(props, option, state) => {
                 const { key, ...otherProps } = props;
@@ -586,9 +586,7 @@ export default function AddItemForm({
                         {highlightText(option.name || 'Unknown', searchTerm)}
                       </ProductNameText>
                       <ProductDetailsText>
-                        {option.product_name
-                          ? `Product: ${option.product_name} · `
-                          : ''}
+                        {option.product_name ? `Product: ${option.product_name} · ` : ''}
                         {option.category || 'No category'} | Value: ${option.value ?? 0} | Stock:{' '}
                         {option.stock}
                       </ProductDetailsText>
@@ -759,10 +757,7 @@ export default function AddItemForm({
       </Dialog>
 
       {/* New Slot — creates storage_locations row for the selected warehouse */}
-      <Dialog
-        open={slotDialogOpen}
-        onClose={() => !creatingSlot && setSlotDialogOpen(false)}
-      >
+      <Dialog open={slotDialogOpen} onClose={() => !creatingSlot && setSlotDialogOpen(false)}>
         <DialogTitle>Add New Slot</DialogTitle>
         <DialogContent>
           <TextField

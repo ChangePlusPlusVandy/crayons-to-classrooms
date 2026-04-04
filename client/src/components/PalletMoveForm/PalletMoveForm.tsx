@@ -16,11 +16,7 @@ import {
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
-import {
-  getStorageLocations,
-  getItemsByLocation,
-  groupItemsByLocation,
-} from '../../api/moveItem';
+import { getStorageLocations, getItemsByLocation, groupItemsByLocation } from '../../api/moveItem';
 import { createStorageLocation } from '../../api/storageLocation';
 import { Warehouse } from '../../types/Warehouse';
 import { StorageLocation } from '../../types/StorageLocation';

@@ -23,11 +23,7 @@ import {
   Snackbar,
 } from '@mui/material';
 import { getLimboItems, ItemInfo } from '../../api/itemInfo';
-import {
-  createItemWithMovement,
-  getStorageLocations,
-  getWarehouses,
-} from '../../api/addItem';
+import { createItemWithMovement, getStorageLocations, getWarehouses } from '../../api/addItem';
 import { createStorageLocation } from '../../api/storageLocation';
 import { Warehouse } from '../../types/Warehouse';
 import { StorageLocation } from '../../types/StorageLocation';
@@ -152,8 +148,12 @@ export default function Limbo() {
     });
 
     return filtered.sort((a, b) => {
-      const ta = a.time_last_updated ? new Date(a.time_last_updated).getTime() : Number.NEGATIVE_INFINITY;
-      const tb = b.time_last_updated ? new Date(b.time_last_updated).getTime() : Number.NEGATIVE_INFINITY;
+      const ta = a.time_last_updated
+        ? new Date(a.time_last_updated).getTime()
+        : Number.NEGATIVE_INFINITY;
+      const tb = b.time_last_updated
+        ? new Date(b.time_last_updated).getTime()
+        : Number.NEGATIVE_INFINITY;
       const byTime = tb - ta;
       if (Number.isNaN(byTime) || byTime === 0) {
         return a.name.localeCompare(b.name);
@@ -318,7 +318,6 @@ export default function Limbo() {
   };
 
   const rowsInTable = filteredItems.length;
-
 
   return (
     <Container maxWidth="lg" sx={limboStyles.container}>
@@ -777,7 +776,11 @@ export default function Limbo() {
               minWidth: 120,
             }}
           >
-            {creatingNewSlot ? <CircularProgress size={20} sx={{ color: '#FFFFFF' }} /> : 'Add slot'}
+            {creatingNewSlot ? (
+              <CircularProgress size={20} sx={{ color: '#FFFFFF' }} />
+            ) : (
+              'Add slot'
+            )}
           </Button>
         </DialogActions>
       </Dialog>

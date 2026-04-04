@@ -64,7 +64,13 @@ export function EditMoveDialog({ open, onClose, movement, onSuccess }: EditMoveD
     }
 
     fetchData();
-  }, [open, movement.item_id, movement.product_id, movement.from_location_id, movement.to_location_id]);
+  }, [
+    open,
+    movement.item_id,
+    movement.product_id,
+    movement.from_location_id,
+    movement.to_location_id,
+  ]);
 
   // Simulate post-undo state: adjust item group quantities based on what
   // the undo of the original movement would do to item locations

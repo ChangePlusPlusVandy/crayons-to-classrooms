@@ -235,8 +235,7 @@ export default function PalletAddForm({
       return;
     }
 
-    const destinationLocation =
-      warehouseLocations.find((loc) => loc.slot === selectedSlot) ?? null;
+    const destinationLocation = warehouseLocations.find((loc) => loc.slot === selectedSlot) ?? null;
 
     if (!destinationLocation) {
       setError('Could not find a location for the selected slot.');
@@ -416,7 +415,11 @@ export default function PalletAddForm({
                   const { key, ...otherProps } = props;
                   if (option.id === CREATE_NEW_SENTINEL.id) {
                     return (
-                      <li key={key} {...otherProps} style={{ fontStyle: 'italic', color: '#1976d2' }}>
+                      <li
+                        key={key}
+                        {...otherProps}
+                        style={{ fontStyle: 'italic', color: '#1976d2' }}
+                      >
                         {CREATE_NEW_SENTINEL.name}
                       </li>
                     );
@@ -424,13 +427,9 @@ export default function PalletAddForm({
                   return (
                     <li key={key} {...otherProps}>
                       <ProductOptionContainer>
-                        <ProductNameText>
-                          {option.name || 'Unknown'}
-                        </ProductNameText>
+                        <ProductNameText>{option.name || 'Unknown'}</ProductNameText>
                         <ProductDetailsText>
-                          {option.product_name
-                            ? `Product: ${option.product_name} · `
-                            : ''}
+                          {option.product_name ? `Product: ${option.product_name} · ` : ''}
                           {option.category || 'No category'} | Value: ${option.value ?? 0} | Stock:{' '}
                           {option.stock}
                         </ProductDetailsText>
@@ -457,11 +456,7 @@ export default function PalletAddForm({
                 slotProps={{ htmlInput: { min: 1, step: 1 } }}
               />
               {row.isNewProduct && (
-                <IconButton
-                  onClick={() => handleEditNewItem(index)}
-                  size="small"
-                  color="primary"
-                >
+                <IconButton onClick={() => handleEditNewItem(index)} size="small" color="primary">
                   <EditIcon />
                 </IconButton>
               )}
@@ -556,7 +551,7 @@ export default function PalletAddForm({
         onConfirm={handleNewItemConfirm}
         products={products}
         availableCategories={availableCategories}
-        initialData={editingRow?.isNewProduct ? editingRow.newProductData ?? null : null}
+        initialData={editingRow?.isNewProduct ? (editingRow.newProductData ?? null) : null}
       />
     </Stack>
   );
