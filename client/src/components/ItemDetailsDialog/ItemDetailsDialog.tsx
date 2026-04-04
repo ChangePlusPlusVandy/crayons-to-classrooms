@@ -154,7 +154,9 @@ export function ItemDetailsDialog({ open, onClose, itemId }: ItemDetailsDialogPr
                           <TableBody>
                             {wh.locations.map((loc, idx) => (
                               <TableRow key={idx}>
-                                <TableCell sx={{ fontSize: '0.8rem' }}>{loc.location_code}</TableCell>
+                                <TableCell sx={{ fontSize: '0.8rem' }}>
+                                  {loc.location_code}
+                                </TableCell>
                                 <TableCell sx={{ fontSize: '0.8rem', color: 'text.secondary' }}>
                                   {loc.stock}
                                 </TableCell>

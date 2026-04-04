@@ -14,11 +14,7 @@ import {
   DialogActions,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
-import {
-  getProducts,
-  getStorageLocations,
-  createProduct,
-} from '../../api/addItem';
+import { getProducts, getStorageLocations, createProduct } from '../../api/addItem';
 import { createStorageLocation } from '../../api/storageLocation';
 import { getItemInfoAll, ItemInfo } from '../../api/itemInfo';
 import { Warehouse } from '../../types/Warehouse';
@@ -761,10 +757,7 @@ export default function AddItemForm({
       </Dialog>
 
       {/* New Slot — creates storage_locations row for the selected warehouse */}
-      <Dialog
-        open={slotDialogOpen}
-        onClose={() => !creatingSlot && setSlotDialogOpen(false)}
-      >
+      <Dialog open={slotDialogOpen} onClose={() => !creatingSlot && setSlotDialogOpen(false)}>
         <DialogTitle>Add New Slot</DialogTitle>
         <DialogContent>
           <TextField

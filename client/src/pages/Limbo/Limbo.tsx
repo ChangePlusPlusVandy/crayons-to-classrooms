@@ -23,11 +23,7 @@ import {
   Snackbar,
 } from '@mui/material';
 import { getLimboItems, ItemInfo } from '../../api/itemInfo';
-import {
-  createItemWithMovement,
-  getStorageLocations,
-  getWarehouses,
-} from '../../api/addItem';
+import { createItemWithMovement, getStorageLocations, getWarehouses } from '../../api/addItem';
 import { createStorageLocation } from '../../api/storageLocation';
 import { Warehouse } from '../../types/Warehouse';
 import { StorageLocation } from '../../types/StorageLocation';
@@ -780,7 +776,11 @@ export default function Limbo() {
               minWidth: 120,
             }}
           >
-            {creatingNewSlot ? <CircularProgress size={20} sx={{ color: '#FFFFFF' }} /> : 'Add slot'}
+            {creatingNewSlot ? (
+              <CircularProgress size={20} sx={{ color: '#FFFFFF' }} />
+            ) : (
+              'Add slot'
+            )}
           </Button>
         </DialogActions>
       </Dialog>
