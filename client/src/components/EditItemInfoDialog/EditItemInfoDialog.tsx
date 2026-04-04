@@ -200,7 +200,7 @@ export function EditItemInfoDialog({ open, onClose, onSaved, itemInfo }: EditIte
 
           {/* Quantity */}
           <FormControl fullWidth>
-            <EditItemFormLabel htmlFor="edit-quantity-input">Quantity</EditItemFormLabel>
+            <EditItemFormLabel htmlFor="edit-quantity-input">Pack Size</EditItemFormLabel>
             <TextField
               id="edit-quantity-input"
               type="number"
