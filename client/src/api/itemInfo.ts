@@ -91,6 +91,9 @@ export interface UpdateItemInfoRequest {
   category?: string;
   item_limit?: number;
   fixture?: string;
+  product_id?: string;
+  value?: number;
+  quantity?: number;
 }
 
 export async function updateItemInfo(id: string, data: UpdateItemInfoRequest): Promise<void> {
