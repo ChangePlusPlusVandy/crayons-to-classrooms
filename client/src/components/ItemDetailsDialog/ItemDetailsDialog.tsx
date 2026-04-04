@@ -104,13 +104,13 @@ export function ItemDetailsDialog({ open, onClose, itemId }: ItemDetailsDialogPr
                 />
               </Box>
               <Box sx={styles.fieldGroup}>
-                <Box sx={styles.fieldLabel}>Stock</Box>
+                <Box sx={styles.fieldLabel}>Total Stock</Box>
                 <Typography sx={styles.fieldValue}>{details.stock}</Typography>
               </Box>
-              {details.category && (
+              {details.fixture && (
                 <Box sx={styles.fieldGroup}>
-                  <Box sx={styles.fieldLabel}>Category</Box>
-                  <Typography sx={styles.fieldValue}>{details.category}</Typography>
+                  <Box sx={styles.fieldLabel}>Fixture</Box>
+                  <Typography sx={styles.fieldValue}>{details.fixture}</Typography>
                 </Box>
               )}
             </Box>
@@ -147,7 +147,7 @@ export function ItemDetailsDialog({ open, onClose, itemId }: ItemDetailsDialogPr
                               <TableCell
                                 sx={{ fontWeight: 600, fontSize: '0.75rem', width: '50%' }}
                               >
-                                Fixture
+                                Stock
                               </TableCell>
                             </TableRow>
                           </TableHead>
@@ -156,7 +156,7 @@ export function ItemDetailsDialog({ open, onClose, itemId }: ItemDetailsDialogPr
                               <TableRow key={idx}>
                                 <TableCell sx={{ fontSize: '0.8rem' }}>{loc.slot}</TableCell>
                                 <TableCell sx={{ fontSize: '0.8rem', color: 'text.secondary' }}>
-                                  {loc.fixture || 'No fixture'}
+                                  {loc.stock}
                                 </TableCell>
                               </TableRow>
                             ))}

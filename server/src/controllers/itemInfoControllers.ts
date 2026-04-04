@@ -250,14 +250,16 @@ export const getItemInfoDetails = async (req: Request, res: Response) => {
 
     // 2. Get warehouse + location data as flat rows
     const locationResult = await pool.query(
-      `SELECT DISTINCT
+      `SELECT
          w.id AS warehouse_id,
          w.name AS warehouse_name,
-         sl.location_code, sl.aisle, sl.slot, sl.fixture
+         sl.location_code,
+         COUNT(i.id) AS stock
        FROM items i
        JOIN warehouse w ON i.warehouse::uuid = w.id
        LEFT JOIN storage_locations sl ON i.current_location_id::uuid = sl.id
-       WHERE i.name = $1 AND i.status = 'active'`,
+       WHERE i.name = $1 AND i.status = 'active'
+       GROUP BY w.id, w.name, sl.location_code`,
       [itemInfo.name]
     );
 
@@ -267,7 +269,7 @@ export const getItemInfoDetails = async (req: Request, res: Response) => {
       {
         warehouse_id: string;
         warehouse_name: string;
-        locations: { location_code: string; aisle: string; slot: string; fixture: string }[];
+        locations: { location_code: string; aisle: string; slot: string; stock: number }[];
       }
     >();
 
@@ -278,7 +280,7 @@ export const getItemInfoDetails = async (req: Request, res: Response) => {
             location_code: row.location_code,
             aisle: row.aisle,
             slot: row.slot,
-            fixture: row.fixture,
+            stock: parseInt(row.stock),
           }
         : null;
 

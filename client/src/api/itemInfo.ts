@@ -59,7 +59,7 @@ export interface ItemInfoWarehouseLocation {
     location_code: string;
     aisle: string;
     slot: string;
-    fixture: string | null;
+    stock: number;
   }[];
 }
 
