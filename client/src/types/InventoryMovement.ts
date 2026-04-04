@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 export const InventoryMovementSchema = z.object({
   id: z.string(),
-  inventory_action: z.enum(['MOVE', 'ADD', 'CHECKOUT', 'DISCARD', 'ADJUSTMENT', 'DONATED']),
+  inventory_action: z.enum(['MOVE', 'ADD', 'REMOVE', 'CHECKOUT', 'DISCARD', 'ADJUSTMENT', 'DONATED']),
   item_id: z.string(),
   product_id: z.string().nullable(),
   from_location_id: z.string().nullable(),
