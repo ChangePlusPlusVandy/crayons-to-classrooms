@@ -244,7 +244,9 @@ export default function PalletRemoveForm({
         <Autocomplete
           id="pallet-removal-action-select"
           options={removalActionOptions}
-          value={removalActionOptions.find((o) => o.value === removalAction) ?? removalActionOptions[0]}
+          value={
+            removalActionOptions.find((o) => o.value === removalAction) ?? removalActionOptions[0]
+          }
           onChange={(_, newValue) => {
             if (newValue) setRemovalAction(newValue.value);
           }}

@@ -95,7 +95,6 @@ export default function AddItemForm({
   const [newItemValue, setNewItemValue] = useState<number | ''>('');
   const [newItemPackSize, setNewItemPackSize] = useState<number | ''>('');
 
-
   // Category/subcategory dialog states
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
   const [subcategoryDialogOpen, setSubcategoryDialogOpen] = useState(false);
@@ -122,7 +121,9 @@ export default function AddItemForm({
         setItemInfoList(itemInfoData);
         setStorageLocations(locationsData);
         if (initialItemInfoId && !initialItemInfo) {
-          const match = itemInfoData.find((info) => info.id === initialItemInfoId && !!info.product_id);
+          const match = itemInfoData.find(
+            (info) => info.id === initialItemInfoId && !!info.product_id
+          );
           if (match) setSelectedItemInfo(match);
         }
       } catch (err) {
@@ -211,8 +212,7 @@ export default function AddItemForm({
   };
 
   const handleSubmit = async () => {
-    const destinationLocation =
-      warehouseLocations.find((loc) => loc.slot === selectedSlot) ?? null;
+    const destinationLocation = warehouseLocations.find((loc) => loc.slot === selectedSlot) ?? null;
 
     // Validation
     if (!selectedWarehouse) {
@@ -549,9 +549,7 @@ export default function AddItemForm({
                         {highlightText(option.name || 'Unknown', searchTerm)}
                       </ProductNameText>
                       <ProductDetailsText>
-                        {option.product_name
-                          ? `Product: ${option.product_name} · `
-                          : ''}
+                        {option.product_name ? `Product: ${option.product_name} · ` : ''}
                         {option.category || 'No category'} | Value: ${option.value ?? 0} | Stock:{' '}
                         {option.stock}
                       </ProductDetailsText>

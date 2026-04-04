@@ -11,11 +11,7 @@ import {
   Typography,
 } from '@mui/material';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
-import {
-  getStorageLocations,
-  getItemsByLocation,
-  groupItemsByLocation,
-} from '../../api/moveItem';
+import { getStorageLocations, getItemsByLocation, groupItemsByLocation } from '../../api/moveItem';
 import { Warehouse } from '../../types/Warehouse';
 import { StorageLocation } from '../../types/StorageLocation';
 import { ItemGroup } from '../../types/Item';

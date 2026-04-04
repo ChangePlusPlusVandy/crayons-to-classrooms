@@ -140,7 +140,10 @@ const pgDecimalNullable = z
 
 export const ItemInfoSchema = z.object({
   id: z.string(),
-  name: z.string().nullable().transform((v) => v ?? ''),
+  name: z
+    .string()
+    .nullable()
+    .transform((v) => v ?? ''),
   /** Joined from products when present; for display only. */
   product_name: z.string().nullable().optional(),
   product_id: z.string().nullable().optional(),
@@ -198,10 +201,7 @@ export async function getOutOfStockItems(): Promise<ItemInfo[]> {
 }
 
 /** PATCH /item-info/:id — body must include at least one allowed field (server-validated). */
-export async function patchItemInfo(
-  id: string,
-  body: { limbo: boolean }
-): Promise<ItemInfo> {
+export async function patchItemInfo(id: string, body: { limbo: boolean }): Promise<ItemInfo> {
   const response = await authFetch(`${API_BASE_URL}/item-info/${id}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
