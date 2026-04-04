@@ -98,12 +98,16 @@ export default function RemoveItemPage() {
     );
     if (!matchingItem) return;
 
-    getWarehouses().then((allWarehouses) => {
-      const warehouse = allWarehouses.find((w) => w.id === matchingItem.warehouse);
-      if (warehouse) {
-        setSelectedWarehouse(warehouse);
-      }
-    });
+    getWarehouses()
+      .then((allWarehouses) => {
+        const warehouse = allWarehouses.find((w) => w.id === matchingItem.warehouse);
+        if (warehouse) {
+          setSelectedWarehouse(warehouse);
+        }
+      })
+      .catch(() => {
+        setError('Failed to load warehouses.');
+      });
   }, [items, prefill]);
 
   // Auto-select item group once group options are built
