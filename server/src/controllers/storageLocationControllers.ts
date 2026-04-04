@@ -123,7 +123,7 @@ export async function createStorageLocation(req: Request, res: Response) {
 
     const result = await pool.query(
       'INSERT INTO storage_locations (aisle, slot, fixture, location_code, active, extra_info, warehouse_id) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *;',
-      [aisle, slot, null, computedLocationCode, active, extra_info, warehouse_id]
+      [aisle || null, slot,  null, computedLocationCode, active, extra_info, warehouse_id]
     );
 
     res.status(201).json(result.rows[0]);
