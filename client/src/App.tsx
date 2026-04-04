@@ -10,6 +10,7 @@ import SetPassword from './pages/SetPassword/SetPassword';
 import Users from './pages/Users/Users';
 import Inventory from './pages/Inventory/Inventory';
 import RemoveItemPage from './pages/TestPage/RemoveItemPage';
+import Limbo from './pages/Limbo/Limbo';
 import './App.css';
 
 function App() {
@@ -32,10 +33,7 @@ function App() {
                   <Route path="/users" element={<Users />} />
                   <Route path="/inventory" element={<Inventory />} />
                   <Route path="/activity-log" element={<Activities />} />
-                  <Route
-                    path="/limbo-items"
-                    element={<div style={{ padding: '2rem' }}>Limbo Items Page (Coming Soon)</div>}
-                  />
+                  <Route path="/limbo-items" element={<Limbo />} />
                   <Route
                     path="/analytics"
                     element={<div style={{ padding: '2rem' }}>Analytics Page (Coming Soon)</div>}

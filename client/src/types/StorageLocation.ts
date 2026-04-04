@@ -2,7 +2,7 @@ export type StorageLocation = {
   id: string;
   aisle: string;
   slot: string;
-  fixture: string;
+  fixture: string | null;
   location_code: string;
   active: boolean;
   extra_info: string | null;

@@ -15,6 +15,7 @@ import {
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import { getProducts, getStorageLocations, createProduct } from '../../api/addItem';
+import { getItemInfoAll, ItemInfo } from '../../api/itemInfo';
 import { Warehouse } from '../../types/Warehouse';
 import { StorageLocation } from '../../types/StorageLocation';
 import { Product } from '../../types/Product';
@@ -30,7 +31,7 @@ import { SlotSelector } from '../SlotSelector/SlotSelector';
 
 export interface AddItemFormData {
   warehouse: Warehouse;
-  product: Product;
+  itemInfo: ItemInfo;
   destinationLocationId: string;
   quantity: number;
   notes: string;
@@ -48,7 +49,8 @@ export interface AddItemFormData {
 
 interface AddItemFormProps {
   initialWarehouse?: Warehouse | null;
-  initialProduct?: Product | null;
+  initialItemInfo?: ItemInfo | null;
+  initialItemInfoId?: string;
   initialSlot?: string | null;
   initialQuantity?: number | '';
   initialNotes?: string;
@@ -60,7 +62,8 @@ interface AddItemFormProps {
 
 export default function AddItemForm({
   initialWarehouse = null,
-  initialProduct = null,
+  initialItemInfo = null,
+  initialItemInfoId,
   initialSlot = null,
   initialQuantity = '',
   initialNotes = '',
@@ -71,11 +74,12 @@ export default function AddItemForm({
 }: AddItemFormProps) {
   // Data states
   const [products, setProducts] = useState<Product[]>([]);
+  const [itemInfoList, setItemInfoList] = useState<ItemInfo[]>([]);
   const [storageLocations, setStorageLocations] = useState<StorageLocation[]>([]);
 
   // Form states
   const [selectedWarehouse, setSelectedWarehouse] = useState<Warehouse | null>(initialWarehouse);
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(initialProduct);
+  const [selectedItemInfo, setSelectedItemInfo] = useState<ItemInfo | null>(initialItemInfo);
   const [selectedSlot, setSelectedSlot] = useState<string | null>(initialSlot);
   const [quantityToAdd, setQuantityToAdd] = useState<number | ''>(initialQuantity);
   const [notes, setNotes] = useState(initialNotes);
@@ -90,7 +94,7 @@ export default function AddItemForm({
   const [newItemLimit, setNewItemLimit] = useState<number | ''>('');
   const [newItemValue, setNewItemValue] = useState<number | ''>('');
   const [newItemPackSize, setNewItemPackSize] = useState<number | ''>('');
-  const [newItemFixture, setNewItemFixture] = useState<string | null>(null);
+
 
   // Category/subcategory dialog states
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
@@ -109,12 +113,18 @@ export default function AddItemForm({
   useEffect(() => {
     async function fetchInitialData() {
       try {
-        const [productsData, locationsData] = await Promise.all([
+        const [productsData, itemInfoData, locationsData] = await Promise.all([
           getProducts(),
+          getItemInfoAll(),
           getStorageLocations(),
         ]);
         setProducts(productsData);
+        setItemInfoList(itemInfoData);
         setStorageLocations(locationsData);
+        if (initialItemInfoId && !initialItemInfo) {
+          const match = itemInfoData.find((info) => info.id === initialItemInfoId && !!info.product_id);
+          if (match) setSelectedItemInfo(match);
+        }
       } catch (err) {
         setError('Failed to load initial data. Please refresh the page.');
       } finally {
@@ -123,7 +133,13 @@ export default function AddItemForm({
     }
 
     fetchInitialData();
-  }, []);
+  }, [initialItemInfoId, initialItemInfo]);
+
+  // Exclude item_info rows without a product_id — downstream flows
+  // (undo, edit, grouping) require a non-null product_id on movements.
+  const selectableItemInfoList = useMemo(() => {
+    return itemInfoList.filter((info) => !!info.product_id);
+  }, [itemInfoList]);
 
   // Compute warehouseLocations for form submission
   const warehouseLocations = useMemo(() => {
@@ -131,17 +147,6 @@ export default function AddItemForm({
       ? storageLocations.filter((loc) => loc.warehouse_id === selectedWarehouse.id)
       : [];
   }, [selectedWarehouse, storageLocations]);
-
-  // Derive available fixtures from storage locations
-  const availableFixtures = useMemo(() => {
-    const fixtureSet = new Set<string>();
-    storageLocations.forEach((loc) => {
-      if (loc.fixture && loc.fixture.trim() !== '') {
-        fixtureSet.add(loc.fixture);
-      }
-    });
-    return Array.from(fixtureSet).sort();
-  }, [storageLocations]);
 
   // Derive available categories from existing products + custom ones
   const availableCategories = useMemo(() => {
@@ -202,19 +207,19 @@ export default function AddItemForm({
         !hasNewItemFieldErrors()
       );
     }
-    return !!selectedWarehouse && !!selectedProduct && !!selectedSlot && isQuantityValid();
+    return !!selectedWarehouse && !!selectedItemInfo && !!selectedSlot && isQuantityValid();
   };
 
   const handleSubmit = async () => {
-    // Find the destination location based on slot (first matching location)
-    const destinationLocation = warehouseLocations.find((loc) => loc.slot === selectedSlot);
+    const destinationLocation =
+      warehouseLocations.find((loc) => loc.slot === selectedSlot) ?? null;
 
     // Validation
     if (!selectedWarehouse) {
       setError('Please select a warehouse.');
       return;
     }
-    if (!isNewItemMode && !selectedProduct) {
+    if (!isNewItemMode && !selectedItemInfo) {
       setError('Please select an item name.');
       return;
     }
@@ -244,22 +249,26 @@ export default function AddItemForm({
 
     try {
       if (isNewItemMode) {
-        // Build a placeholder product for the form data — the real product will be created by the parent
-        const placeholderProduct: Product = {
+        // Build a placeholder itemInfo — the real item_info row will be created server-side by syncItemInfoStock
+        const placeholderItemInfo: ItemInfo = {
           id: '',
-          created_at: '',
           name: newItemName.trim(),
-          description: null,
-          unit_of_measure: null,
-          value: typeof newItemValue === 'number' ? newItemValue : 0,
-          item_limit: typeof newItemLimit === 'number' ? newItemLimit : 0,
-          category: newItemCategory || '',
-          total_count: 0,
+          product_id: selectedSubcategoryProduct?.id || null,
+          category: newItemCategory || null,
+          quantity: null,
+          value: typeof newItemValue === 'number' ? newItemValue : null,
+          item_limit: typeof newItemLimit === 'number' ? newItemLimit : null,
+          stock: 0,
+          fixture: null,
+          last_known_location_code: null,
+          time_last_updated: null,
+          notes: null,
+          limbo: false,
         };
 
         await onSubmit({
           warehouse: selectedWarehouse,
-          product: placeholderProduct,
+          itemInfo: placeholderItemInfo,
           destinationLocationId: destinationLocation.id,
           quantity: quantityToAdd as number,
           notes,
@@ -271,13 +280,12 @@ export default function AddItemForm({
             limit: typeof newItemLimit === 'number' ? newItemLimit : undefined,
             value: typeof newItemValue === 'number' ? newItemValue : undefined,
             packSize: typeof newItemPackSize === 'number' ? newItemPackSize : undefined,
-            fixture: newItemFixture || undefined,
           },
         });
       } else {
         await onSubmit({
           warehouse: selectedWarehouse,
-          product: selectedProduct!,
+          itemInfo: selectedItemInfo!,
           destinationLocationId: destinationLocation.id,
           quantity: quantityToAdd as number,
           notes,
@@ -353,7 +361,7 @@ export default function AddItemForm({
         fullWidth
       />
 
-      {/* Item Name (Product) Selection */}
+      {/* Item name (item_info) */}
       <FormControl fullWidth>
         <AddItemFormLabel htmlFor="item-name-select">Item Name</AddItemFormLabel>
         {isNewItemMode ? (
@@ -501,21 +509,6 @@ export default function AddItemForm({
               />
             </FormControl>
 
-            {/* Fixture */}
-            <FormControl fullWidth sx={{ mt: 2 }}>
-              <AddItemFormLabel htmlFor="fixture-input">Fixture</AddItemFormLabel>
-              <Autocomplete
-                id="fixture-input"
-                options={availableFixtures}
-                value={newItemFixture}
-                onChange={(_, newValue) => setNewItemFixture(newValue)}
-                renderInput={(params) => (
-                  <TextField {...params} placeholder="Select fixture (optional)" />
-                )}
-                noOptionsText="No fixtures available"
-              />
-            </FormControl>
-
             <Button
               onClick={() => {
                 setIsNewItemMode(false);
@@ -536,8 +529,8 @@ export default function AddItemForm({
           <>
             <Autocomplete
               id="item-name-select"
-              options={products}
-              getOptionLabel={(option) => option.name || 'Unknown Product'}
+              options={selectableItemInfoList}
+              getOptionLabel={(option) => option.name || 'Unknown'}
               filterOptions={(options, state) => {
                 const searchTerm = state.inputValue.toLowerCase().trim();
                 if (!searchTerm) return options;
@@ -556,28 +549,32 @@ export default function AddItemForm({
                         {highlightText(option.name || 'Unknown', searchTerm)}
                       </ProductNameText>
                       <ProductDetailsText>
-                        {option.category} | Value: ${option.value}
+                        {option.product_name
+                          ? `Product: ${option.product_name} · `
+                          : ''}
+                        {option.category || 'No category'} | Value: ${option.value ?? 0} | Stock:{' '}
+                        {option.stock}
                       </ProductDetailsText>
                     </ProductOptionContainer>
                   </li>
                 );
               }}
-              value={selectedProduct}
+              value={selectedItemInfo}
               onChange={(_, newValue) => {
-                setSelectedProduct(newValue);
+                setSelectedItemInfo(newValue);
                 setError('');
               }}
               renderInput={(params) => (
                 <TextField {...params} placeholder="Search for an item name" />
               )}
-              noOptionsText="No matching products found"
+              noOptionsText="No matching items found"
             />
             {allowNewItem && (
               <Button
                 startIcon={<AddIcon />}
                 onClick={() => {
                   setIsNewItemMode(true);
-                  setSelectedProduct(null);
+                  setSelectedItemInfo(null);
                   setError('');
                 }}
                 sx={{

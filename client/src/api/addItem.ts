@@ -13,6 +13,7 @@ const CreateInventoryMovementRequestSchema = InventoryMovementSchema.omit({
   id: true,
   performed_at: true,
 }).extend({
+  product_id: z.string(),
   performed_by: z.string(),
   from_location_id: z.string().nullable().optional(),
   to_location_id: z.string().nullable().optional(),
@@ -65,6 +66,7 @@ export async function getInventoryMovements(): Promise<InventoryMovement[]> {
 
 export async function createItem(itemData: {
   name: string;
+  item_info?: string;
   product_id?: string;
   quantity: number;
   stock: number;
@@ -123,6 +125,7 @@ export async function createProduct(payload: {
 export async function createItemWithMovement(payload: {
   item: {
     name: string;
+    item_info?: string;
     product_id?: string;
     quantity: number;
     stock: number;
@@ -153,5 +156,44 @@ export async function createItemWithMovement(payload: {
     body: JSON.stringify(payload),
   });
   if (!response.ok) throw new Error('Failed to create items with movement');
+  return response.json();
+}
+
+export async function bulkCreateItemsWithMovement(payload: {
+  entries: Array<{
+    item: {
+      name: string;
+      item_info?: string;
+      product_id?: string;
+      quantity: number;
+      stock: number;
+      current_location_id: string;
+      status: 'active' | 'inactive' | 'discontinued' | 'checked_out';
+      created_by: string;
+      warehouse: string;
+      category?: string;
+      item_limit?: number;
+      value?: number;
+      limbo?: boolean;
+      notes?: string;
+    };
+    movement: {
+      inventory_action: 'ADD';
+      from_location_id?: string | null;
+      to_location_id: string;
+      quantity: number;
+      performed_by: string;
+      note?: string;
+    };
+  }>;
+}): Promise<{ results: Array<{ items: Item[]; movement: InventoryMovement }> }> {
+  const response = await authFetch(`${API_BASE_URL}/inventory-movement/with-items`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) throw new Error('Failed to bulk create items with movements');
   return response.json();
 }

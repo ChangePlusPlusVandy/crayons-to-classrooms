@@ -76,6 +76,7 @@ export const syncItemInfoStock = async (
   quantity: number | undefined,
   value: number | undefined,
   itemLimit: number | undefined,
+  limbo: boolean | undefined,
   fixture: string | null | undefined,
   lastKnownLocationCode: string | null | undefined,
   stockDelta: number,
@@ -85,23 +86,23 @@ export const syncItemInfoStock = async (
   try {
     if (!createIfMissing) {
       const updateResult = await db.query(
-        'UPDATE item_info SET stock = stock + $1, limbo = (stock + $1) = 0, fixture = COALESCE($2, fixture), last_known_location_code = COALESCE($3, last_known_location_code), time_last_updated = NOW() WHERE name = $4 RETURNING id',
+        'UPDATE item_info SET stock = GREATEST(stock + $1, 0), fixture = COALESCE($2, fixture), last_known_location_code = COALESCE($3, last_known_location_code), time_last_updated = NOW() WHERE name = $4 RETURNING id',
         [stockDelta, fixture ?? null, lastKnownLocationCode ?? null, itemName]
       );
       return updateResult.rows[0]?.id ?? null;
     }
 
     const upsertResult = await db.query(
-      `INSERT INTO item_info (name, product_id, category, quantity, value, item_limit, stock, fixture, last_known_location_code, time_last_updated, notes)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), $10)
+      `INSERT INTO item_info (name, product_id, category, quantity, value, item_limit, limbo, stock, fixture, last_known_location_code, time_last_updated, notes)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), $11)
        ON CONFLICT (name) DO UPDATE
        SET stock = item_info.stock + EXCLUDED.stock,
-           limbo = (item_info.stock + EXCLUDED.stock) = 0,
            product_id = COALESCE(EXCLUDED.product_id, item_info.product_id),
            category = COALESCE(EXCLUDED.category, item_info.category),
            quantity = COALESCE(EXCLUDED.quantity, item_info.quantity),
            value = COALESCE(EXCLUDED.value, item_info.value),
            item_limit = COALESCE(EXCLUDED.item_limit, item_info.item_limit),
+           limbo = COALESCE(EXCLUDED.limbo, item_info.limbo),
            fixture = COALESCE(EXCLUDED.fixture, item_info.fixture),
            last_known_location_code = COALESCE(EXCLUDED.last_known_location_code, item_info.last_known_location_code),
            time_last_updated = NOW()
@@ -111,8 +112,9 @@ export const syncItemInfoStock = async (
         productId ?? null,
         category ?? null,
         quantity ?? null,
-        value ?? null,
+        value != null ? Math.round(value) : null,
         itemLimit ?? null,
+        limbo ?? false,
         stockDelta,
         fixture ?? null,
         lastKnownLocationCode ?? null,
@@ -129,6 +131,7 @@ export const syncItemInfoStock = async (
       value,
       stockDelta,
       itemLimit,
+      limbo,
       fixture,
       lastKnownLocationCode,
       createIfMissing,
@@ -247,7 +250,7 @@ export const getItemsByName = async (req: Request, res: Response) => {
   }
 };
 /**
- * Retrieves all items currently at a specific location.
+ * Retrieves all active items currently at a specific location.
  *
  * @param {Request} req - Express request object with:
  *   - locationId: UUID of the location (in params)
@@ -258,9 +261,10 @@ export const getItemsByName = async (req: Request, res: Response) => {
 export const getItemsByLocationId = async (req: Request, res: Response) => {
   try {
     const { locationId } = locationIdParamSchema.parse(req.params);
-    const items = await pool.query('SELECT * FROM items WHERE current_location_id = $1', [
-      locationId,
-    ]);
+    const items = await pool.query(
+      "SELECT * FROM items WHERE current_location_id = $1 AND status = 'active'",
+      [locationId]
+    );
 
     if (!countRows(items.rows, res)) {
       return;
@@ -374,8 +378,8 @@ export async function createItemCore(
   db: DbClient = pool
 ): Promise<any[]> {
   const {
-    name,
-    product_id,
+    name: bodyName,
+    product_id: bodyProductId,
     current_location_id,
     fixture,
     created_by,
@@ -383,21 +387,46 @@ export async function createItemCore(
     stock,
     status,
     warehouse,
-    category,
-    item_limit,
-    value,
+    category: bodyCategory,
+    item_limit: bodyItemLimit,
+    value: bodyValue,
     limbo,
     notes,
+    item_info: bodyItemInfoId,
   } = data;
 
-  // Check if product_id, warehouse exist in tables
-  // Only check current_location_id and product_id if provided
+  let insertName = bodyName;
+  let insertProductId = bodyProductId ?? null;
+  let insertCategory = bodyCategory ?? null;
+  let insertItemLimit = bodyItemLimit ?? null;
+  let insertValue = bodyValue ?? 0;
+  let insertItemInfoId: string | null = null;
+
+  if (bodyItemInfoId) {
+    const infoRes = await db.query(
+      'SELECT id, name, product_id, category, value, item_limit FROM item_info WHERE id = $1',
+      [bodyItemInfoId]
+    );
+    if (infoRes.rows.length === 0) {
+      throw new ForeignKeyError('item_info');
+    }
+    const row = infoRes.rows[0];
+    insertItemInfoId = row.id;
+    insertName = row.name;
+    insertProductId = row.product_id ?? null;
+    insertCategory = row.category ?? null;
+    insertItemLimit = row.item_limit ?? null;
+    insertValue = row.value != null ? Number(row.value) : 0;
+  }
+
   const validationPromises: Promise<any>[] = [
     db.query('SELECT id FROM warehouse WHERE id = $1', [warehouse]),
   ];
 
-  if (product_id) {
-    validationPromises.push(db.query('SELECT id FROM products WHERE id = $1', [product_id]));
+  if (insertProductId) {
+    validationPromises.push(
+      db.query('SELECT id FROM products WHERE id = $1', [insertProductId])
+    );
   }
 
   if (current_location_id) {
@@ -414,7 +443,7 @@ export async function createItemCore(
   }
   resultIdx++;
 
-  if (product_id) {
+  if (insertProductId) {
     if (validationResults[resultIdx].rows.length === 0) {
       throw new ForeignKeyError('product_id');
     }
@@ -426,52 +455,67 @@ export async function createItemCore(
   }
 
   const newItems = await db.query(
-    'INSERT INTO items (name, product_id, quantity, stock, current_location_id, status, created_by, warehouse, category, item_limit, value, limbo, notes, created_at, updated_at) SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW(), NOW() FROM generate_series(1, $14) RETURNING *',
+    'INSERT INTO items (name, product_id, quantity, stock, current_location_id, status, created_by, warehouse, category, item_limit, limbo, value, notes, item_info, created_at, updated_at) SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW(), NOW() FROM generate_series(1, $15) RETURNING *',
     [
-      name,
-      product_id ?? null,
+      insertName,
+      insertProductId,
       quantity,
       stock ?? null,
       current_location_id ?? null,
       status,
       created_by,
       warehouse,
-      category ?? null,
-      item_limit ?? null,
-      value ?? 0,
+      insertCategory ?? null,
+      insertItemLimit ?? null,
       limbo ?? false,
+      insertValue,
       notes ?? null,
+      insertItemInfoId,
       count,
     ]
   );
 
   const { locationCode } = await getLocationInfo(current_location_id ?? null, db);
   const fixtureOverride = fixture ?? null;
-  const itemInfoId = await syncItemInfoStock(
-    name,
-    product_id ?? undefined,
-    category ?? 'UNKNOWN',
-    quantity,
-    value ?? 0,
-    item_limit ?? 0,
-    fixtureOverride,
-    locationCode,
-    count,
-    true,
-    db
-  );
-  let createdItem = newItems.rows[0];
-  if (itemInfoId) {
-    const updatedItem = await pool.query(
-      'UPDATE items SET item_info = $1, updated_at = NOW() WHERE id = $2 RETURNING *',
-      [itemInfoId, createdItem.id]
+
+  if (insertItemInfoId) {
+    await db.query(
+      `UPDATE item_info SET stock = stock + $1,
+        fixture = COALESCE($2, fixture),
+        last_known_location_code = COALESCE($3, last_known_location_code),
+        time_last_updated = NOW()
+       WHERE id = $4`,
+      [count, fixtureOverride ?? null, locationCode ?? null, insertItemInfoId]
     );
-    if (updatedItem.rows[0]) {
-      createdItem = updatedItem.rows[0];
+  } else {
+    const syncedItemInfoId = await syncItemInfoStock(
+      insertName,
+      insertProductId ?? undefined,
+      insertCategory ?? 'UNKNOWN',
+      quantity,
+      insertValue,
+      insertItemLimit ?? undefined,
+      limbo ?? false,
+      fixtureOverride,
+      locationCode,
+      count,
+      true,
+      db
+    );
+    if (syncedItemInfoId) {
+      await db.query(
+        'UPDATE items SET item_info = $1, updated_at = NOW() WHERE id = ANY($2::uuid[])',
+        [syncedItemInfoId, newItems.rows.map((r: { id: string }) => r.id)]
+      );
     }
   }
 
-  return newItems.rows;
+  const ids = newItems.rows.map((r: { id: string }) => r.id);
+  const refreshed = await db.query(
+    'SELECT * FROM items WHERE id = ANY($1::uuid[]) ORDER BY created_at',
+    [ids]
+  );
+  return refreshed.rows;
 }
 
 /**
@@ -628,6 +672,7 @@ export const updateItem = async (req: Request, res: Response) => {
         undefined,
         undefined,
         0,
+        false,
         undefined,
         undefined,
         -1,
@@ -640,6 +685,7 @@ export const updateItem = async (req: Request, res: Response) => {
         updatedItem.quantity,
         updatedItem.value,
         updatedItem.item_limit ?? undefined,
+        updatedItem.limbo ?? false,
         undefined,
         locationCode,
         1,
@@ -653,6 +699,7 @@ export const updateItem = async (req: Request, res: Response) => {
         updatedItem.quantity,
         updatedItem.value,
         updatedItem.item_limit ?? undefined,
+        updatedItem.limbo ?? false,
         undefined,
         locationCode,
         0,
@@ -700,6 +747,7 @@ export const deleteItem = async (req: Request, res: Response) => {
         undefined,
         undefined,
         0,
+        false,
         undefined,
         undefined,
         -1,
