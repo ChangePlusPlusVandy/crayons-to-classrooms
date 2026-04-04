@@ -18,8 +18,8 @@ import {
   getProducts,
   getStorageLocations,
   createProduct,
-  createStorageLocation,
 } from '../../api/addItem';
+import { createStorageLocation } from '../../api/storageLocation';
 import { Warehouse } from '../../types/Warehouse';
 import { StorageLocation } from '../../types/StorageLocation';
 import { Product } from '../../types/Product';
@@ -351,6 +351,8 @@ export default function AddItemForm({
       setSlotDialogOpen(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to create slot. Please try again.');
+      setNewSlotCode('');
+      setSlotDialogOpen(false);
     } finally {
       setCreatingSlot(false);
     }
@@ -779,7 +781,7 @@ export default function AddItemForm({
             sx={{ mt: 1 }}
             helperText={
               selectedWarehouse
-                ? `Creates a storage location in ${selectedWarehouse.name}.`
+                ? `Creates a unique storage location in ${selectedWarehouse.name}.`
                 : 'Select a warehouse in the form first.'
             }
           />

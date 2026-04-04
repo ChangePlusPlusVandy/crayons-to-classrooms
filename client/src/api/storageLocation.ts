@@ -45,7 +45,7 @@ export async function createStorageLocation(
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
   });
-  if (!response.ok) throw new Error('Failed to create storage location');
+  if (!response.ok) throw new Error('Failed to create new storage location');
   return response.json();
 }
 

@@ -39,37 +39,6 @@ export async function getStorageLocations(): Promise<StorageLocation[]> {
   return response.json();
 }
 
-export type CreateStorageLocationPayload = {
-  aisle?: string | null;
-  slot: string;
-  fixture?: string | null;
-  active: boolean;
-  extra_info?: string | null;
-  warehouse_id: string;
-};
-
-/** POST /storage-locations — creates a row for the given warehouse (slot + aisle required server-side). */
-export async function createStorageLocation(
-  body: CreateStorageLocationPayload
-): Promise<StorageLocation> {
-  const response = await authFetch(`${API_BASE_URL}/storage-locations`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-  if (!response.ok) {
-    let message = 'Failed to create storage location';
-    try {
-      const err = (await response.json()) as { error?: string; details?: { message?: string }[] };
-      if (err.error) message = err.error;
-      if (err.details?.[0]?.message) message = `${message}: ${err.details[0].message}`;
-    } catch {
-      /* ignore */
-    }
-    throw new Error(message);
-  }
-  return response.json();
-}
 
 export async function getProductById(id: string): Promise<Product> {
   const response = await authFetch(`${API_BASE_URL}/products/${id}`);

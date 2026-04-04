@@ -25,10 +25,10 @@ import {
 import { getLimboItems, ItemInfo } from '../../api/itemInfo';
 import {
   createItemWithMovement,
-  createStorageLocation,
   getStorageLocations,
   getWarehouses,
 } from '../../api/addItem';
+import { createStorageLocation } from '../../api/storageLocation';
 import { Warehouse } from '../../types/Warehouse';
 import { StorageLocation } from '../../types/StorageLocation';
 import { useAuth } from '../../context/AuthContext';
@@ -37,6 +37,7 @@ import itemIcon from '../../assets/item.svg';
 import clockIcon from '../../assets/clock.svg';
 import upArrowIcon from '../../assets/up_arrow.svg';
 import searchIcon from '../../assets/search.svg';
+import exitIcon from '../../assets/exit.svg';
 
 export default function Limbo() {
   const { user } = useAuth();
@@ -202,11 +203,13 @@ export default function Limbo() {
         warehouse_id: wh.id,
       });
       setStorageLocations((prev) => [...prev, created]);
-      setRestockSlotCode(created.slot);
+      setRestockSlotCode(created.location_code);
       setNewSlotCode('');
       setNewSlotDialogOpen(false);
     } catch (e) {
       setRestockError(e instanceof Error ? e.message : 'Failed to create slot.');
+      setNewSlotCode('');
+      setNewSlotDialogOpen(false);
     } finally {
       setCreatingNewSlot(false);
     }
@@ -521,7 +524,12 @@ export default function Limbo() {
       >
         <DialogContent sx={limboStyles.restockDialogContent}>
           <Box sx={limboStyles.restockDialogClose} onClick={closeRestockDialog}>
-            ×
+            <Box
+              component="img"
+              src={exitIcon}
+              alt="Close"
+              sx={{ width: 16, height: 16, display: 'block' }}
+            />
           </Box>
           <Typography sx={limboStyles.restockDialogTitle}>Restock item from limbo</Typography>
 
@@ -706,7 +714,12 @@ export default function Limbo() {
             sx={limboStyles.restockDialogClose}
             onClick={() => !creatingNewSlot && setNewSlotDialogOpen(false)}
           >
-            ×
+            <Box
+              component="img"
+              src={exitIcon}
+              alt="Close"
+              sx={{ width: 16, height: 16, display: 'block' }}
+            />
           </Box>
           <Typography sx={limboStyles.restockDialogTitle}>Add new slot</Typography>
           <Box sx={limboStyles.restockOptionsBox}>
@@ -728,7 +741,7 @@ export default function Limbo() {
               </Box>
               <Typography sx={limboStyles.restockingLabel}>
                 {restockWarehouse
-                  ? `Creates a storage location in ${restockWarehouse}.`
+                  ? `Creates a unique storage location in ${restockWarehouse}.`
                   : 'Select a warehouse in the restock form first.'}
               </Typography>
             </Box>

@@ -24,7 +24,7 @@ export const createStorageLocationSchema = z.object({
 // Schema for validating storage location updates
 export const updateStorageLocationSchema = z
   .object({
-    aisle: z.string().min(1, 'Aisle cannot be empty').optional(),
+    aisle: z.string().min(1, 'Aisle cannot be empty').nullable().optional(),
     slot: z.string().min(1, 'Slot cannot be empty').optional(),
     fixture: z.string().nullable().optional(),
     active: z.boolean().optional(),

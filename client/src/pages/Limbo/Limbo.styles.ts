@@ -276,11 +276,6 @@ export const limboStyles = {
     alignItems: 'center',
     justifyContent: 'center',
     cursor: 'pointer',
-    color: '#6B7280',
-    fontFamily: 'Inter, sans-serif',
-    fontWeight: 500,
-    fontSize: '16px',
-    lineHeight: '16px',
   },
   restockOptionsBox: {
     width: '100%',
