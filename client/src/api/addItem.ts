@@ -39,6 +39,7 @@ export async function getStorageLocations(): Promise<StorageLocation[]> {
   return response.json();
 }
 
+
 export async function getProductById(id: string): Promise<Product> {
   const response = await authFetch(`${API_BASE_URL}/products/${id}`);
   if (!response.ok) throw new Error('Failed to fetch product');

@@ -8,10 +8,15 @@ import {
   Autocomplete,
   Stack,
   FormControl,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from '@mui/material';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import AddIcon from '@mui/icons-material/Add';
 import { getStorageLocations, getItemsByLocation, groupItemsByLocation } from '../../api/moveItem';
+import { createStorageLocation } from '../../api/storageLocation';
 import { Warehouse } from '../../types/Warehouse';
 import { StorageLocation } from '../../types/StorageLocation';
 import { Item, ItemGroup } from '../../types/Item';
@@ -75,6 +80,9 @@ export default function MoveItemForm({
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [slotDialogOpen, setSlotDialogOpen] = useState(false);
+  const [newSlotCode, setNewSlotCode] = useState('');
+  const [creatingSlot, setCreatingSlot] = useState(false);
 
   // Track whether we still need to auto-select the item group from initialProductId
   const [pendingAutoSelect, setPendingAutoSelect] = useState(!!initialProductId);
@@ -284,6 +292,38 @@ export default function MoveItemForm({
       return `Cannot exceed ${selectedItemGroup.quantity} available`;
     }
     return '';
+  };
+
+  const handleAddNewSlot = async () => {
+    const slot = newSlotCode.trim();
+    if (!selectedWarehouse) {
+      setError('Please select a warehouse before adding a slot.');
+      return;
+    }
+    if (!slot) {
+      setError('Please enter a slot code.');
+      return;
+    }
+
+    setCreatingSlot(true);
+    setError('');
+    try {
+      const created = await createStorageLocation({
+        slot,
+        active: true,
+        warehouse_id: selectedWarehouse.id,
+      });
+      setStorageLocations((prev) => [...prev, created]);
+      setSelectedDestinationSlot(created.slot);
+      setNewSlotCode('');
+      setSlotDialogOpen(false);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to create slot. Please try again.');
+      setNewSlotCode('');
+      setSlotDialogOpen(false);
+    } finally {
+      setCreatingSlot(false);
+    }
   };
 
   const handleSubmit = async () => {
@@ -510,13 +550,49 @@ export default function MoveItemForm({
             },
           }}
           onClick={() => {
-            // Does nothing for now
+            setError('');
+            setNewSlotCode('');
+            setSlotDialogOpen(true);
           }}
           disabled={!selectedWarehouse}
         >
           New Slot
         </Button>
       </SlotSelector>
+
+      <Dialog open={slotDialogOpen} onClose={() => !creatingSlot && setSlotDialogOpen(false)}>
+        <DialogTitle>Add New Slot</DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            fullWidth
+            required
+            label="Slot code"
+            value={newSlotCode}
+            onChange={(e) => setNewSlotCode(e.target.value)}
+            placeholder="e.g. A-12-03"
+            sx={{ mt: 1 }}
+            helperText={
+              selectedWarehouse
+                ? `Creates a unique storage location in ${selectedWarehouse.name}.`
+                : 'Select a warehouse in the form first.'
+            }
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setSlotDialogOpen(false)} disabled={creatingSlot}>
+            Cancel
+          </Button>
+          <Button
+            onClick={() => void handleAddNewSlot()}
+            disabled={!newSlotCode.trim() || !selectedWarehouse || creatingSlot}
+            variant="contained"
+          >
+            {creatingSlot ? <CircularProgress size={20} /> : 'Add slot'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       <FormControl fullWidth>
         <MoveItemFormLabel htmlFor="notes-input">Notes</MoveItemFormLabel>
         <TextField
