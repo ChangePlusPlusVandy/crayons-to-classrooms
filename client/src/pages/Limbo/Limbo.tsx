@@ -22,12 +22,13 @@ import {
   Autocomplete,
   Snackbar,
 } from '@mui/material';
-import { getLimboItems, ItemInfo } from '../../api/itemInfo';
+import { deleteItemInfo, getLimboItems, ItemInfo } from '../../api/itemInfo';
 import { createItemWithMovement, getStorageLocations, getWarehouses } from '../../api/addItem';
 import { createStorageLocation } from '../../api/storageLocation';
 import { Warehouse } from '../../types/Warehouse';
 import { StorageLocation } from '../../types/StorageLocation';
 import { useAuth } from '../../context/AuthContext';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import { limboStyles } from './Limbo.styles';
 import itemIcon from '../../assets/item.svg';
 import clockIcon from '../../assets/clock.svg';
@@ -59,6 +60,12 @@ export default function Limbo() {
   const [newSlotDialogOpen, setNewSlotDialogOpen] = useState(false);
   const [newSlotCode, setNewSlotCode] = useState('');
   const [creatingNewSlot, setCreatingNewSlot] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState<ItemInfo | null>(null);
+  const [deleteSubmitting, setDeleteSubmitting] = useState(false);
+  const [tableActionError, setTableActionError] = useState('');
+
+  const tableRowActionsLocked =
+    deleteSubmitting || itemToDelete !== null || restockSubmitting;
 
   const warehouseNameOptions = useMemo(
     () => [...warehouses].map((w) => w.name).sort((a, b) => a.localeCompare(b)),
@@ -180,6 +187,30 @@ export default function Limbo() {
     setRestockError('');
     setNewSlotDialogOpen(false);
     setNewSlotCode('');
+  };
+
+  const closeDeleteDialog = () => {
+    if (!deleteSubmitting) setItemToDelete(null);
+  };
+
+  const handleConfirmDeleteItemInfo = async () => {
+    if (!itemToDelete) return;
+    const target = itemToDelete;
+    setTableActionError('');
+    setDeleteSubmitting(true);
+    try {
+      await deleteItemInfo(target.id);
+      setItems((prev) => prev.filter((i) => i.id !== target.id));
+      if (restockItem?.id === target.id) {
+        closeRestockDialog();
+      }
+      setItemToDelete(null);
+    } catch (e) {
+      setItemToDelete(null);
+      setTableActionError(e instanceof Error ? e.message : 'Could not delete item.');
+    } finally {
+      setDeleteSubmitting(false);
+    }
   };
 
   const handleAddNewSlotFromRestock = async () => {
@@ -368,6 +399,11 @@ export default function Limbo() {
                 {error}
               </Alert>
             )}
+            {tableActionError && (
+              <Alert severity="error" sx={{ mb: 1 }} onClose={() => setTableActionError('')}>
+                {tableActionError}
+              </Alert>
+            )}
 
             <Box sx={limboStyles.filtersRow}>
               <Box sx={limboStyles.searchNameArea}>
@@ -427,8 +463,8 @@ export default function Limbo() {
                     <TableCell sx={{ ...limboStyles.tableHeadCell, width: 401 }}>
                       Last Updated
                     </TableCell>
-                    <TableCell sx={{ ...limboStyles.tableHeadCell, width: 183 }} align="left">
-                      Restock Action
+                    <TableCell sx={{ ...limboStyles.tableHeadCell, width: 260 }} align="left">
+                      Limbo Actions
                     </TableCell>
                   </TableRow>
                 </TableHead>
@@ -467,19 +503,25 @@ export default function Limbo() {
                             : '-'}
                         </Box>
                       </TableCell>
-                      <TableCell sx={{ ...limboStyles.tableCell, width: 183, py: 0 }} align="left">
+                      <TableCell sx={{ ...limboStyles.tableCell, width: 260, py: 0 }} align="left">
                         <Box
                           sx={{
-                            height: '69px',
+                            minHeight: '69px',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'flex-start',
+                            gap: 1,
+                            flexWrap: 'wrap',
                           }}
                         >
                           <Button
                             variant="contained"
                             size="small"
-                            onClick={() => openRestockDialog(item)}
+                            disabled={tableRowActionsLocked}
+                            onClick={() => {
+                              setTableActionError('');
+                              openRestockDialog(item);
+                            }}
                             sx={limboStyles.restockButton}
                           >
                             <Box sx={{ display: 'flex', alignItems: 'center' }}>
@@ -491,6 +533,19 @@ export default function Limbo() {
                               />
                               Restock
                             </Box>
+                          </Button>
+                          <Button
+                            size="small"
+                            color="error"
+                            startIcon={<DeleteOutlineIcon />}
+                            disabled={tableRowActionsLocked}
+                            onClick={() => {
+                              setTableActionError('');
+                              setItemToDelete(item);
+                            }}
+                            sx={{ textTransform: 'none' }}
+                          >
+                            Delete
                           </Button>
                         </Box>
                       </TableCell>
@@ -781,6 +836,79 @@ export default function Limbo() {
             ) : (
               'Add slot'
             )}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={itemToDelete !== null}
+        onClose={() => {
+          if (!deleteSubmitting) closeDeleteDialog();
+        }}
+        maxWidth={false}
+        fullWidth={false}
+        slotProps={{ paper: { sx: limboStyles.restockDialogPaper } }}
+        aria-labelledby="limbo-delete-item-info-dialog-title"
+      >
+        <DialogContent sx={limboStyles.restockDialogContent}>
+          <Box sx={limboStyles.restockDialogClose} onClick={closeDeleteDialog}>
+            <Box
+              component="img"
+              src={exitIcon}
+              alt="Close"
+              sx={{ width: 16, height: 16, display: 'block' }}
+            />
+          </Box>
+          <Typography id="limbo-delete-item-info-dialog-title" sx={limboStyles.restockDialogTitle}>
+            Delete Item Info
+          </Typography>
+
+          <Box sx={limboStyles.restockOptionsBox}>
+            <Typography
+              component="p"
+              sx={{
+                ...limboStyles.restockingLabel,
+                m: 0,
+              }}
+            >
+              Are you sure you want to delete{' '}
+              <Box component="span" sx={limboStyles.restockItemName}>
+                {itemToDelete?.name ?? ''}
+              </Box>
+              ?
+            </Typography>
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ justifyContent: 'flex-end', pr: 3, pb: 2, gap: 1.5 }}>
+          <Button
+            onClick={closeDeleteDialog}
+            disabled={deleteSubmitting}
+            sx={{
+              height: 36,
+              width: '79.3515625px',
+              textTransform: 'none',
+              bgcolor: '#FFFFFF',
+              color: '#0A0A0A',
+              borderRadius: '10px',
+              px: 2.5,
+              boxShadow: 'none',
+              '&:hover': {
+                bgcolor: '#F3F4F6',
+                boxShadow: 'none',
+              },
+            }}
+          >
+            Cancel
+          </Button>
+          <Button
+            size="small"
+            color="error"
+            startIcon={<DeleteOutlineIcon />}
+            disabled={deleteSubmitting}
+            onClick={() => void handleConfirmDeleteItemInfo()}
+            sx={{ textTransform: 'none' }}
+          >
+            {deleteSubmitting ? 'Deleting…' : 'Delete'}
           </Button>
         </DialogActions>
       </Dialog>
