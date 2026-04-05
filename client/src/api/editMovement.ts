@@ -24,7 +24,8 @@ export async function editAddMovementTransaction(
   payload: {
     item: {
       name: string;
-      product_id: string;
+      item_info?: string;
+      product_id?: string;
       quantity: number;
       stock: number;
       current_location_id: string;

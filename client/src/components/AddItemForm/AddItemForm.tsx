@@ -15,6 +15,8 @@ import {
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import { getProducts, getStorageLocations, createProduct } from '../../api/addItem';
+import { createStorageLocation } from '../../api/storageLocation';
+import { getItemInfoAll, ItemInfo } from '../../api/itemInfo';
 import { Warehouse } from '../../types/Warehouse';
 import { StorageLocation } from '../../types/StorageLocation';
 import { Product } from '../../types/Product';
@@ -30,7 +32,7 @@ import { SlotSelector } from '../SlotSelector/SlotSelector';
 
 export interface AddItemFormData {
   warehouse: Warehouse;
-  product: Product;
+  itemInfo: ItemInfo;
   destinationLocationId: string;
   quantity: number;
   notes: string;
@@ -48,7 +50,8 @@ export interface AddItemFormData {
 
 interface AddItemFormProps {
   initialWarehouse?: Warehouse | null;
-  initialProduct?: Product | null;
+  initialItemInfo?: ItemInfo | null;
+  initialItemInfoId?: string;
   initialSlot?: string | null;
   initialQuantity?: number | '';
   initialNotes?: string;
@@ -60,7 +63,8 @@ interface AddItemFormProps {
 
 export default function AddItemForm({
   initialWarehouse = null,
-  initialProduct = null,
+  initialItemInfo = null,
+  initialItemInfoId,
   initialSlot = null,
   initialQuantity = '',
   initialNotes = '',
@@ -71,11 +75,12 @@ export default function AddItemForm({
 }: AddItemFormProps) {
   // Data states
   const [products, setProducts] = useState<Product[]>([]);
+  const [itemInfoList, setItemInfoList] = useState<ItemInfo[]>([]);
   const [storageLocations, setStorageLocations] = useState<StorageLocation[]>([]);
 
   // Form states
   const [selectedWarehouse, setSelectedWarehouse] = useState<Warehouse | null>(initialWarehouse);
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(initialProduct);
+  const [selectedItemInfo, setSelectedItemInfo] = useState<ItemInfo | null>(initialItemInfo);
   const [selectedSlot, setSelectedSlot] = useState<string | null>(initialSlot);
   const [quantityToAdd, setQuantityToAdd] = useState<number | ''>(initialQuantity);
   const [notes, setNotes] = useState(initialNotes);
@@ -90,7 +95,6 @@ export default function AddItemForm({
   const [newItemLimit, setNewItemLimit] = useState<number | ''>('');
   const [newItemValue, setNewItemValue] = useState<number | ''>('');
   const [newItemPackSize, setNewItemPackSize] = useState<number | ''>('');
-  const [newItemFixture, setNewItemFixture] = useState<string | null>(null);
 
   // Category/subcategory dialog states
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
@@ -99,6 +103,10 @@ export default function AddItemForm({
   const [newSubcategoryProductName, setNewSubcategoryProductName] = useState('');
   const [customCategories, setCustomCategories] = useState<string[]>([]);
   const [creatingSubcategory, setCreatingSubcategory] = useState(false);
+
+  const [slotDialogOpen, setSlotDialogOpen] = useState(false);
+  const [newSlotCode, setNewSlotCode] = useState('');
+  const [creatingSlot, setCreatingSlot] = useState(false);
 
   // UI states
   const [loading, setLoading] = useState(true);
@@ -109,12 +117,20 @@ export default function AddItemForm({
   useEffect(() => {
     async function fetchInitialData() {
       try {
-        const [productsData, locationsData] = await Promise.all([
+        const [productsData, itemInfoData, locationsData] = await Promise.all([
           getProducts(),
+          getItemInfoAll(),
           getStorageLocations(),
         ]);
         setProducts(productsData);
+        setItemInfoList(itemInfoData);
         setStorageLocations(locationsData);
+        if (initialItemInfoId && !initialItemInfo) {
+          const match = itemInfoData.find(
+            (info) => info.id === initialItemInfoId && !!info.product_id
+          );
+          if (match) setSelectedItemInfo(match);
+        }
       } catch (err) {
         setError('Failed to load initial data. Please refresh the page.');
       } finally {
@@ -123,7 +139,13 @@ export default function AddItemForm({
     }
 
     fetchInitialData();
-  }, []);
+  }, [initialItemInfoId, initialItemInfo]);
+
+  // Exclude item_info rows without a product_id — downstream flows
+  // (undo, edit, grouping) require a non-null product_id on movements.
+  const selectableItemInfoList = useMemo(() => {
+    return itemInfoList.filter((info) => !!info.product_id);
+  }, [itemInfoList]);
 
   // Compute warehouseLocations for form submission
   const warehouseLocations = useMemo(() => {
@@ -131,17 +153,6 @@ export default function AddItemForm({
       ? storageLocations.filter((loc) => loc.warehouse_id === selectedWarehouse.id)
       : [];
   }, [selectedWarehouse, storageLocations]);
-
-  // Derive available fixtures from storage locations
-  const availableFixtures = useMemo(() => {
-    const fixtureSet = new Set<string>();
-    storageLocations.forEach((loc) => {
-      if (loc.fixture && loc.fixture.trim() !== '') {
-        fixtureSet.add(loc.fixture);
-      }
-    });
-    return Array.from(fixtureSet).sort();
-  }, [storageLocations]);
 
   // Derive available categories from existing products + custom ones
   const availableCategories = useMemo(() => {
@@ -202,7 +213,7 @@ export default function AddItemForm({
         !hasNewItemFieldErrors()
       );
     }
-    return !!selectedWarehouse && !!selectedProduct && !!selectedSlot && isQuantityValid();
+    return !!selectedWarehouse && !!selectedItemInfo && !!selectedSlot && isQuantityValid();
   };
 
   const handleSubmit = async () => {
@@ -218,7 +229,7 @@ export default function AddItemForm({
       setError('Please select a warehouse.');
       return;
     }
-    if (!isNewItemMode && !selectedProduct) {
+    if (!isNewItemMode && !selectedItemInfo) {
       setError('Please select an item name.');
       return;
     }
@@ -248,22 +259,26 @@ export default function AddItemForm({
 
     try {
       if (isNewItemMode) {
-        // Build a placeholder product for the form data — the real product will be created by the parent
-        const placeholderProduct: Product = {
+        // Build a placeholder itemInfo — the real item_info row will be created server-side by syncItemInfoStock
+        const placeholderItemInfo: ItemInfo = {
           id: '',
-          created_at: '',
           name: newItemName.trim(),
-          description: null,
-          unit_of_measure: null,
-          value: typeof newItemValue === 'number' ? newItemValue : 0,
-          item_limit: typeof newItemLimit === 'number' ? newItemLimit : 0,
-          category: newItemCategory || '',
-          total_count: 0,
+          product_id: selectedSubcategoryProduct?.id || null,
+          category: newItemCategory || null,
+          quantity: null,
+          value: typeof newItemValue === 'number' ? newItemValue : null,
+          item_limit: typeof newItemLimit === 'number' ? newItemLimit : null,
+          stock: 0,
+          fixture: null,
+          last_known_location_code: null,
+          time_last_updated: null,
+          notes: null,
+          limbo: false,
         };
 
         await onSubmit({
           warehouse: selectedWarehouse,
-          product: placeholderProduct,
+          itemInfo: placeholderItemInfo,
           destinationLocationId: destinationLocation.id,
           quantity: quantityToAdd as number,
           notes,
@@ -275,13 +290,12 @@ export default function AddItemForm({
             limit: typeof newItemLimit === 'number' ? newItemLimit : undefined,
             value: typeof newItemValue === 'number' ? newItemValue : undefined,
             packSize: typeof newItemPackSize === 'number' ? newItemPackSize : undefined,
-            fixture: newItemFixture || undefined,
           },
         });
       } else {
         await onSubmit({
           warehouse: selectedWarehouse,
-          product: selectedProduct!,
+          itemInfo: selectedItemInfo!,
           destinationLocationId: destinationLocation.id,
           quantity: quantityToAdd as number,
           notes,
@@ -321,6 +335,38 @@ export default function AddItemForm({
     }
   };
 
+  const handleAddNewSlot = async () => {
+    const slot = newSlotCode.trim();
+    if (!selectedWarehouse) {
+      setError('Please select a warehouse before adding a slot.');
+      return;
+    }
+    if (!slot) {
+      setError('Please enter a slot code.');
+      return;
+    }
+
+    setCreatingSlot(true);
+    setError('');
+    try {
+      const created = await createStorageLocation({
+        slot,
+        active: true,
+        warehouse_id: selectedWarehouse.id,
+      });
+      setStorageLocations((prev) => [...prev, created]);
+      setSelectedSlot(created.slot);
+      setNewSlotCode('');
+      setSlotDialogOpen(false);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to create slot. Please try again.');
+      setNewSlotCode('');
+      setSlotDialogOpen(false);
+    } finally {
+      setCreatingSlot(false);
+    }
+  };
+
   if (loading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
@@ -357,7 +403,7 @@ export default function AddItemForm({
         fullWidth
       />
 
-      {/* Item Name (Product) Selection */}
+      {/* Item name (item_info) */}
       <FormControl fullWidth>
         <AddItemFormLabel htmlFor="item-name-select">Item Name</AddItemFormLabel>
         {isNewItemMode ? (
@@ -505,21 +551,6 @@ export default function AddItemForm({
               />
             </FormControl>
 
-            {/* Fixture */}
-            <FormControl fullWidth sx={{ mt: 2 }}>
-              <AddItemFormLabel htmlFor="fixture-input">Fixture</AddItemFormLabel>
-              <Autocomplete
-                id="fixture-input"
-                options={availableFixtures}
-                value={newItemFixture}
-                onChange={(_, newValue) => setNewItemFixture(newValue)}
-                renderInput={(params) => (
-                  <TextField {...params} placeholder="Select fixture (optional)" />
-                )}
-                noOptionsText="No fixtures available"
-              />
-            </FormControl>
-
             <Button
               onClick={() => {
                 setIsNewItemMode(false);
@@ -540,8 +571,8 @@ export default function AddItemForm({
           <>
             <Autocomplete
               id="item-name-select"
-              options={products}
-              getOptionLabel={(option) => option.name || 'Unknown Product'}
+              options={selectableItemInfoList}
+              getOptionLabel={(option) => option.name || 'Unknown'}
               filterOptions={(options, state) => {
                 const searchTerm = state.inputValue.toLowerCase().trim();
                 if (!searchTerm) return options;
@@ -560,28 +591,30 @@ export default function AddItemForm({
                         {highlightText(option.name || 'Unknown', searchTerm)}
                       </ProductNameText>
                       <ProductDetailsText>
-                        {option.category} | Value: ${option.value}
+                        {option.product_name ? `Product: ${option.product_name} · ` : ''}
+                        {option.category || 'No category'} | Value: ${option.value ?? 0} | Stock:{' '}
+                        {option.stock}
                       </ProductDetailsText>
                     </ProductOptionContainer>
                   </li>
                 );
               }}
-              value={selectedProduct}
+              value={selectedItemInfo}
               onChange={(_, newValue) => {
-                setSelectedProduct(newValue);
+                setSelectedItemInfo(newValue);
                 setError('');
               }}
               renderInput={(params) => (
                 <TextField {...params} placeholder="Search for an item name" />
               )}
-              noOptionsText="No matching products found"
+              noOptionsText="No matching items found"
             />
             {allowNewItem && (
               <Button
                 startIcon={<AddIcon />}
                 onClick={() => {
                   setIsNewItemMode(true);
-                  setSelectedProduct(null);
+                  setSelectedItemInfo(null);
                   setError('');
                 }}
                 sx={{
@@ -610,7 +643,26 @@ export default function AddItemForm({
         }}
         warehouse={selectedWarehouse}
         storageLocations={storageLocations}
-      />
+      >
+        <Button
+          startIcon={<AddIcon />}
+          onClick={() => {
+            setError('');
+            setNewSlotCode('');
+            setSlotDialogOpen(true);
+          }}
+          disabled={!selectedWarehouse}
+          sx={{
+            justifyContent: 'flex-start',
+            textTransform: 'none',
+            color: 'primary.main',
+            mt: 0,
+            '&:hover': { backgroundColor: 'transparent' },
+          }}
+        >
+          New Slot
+        </Button>
+      </SlotSelector>
 
       {/* Quantity to Add */}
       <FormControl fullWidth>
@@ -705,6 +757,40 @@ export default function AddItemForm({
             disabled={!newSubcategoryProductName.trim() || creatingSubcategory}
           >
             {creatingSubcategory ? <CircularProgress size={20} /> : 'Add'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* New Slot — creates storage_locations row for the selected warehouse */}
+      <Dialog open={slotDialogOpen} onClose={() => !creatingSlot && setSlotDialogOpen(false)}>
+        <DialogTitle>Add New Slot</DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            fullWidth
+            required
+            label="Slot code"
+            value={newSlotCode}
+            onChange={(e) => setNewSlotCode(e.target.value)}
+            placeholder="e.g. A-12-03"
+            sx={{ mt: 1 }}
+            helperText={
+              selectedWarehouse
+                ? `Creates a unique storage location in ${selectedWarehouse.name}.`
+                : 'Select a warehouse in the form first.'
+            }
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setSlotDialogOpen(false)} disabled={creatingSlot}>
+            Cancel
+          </Button>
+          <Button
+            onClick={() => void handleAddNewSlot()}
+            disabled={!newSlotCode.trim() || !selectedWarehouse || creatingSlot}
+            variant="contained"
+          >
+            {creatingSlot ? <CircularProgress size={20} /> : 'Add slot'}
           </Button>
         </DialogActions>
       </Dialog>

@@ -97,12 +97,14 @@ export async function getAllMovementsDetailed(req: Request, res: Response): Prom
           im.note,
           im.performed_at,
           im.inventory_action,
-          p.name AS product_name,
-          from_loc.location_code AS from_location_name,
-          to_loc.location_code AS to_location_name,
+          COALESCE(ii.name, i.name, p.name) AS product_name,
+          from_loc.slot AS from_location_name,
+          to_loc.slot AS to_location_name,
           pu.name AS user_name,
           au.email AS user_email
         FROM "inventory movement" im
+        LEFT JOIN items i ON im.item_id = i.id
+        LEFT JOIN item_info ii ON i.item_info = ii.id
         LEFT JOIN products p ON im.product_id = p.id
         LEFT JOIN storage_locations from_loc ON im.from_location_id = from_loc.id
         LEFT JOIN storage_locations to_loc ON im.to_location_id = to_loc.id
@@ -435,9 +437,7 @@ export async function createInventoryMovementCore(
   const normalizedToLocationId = to_location_id ?? null;
 
   // Check if item_id, product_id (if provided), from_location_id (if provided), to_location_id (if provided) exist in tables (in parallel)
-  const checks: Promise<any>[] = [
-    db.query('SELECT id, name FROM items WHERE id = $1', [item_id]),
-  ];
+  const checks: Promise<any>[] = [db.query('SELECT id FROM items WHERE id = $1', [item_id])];
 
   if (normalizedToLocationId) {
     checks.push(
@@ -452,7 +452,9 @@ export async function createInventoryMovementCore(
   // Only check from_location_id if it's provided (it's optional for ADD actions)
   if (normalizedFromLocationId) {
     checks.push(
-      db.query('SELECT id, location_code FROM storage_locations WHERE id = $1', [normalizedFromLocationId])
+      db.query('SELECT id, location_code FROM storage_locations WHERE id = $1', [
+        normalizedFromLocationId,
+      ])
     );
   }
 
@@ -515,20 +517,22 @@ export async function createInventoryMovementCore(
     // Capture the return value to detect missing item_info rows
     const syncedId = await syncItemInfoStock(
       itemName,
-      undefined,        // productId — don't update
-      undefined,        // category — don't update
-      undefined,        // quantity — don't update
-      undefined,        // value — don't update
-      undefined,        // itemLimit — don't update
-      undefined,        // limbo — don't update
-      null,             // fixture — don't update (COALESCE keeps existing)
+      undefined, // productId — don't update
+      undefined, // category — don't update
+      undefined, // quantity — don't update
+      undefined, // value — don't update
+      undefined, // itemLimit — don't update
+      undefined, // limbo — don't update
+      null, // fixture — don't update (COALESCE keeps existing)
       fromLocationCode, // update last_known_location_code if we have it
-      -quantity,        // decrement stock
-      false,            // don't create if missing
+      -quantity, // decrement stock
+      false, // don't create if missing
       db
     );
     if (!syncedId) {
-      console.warn(`[createInventoryMovementCore] item_info row not found for item "${itemName}" during ${inventory_action} — stock not decremented`);
+      console.warn(
+        `[createInventoryMovementCore] item_info row not found for item "${itemName}" during ${inventory_action} — stock not decremented`
+      );
     }
   }
 
@@ -710,10 +714,18 @@ export const createItemWithMovement = async (req: Request, res: Response) => {
     }
 
     // Always set fixture to null for ADD operations
-    await client.query(
-      'UPDATE item_info SET fixture = NULL, time_last_updated = NOW() WHERE name = $1',
-      [createdItems[0].name]
-    );
+    const firstCreated = createdItems[0];
+    if (firstCreated.item_info) {
+      await client.query(
+        'UPDATE item_info SET fixture = NULL, time_last_updated = NOW() WHERE id = $1',
+        [firstCreated.item_info]
+      );
+    } else {
+      await client.query(
+        'UPDATE item_info SET fixture = NULL, time_last_updated = NOW() WHERE name = $1',
+        [firstCreated.name]
+      );
+    }
 
     const fullMovementData: CreateInventoryInput = {
       inventory_action: movementData.inventory_action,
@@ -786,10 +798,18 @@ export const bulkCreateItemsWithMovement = async (req: Request, res: Response) =
       }
 
       // Always set fixture to null for ADD operations
-      await client.query(
-        'UPDATE item_info SET fixture = NULL, time_last_updated = NOW() WHERE name = $1',
-        [createdItems[0].name]
-      );
+      const firstRow = createdItems[0];
+      if (firstRow.item_info) {
+        await client.query(
+          'UPDATE item_info SET fixture = NULL, time_last_updated = NOW() WHERE id = $1',
+          [firstRow.item_info]
+        );
+      } else {
+        await client.query(
+          'UPDATE item_info SET fixture = NULL, time_last_updated = NOW() WHERE name = $1',
+          [firstRow.name]
+        );
+      }
 
       const fullMovementData: CreateInventoryInput = {
         inventory_action: movementData.inventory_action,

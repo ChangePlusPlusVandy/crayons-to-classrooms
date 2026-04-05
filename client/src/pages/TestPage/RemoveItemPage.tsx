@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 import {
   Container,
   Typography,
@@ -11,7 +11,9 @@ import {
   FormControl,
 } from '@mui/material';
 
+import { useLocation } from 'react-router-dom';
 import { getItems } from '../../api/items';
+import { getWarehouses } from '../../api/addItem';
 import { getItemsByLocation, removeItemsWithMovement } from '../../api/moveItem';
 import { useAuth } from '../../context/AuthContext';
 import { Item } from '../../types/Item';
@@ -34,6 +36,9 @@ type ItemGroupWithLocation = {
 
 export default function RemoveItemPage() {
   const { user } = useAuth();
+  const location = useLocation();
+  const prefill = location.state as { itemName?: string } | null;
+  const prefillApplied = useRef(false);
   const [items, setItems] = useState<Item[]>([]);
   const [formKey, setFormKey] = useState(0);
   const [selectedWarehouse, setSelectedWarehouse] = useState<Warehouse | null>(null);
@@ -84,6 +89,36 @@ export default function RemoveItemPage() {
     }
     loadData();
   }, []);
+
+  // Auto-select warehouse when navigating from Inventory with a prefilled item name
+  useEffect(() => {
+    if (!prefill?.itemName || prefillApplied.current || items.length === 0) return;
+    const matchingItem = items.find(
+      (item) => item.name === prefill.itemName && item.status === 'active' && item.warehouse
+    );
+    if (!matchingItem) return;
+
+    getWarehouses()
+      .then((allWarehouses) => {
+        const warehouse = allWarehouses.find((w) => w.id === matchingItem.warehouse);
+        if (warehouse) {
+          setSelectedWarehouse(warehouse);
+        }
+      })
+      .catch(() => {
+        setError('Failed to load warehouses.');
+      });
+  }, [items, prefill]);
+
+  // Auto-select item group once group options are built
+  useEffect(() => {
+    if (!prefill?.itemName || prefillApplied.current || groupOptions.length === 0) return;
+    const matchingGroup = groupOptions.find((g) => g.name === prefill.itemName);
+    if (matchingGroup) {
+      setSelectedGroup(matchingGroup);
+      prefillApplied.current = true;
+    }
+  }, [groupOptions, prefill]);
 
   // Remove item handler (donate or delete/defective)
   const handleRemoveItem = async () => {

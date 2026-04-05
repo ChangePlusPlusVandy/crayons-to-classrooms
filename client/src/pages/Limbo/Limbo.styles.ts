@@ -276,11 +276,6 @@ export const limboStyles = {
     alignItems: 'center',
     justifyContent: 'center',
     cursor: 'pointer',
-    color: '#6B7280',
-    fontFamily: 'Inter, sans-serif',
-    fontWeight: 500,
-    fontSize: '16px',
-    lineHeight: '16px',
   },
   restockOptionsBox: {
     width: '100%',
@@ -366,6 +361,26 @@ export const limboStyles = {
     borderBottom: 'none',
     display: 'flex',
     alignItems: 'center',
+  },
+  /** Text button under Slot field — matches restock typography, not Add Item primary blue */
+  restockNewSlotLink: {
+    textTransform: 'none',
+    p: 0,
+    minWidth: 0,
+    fontFamily: 'Inter, sans-serif',
+    fontWeight: 500,
+    fontSize: '14px',
+    lineHeight: '21px',
+    letterSpacing: '-0.15px',
+    color: '#101828',
+    justifyContent: 'flex-start',
+    '&:hover': {
+      bgcolor: 'transparent',
+      textDecoration: 'underline',
+    },
+    '&.Mui-disabled': {
+      color: '#9CA3AF',
+    },
   },
   restockInput: {
     width: '100%',
