@@ -246,7 +246,7 @@ export default function RemoveItemPage() {
             groupMap.set(key, {
               items: [item],
               name: item.name,
-              itemInfoId: item.item_info,
+              itemInfoId: item.item_info ?? '',
               locationCode,
               locationId: item.current_location_id,
             });

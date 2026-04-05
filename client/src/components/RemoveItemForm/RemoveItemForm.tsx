@@ -161,7 +161,7 @@ export default function RemoveItemForm({
             groupMap.set(key, {
               items: [item],
               name: item.name,
-              itemInfoId: item.item_info,
+              itemInfoId: item.item_info ?? '',
               locationCode,
               locationId: item.current_location_id,
               productId: item.product_id,
