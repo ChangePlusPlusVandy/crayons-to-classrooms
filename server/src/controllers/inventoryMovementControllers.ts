@@ -868,10 +868,12 @@ export const moveItemsWithMovement = async (req: Request, res: Response) => {
   try {
     await client.query('BEGIN');
 
+    console.log("$1 is this:", movementData.to_location_id, "\n\n\n")
     // Update all items' location in a single query, ensuring they are currently at from_location_id
     const updateResult = await client.query(
       `UPDATE items
-       SET current_location_id = $1,
+       SET current_location_id = $1::uuid,
+           warehouse = (SELECT warehouse_id FROM storage_locations WHERE id = $1::uuid),
            updated_at = NOW()
        WHERE id = ANY($2::uuid[])
          AND current_location_id IS NOT DISTINCT FROM $3
@@ -1208,7 +1210,7 @@ export const undoInventoryMovementCore = async (
 
     // Update items, verifying they're still at the expected location (prevents race conditions)
     const updateResult = await db.query(
-      'UPDATE items SET current_location_id = $1, updated_at = NOW() WHERE id = ANY($2::uuid[]) AND current_location_id = $3',
+      'UPDATE items SET current_location_id = $1::uuid, updated_at = NOW() WHERE id = ANY($2::uuid[]) AND current_location_id = $3',
       [inventoryMovement.from_location_id, itemIds, inventoryMovement.to_location_id]
     );
 
