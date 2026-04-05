@@ -74,7 +74,8 @@ export default function MoveItemForm({
   );
   const [itemGroupsInSourceSlot, setItemGroupsInSourceSlot] = useState<ItemGroup[]>([]);
   const [selectedItemGroup, setSelectedItemGroup] = useState<ItemGroup | null>(null);
-  const [selectedDestinationWarehouse, setSelectedDestinationWarehouse] = useState<Warehouse | null>(initialDestinationWarehouse ?? initialWarehouse);
+  const [selectedDestinationWarehouse, setSelectedDestinationWarehouse] =
+    useState<Warehouse | null>(initialDestinationWarehouse ?? initialWarehouse);
   const [selectedDestinationSlot, setSelectedDestinationSlot] = useState<string | null>(
     initialDestinationSlot
   );

@@ -868,7 +868,7 @@ export const moveItemsWithMovement = async (req: Request, res: Response) => {
   try {
     await client.query('BEGIN');
 
-    console.log("$1 is this:", movementData.to_location_id, "\n\n\n")
+    console.log('$1 is this:', movementData.to_location_id, '\n\n\n');
     // Update all items' location in a single query, ensuring they are currently at from_location_id
     const updateResult = await client.query(
       `UPDATE items

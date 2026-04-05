@@ -49,7 +49,8 @@ export default function PalletMoveForm({
   const [selectedWarehouse, setSelectedWarehouse] = useState<Warehouse | null>(initialWarehouse);
   const [selectedSourceSlot, setSelectedSourceSlot] = useState<StorageLocation | null>(null);
   const [itemGroups, setItemGroups] = useState<ItemGroup[]>([]);
-  const [selectedDestinationWarehouse, setSelectedDestinationWarehouse] = useState<Warehouse | null>(initialWarehouse);
+  const [selectedDestinationWarehouse, setSelectedDestinationWarehouse] =
+    useState<Warehouse | null>(initialWarehouse);
   const [selectedDestinationSlot, setSelectedDestinationSlot] = useState<string | null>(null);
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(true);
