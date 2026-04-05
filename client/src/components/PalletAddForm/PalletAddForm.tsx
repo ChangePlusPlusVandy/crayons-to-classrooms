@@ -465,6 +465,7 @@ export default function PalletAddForm({
         products={products}
         availableCategories={availableCategories}
         initialData={editingRow?.isNewProduct ? editingRow.newProductData ?? null : null}
+        storageLocations={storageLocations}
       />
     </Stack>
   );

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -12,6 +12,7 @@ import {
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import { Product } from '../../types/Product';
+import { StorageLocation } from '../../types/StorageLocation';
 import { ItemInfo } from '../../api/itemInfo';
 import { AddItemFormLabel } from '../AddItemForm/AddItemForm.styles';
 import { NewProductData } from './PalletAddForm';
@@ -23,6 +24,7 @@ interface NewItemDialogProps {
   products: Product[];
   availableCategories: string[];
   initialData?: NewProductData | null;
+  storageLocations: StorageLocation[];
 }
 
 export default function NewItemDialog({
@@ -32,6 +34,7 @@ export default function NewItemDialog({
   products,
   availableCategories,
   initialData = null,
+  storageLocations,
 }: NewItemDialogProps) {
   const [name, setName] = useState('');
   const [category, setCategory] = useState<string | null>(null);
@@ -39,7 +42,7 @@ export default function NewItemDialog({
   const [limit, setLimit] = useState<number | ''>('');
   const [value, setValue] = useState<number | ''>('');
   const [packSize, setPackSize] = useState<number | ''>('');
-
+  const [fixture, setFixture] = useState<string | null>(null);
 
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
   const [subcategoryDialogOpen, setSubcategoryDialogOpen] = useState(false);
@@ -51,6 +54,16 @@ export default function NewItemDialog({
 
   const isEditMode = initialData !== null;
 
+  const availableFixtures = useMemo(() => {
+    const fixtureSet = new Set<string>();
+    storageLocations.forEach((loc) => {
+      if (loc.fixture && loc.fixture.trim() !== '') {
+        fixtureSet.add(loc.fixture);
+      }
+    });
+    return Array.from(fixtureSet).sort();
+  }, [storageLocations]);
+
   // Reset / pre-fill fields when dialog opens
   useEffect(() => {
     if (open) {
@@ -60,7 +73,7 @@ export default function NewItemDialog({
         setLimit(initialData.limit ?? '');
         setValue(initialData.value ?? '');
         setPackSize(initialData.packSize ?? '');
-
+        setFixture(initialData.fixture || null);
 
         if (initialData.newSubcategoryName) {
           // Recreate a pending placeholder for display
@@ -92,6 +105,7 @@ export default function NewItemDialog({
         setLimit('');
         setValue('');
         setPackSize('');
+        setFixture(null);
 
         setPendingSubcategories([]);
       }
@@ -156,7 +170,7 @@ export default function NewItemDialog({
       limit: typeof limit === 'number' ? limit : undefined,
       value: typeof value === 'number' ? value : undefined,
       packSize: typeof packSize === 'number' ? packSize : undefined,
-      fixture: undefined,
+      fixture: fixture || undefined,
     };
 
     const placeholderItemInfo: ItemInfo = {
@@ -168,7 +182,7 @@ export default function NewItemDialog({
       value: typeof value === 'number' ? value : null,
       item_limit: typeof limit === 'number' ? limit : null,
       stock: 0,
-      fixture: null,
+      fixture: fixture,
       last_known_location_code: null,
       time_last_updated: null,
       notes: null,
@@ -324,6 +338,20 @@ export default function NewItemDialog({
                     : ''
                 }
                 slotProps={{ htmlInput: { min: 1, step: 1 } }}
+              />
+            </FormControl>
+
+            {/* Fixture */}
+            <FormControl fullWidth>
+              <AddItemFormLabel>Fixture</AddItemFormLabel>
+              <Autocomplete
+                options={availableFixtures}
+                value={fixture}
+                onChange={(_, newValue) => setFixture(newValue)}
+                renderInput={(params) => (
+                  <TextField {...params} placeholder="Select a fixture (optional)" size="small" />
+                )}
+                size="small"
               />
             </FormControl>
 

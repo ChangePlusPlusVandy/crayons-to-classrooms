@@ -92,7 +92,7 @@ export default function AddItemForm({
   const [newItemLimit, setNewItemLimit] = useState<number | ''>('');
   const [newItemValue, setNewItemValue] = useState<number | ''>('');
   const [newItemPackSize, setNewItemPackSize] = useState<number | ''>('');
-
+  const [newItemFixture, setNewItemFixture] = useState<string | null>(null);
 
   // Category/subcategory dialog states
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
@@ -138,6 +138,17 @@ export default function AddItemForm({
   const selectableItemInfoList = useMemo(() => {
     return itemInfoList.filter((info) => !!info.product_id);
   }, [itemInfoList]);
+
+  // All unique fixture values across storage locations
+  const availableFixtures = useMemo(() => {
+    const fixtureSet = new Set<string>();
+    storageLocations.forEach((loc) => {
+      if (loc.fixture && loc.fixture.trim() !== '') {
+        fixtureSet.add(loc.fixture);
+      }
+    });
+    return Array.from(fixtureSet).sort();
+  }, [storageLocations]);
 
   // Compute warehouseLocations for form submission
   const warehouseLocations = useMemo(() => {
@@ -257,7 +268,7 @@ export default function AddItemForm({
           value: typeof newItemValue === 'number' ? newItemValue : null,
           item_limit: typeof newItemLimit === 'number' ? newItemLimit : null,
           stock: 0,
-          fixture: null,
+          fixture: newItemFixture,
           last_known_location_code: null,
           time_last_updated: null,
           notes: null,
@@ -278,6 +289,7 @@ export default function AddItemForm({
             limit: typeof newItemLimit === 'number' ? newItemLimit : undefined,
             value: typeof newItemValue === 'number' ? newItemValue : undefined,
             packSize: typeof newItemPackSize === 'number' ? newItemPackSize : undefined,
+            fixture: newItemFixture || undefined,
           },
         });
       } else {
@@ -504,6 +516,20 @@ export default function AddItemForm({
                     : ''
                 }
                 slotProps={{ htmlInput: { min: 1, step: 1 } }}
+              />
+            </FormControl>
+
+            {/* Fixture */}
+            <FormControl fullWidth sx={{ mt: 2 }}>
+              <AddItemFormLabel htmlFor="fixture-select">Fixture</AddItemFormLabel>
+              <Autocomplete
+                id="fixture-select"
+                options={availableFixtures}
+                value={newItemFixture}
+                onChange={(_, newValue) => setNewItemFixture(newValue)}
+                renderInput={(params) => (
+                  <TextField {...params} placeholder="Select a fixture (optional)" />
+                )}
               />
             </FormControl>
 
