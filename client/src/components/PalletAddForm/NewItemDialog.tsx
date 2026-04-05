@@ -113,9 +113,9 @@ export default function NewItemDialog({
     }
   }, [open, initialData, products]);
 
-  const allCategories = Array.from(
-    new Set([...availableCategories, ...customCategories])
-  ).sort((a, b) => a.localeCompare(b));
+  const allCategories = Array.from(new Set([...availableCategories, ...customCategories])).sort(
+    (a, b) => a.localeCompare(b)
+  );
 
   // Combined subcategory options: real products + pending placeholders
   const subcategoryOptions = [...products, ...pendingSubcategories];
@@ -198,9 +198,7 @@ export default function NewItemDialog({
         <DialogTitle>{isEditMode ? 'Edit New Item' : 'Create New Item'}</DialogTitle>
         <DialogContent>
           <Stack spacing={2} sx={{ mt: 1 }}>
-            {error && (
-              <span style={{ color: 'red', fontSize: '0.875rem' }}>{error}</span>
-            )}
+            {error && <span style={{ color: 'red', fontSize: '0.875rem' }}>{error}</span>}
 
             {/* Item Name */}
             <FormControl fullWidth>
@@ -223,7 +221,11 @@ export default function NewItemDialog({
                 value={category}
                 onChange={(_, newValue) => setCategory(newValue)}
                 renderInput={(params) => (
-                  <TextField {...params} placeholder="Select or add a category (optional)" size="small" />
+                  <TextField
+                    {...params}
+                    placeholder="Select or add a category (optional)"
+                    size="small"
+                  />
                 )}
                 freeSolo={false}
                 size="small"
@@ -258,7 +260,11 @@ export default function NewItemDialog({
                 onChange={(_, newValue) => setSubcategoryProduct(newValue)}
                 isOptionEqualToValue={(option, val) => option.id === val.id}
                 renderInput={(params) => (
-                  <TextField {...params} placeholder="Select a subcategory (optional)" size="small" />
+                  <TextField
+                    {...params}
+                    placeholder="Select a subcategory (optional)"
+                    size="small"
+                  />
                 )}
                 noOptionsText="No matching products found"
                 size="small"
@@ -333,9 +339,7 @@ export default function NewItemDialog({
                 size="small"
                 error={typeof packSize === 'number' && packSize < 1}
                 helperText={
-                  typeof packSize === 'number' && packSize < 1
-                    ? 'Pack size must be at least 1'
-                    : ''
+                  typeof packSize === 'number' && packSize < 1 ? 'Pack size must be at least 1' : ''
                 }
                 slotProps={{ htmlInput: { min: 1, step: 1 } }}
               />

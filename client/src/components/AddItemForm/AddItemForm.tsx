@@ -15,6 +15,7 @@ import {
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import { getProducts, getStorageLocations, createProduct } from '../../api/addItem';
+import { createStorageLocation } from '../../api/storageLocation';
 import { getItemInfoAll, ItemInfo } from '../../api/itemInfo';
 import { Warehouse } from '../../types/Warehouse';
 import { StorageLocation } from '../../types/StorageLocation';
@@ -88,7 +89,9 @@ export default function AddItemForm({
   const [isNewItemMode, setIsNewItemMode] = useState(false);
   const [newItemName, setNewItemName] = useState('');
   const [newItemCategory, setNewItemCategory] = useState<string | null>(null);
-  const [selectedSubcategoryProduct, setSelectedSubcategoryProduct] = useState<Product | null>(null);
+  const [selectedSubcategoryProduct, setSelectedSubcategoryProduct] = useState<Product | null>(
+    null
+  );
   const [newItemLimit, setNewItemLimit] = useState<number | ''>('');
   const [newItemValue, setNewItemValue] = useState<number | ''>('');
   const [newItemPackSize, setNewItemPackSize] = useState<number | ''>('');
@@ -101,6 +104,10 @@ export default function AddItemForm({
   const [newSubcategoryProductName, setNewSubcategoryProductName] = useState('');
   const [customCategories, setCustomCategories] = useState<string[]>([]);
   const [creatingSubcategory, setCreatingSubcategory] = useState(false);
+
+  const [slotDialogOpen, setSlotDialogOpen] = useState(false);
+  const [newSlotCode, setNewSlotCode] = useState('');
+  const [creatingSlot, setCreatingSlot] = useState(false);
 
   // UI states
   const [loading, setLoading] = useState(true);
@@ -120,7 +127,9 @@ export default function AddItemForm({
         setItemInfoList(itemInfoData);
         setStorageLocations(locationsData);
         if (initialItemInfoId && !initialItemInfo) {
-          const match = itemInfoData.find((info) => info.id === initialItemInfoId && !!info.product_id);
+          const match = itemInfoData.find(
+            (info) => info.id === initialItemInfoId && !!info.product_id
+          );
           if (match) setSelectedItemInfo(match);
         }
       } catch (err) {
@@ -220,8 +229,7 @@ export default function AddItemForm({
   };
 
   const handleSubmit = async () => {
-    const destinationLocation =
-      warehouseLocations.find((loc) => loc.slot === selectedSlot) ?? null;
+    const destinationLocation = warehouseLocations.find((loc) => loc.slot === selectedSlot) ?? null;
 
     // Validation
     if (!selectedWarehouse) {
@@ -332,6 +340,38 @@ export default function AddItemForm({
       setError('Failed to create subcategory product. Please try again.');
     } finally {
       setCreatingSubcategory(false);
+    }
+  };
+
+  const handleAddNewSlot = async () => {
+    const slot = newSlotCode.trim();
+    if (!selectedWarehouse) {
+      setError('Please select a warehouse before adding a slot.');
+      return;
+    }
+    if (!slot) {
+      setError('Please enter a slot code.');
+      return;
+    }
+
+    setCreatingSlot(true);
+    setError('');
+    try {
+      const created = await createStorageLocation({
+        slot,
+        active: true,
+        warehouse_id: selectedWarehouse.id,
+      });
+      setStorageLocations((prev) => [...prev, created]);
+      setSelectedSlot(created.slot);
+      setNewSlotCode('');
+      setSlotDialogOpen(false);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to create slot. Please try again.');
+      setNewSlotCode('');
+      setSlotDialogOpen(false);
+    } finally {
+      setCreatingSlot(false);
     }
   };
 
@@ -558,7 +598,9 @@ export default function AddItemForm({
               filterOptions={(options, state) => {
                 const searchTerm = state.inputValue.toLowerCase().trim();
                 if (!searchTerm) return options;
-                return options.filter((item) => item.name?.toLowerCase().includes(searchTerm));
+                return options.filter((product) =>
+                  product.name?.toLowerCase().includes(searchTerm)
+                );
               }}
               renderOption={(props, option, state) => {
                 const { key, ...otherProps } = props;
@@ -571,9 +613,7 @@ export default function AddItemForm({
                         {highlightText(option.name || 'Unknown', searchTerm)}
                       </ProductNameText>
                       <ProductDetailsText>
-                        {option.product_name
-                          ? `Product: ${option.product_name} · `
-                          : ''}
+                        {option.product_name ? `Product: ${option.product_name} · ` : ''}
                         {option.category || 'No category'} | Value: ${option.value ?? 0} | Stock:{' '}
                         {option.stock}
                       </ProductDetailsText>
@@ -625,7 +665,26 @@ export default function AddItemForm({
         }}
         warehouse={selectedWarehouse}
         storageLocations={storageLocations}
-      />
+      >
+        <Button
+          startIcon={<AddIcon />}
+          onClick={() => {
+            setError('');
+            setNewSlotCode('');
+            setSlotDialogOpen(true);
+          }}
+          disabled={!selectedWarehouse}
+          sx={{
+            justifyContent: 'flex-start',
+            textTransform: 'none',
+            color: 'primary.main',
+            mt: 0,
+            '&:hover': { backgroundColor: 'transparent' },
+          }}
+        >
+          New Slot
+        </Button>
+      </SlotSelector>
 
       {/* Quantity to Add */}
       <FormControl fullWidth>
@@ -720,6 +779,40 @@ export default function AddItemForm({
             disabled={!newSubcategoryProductName.trim() || creatingSubcategory}
           >
             {creatingSubcategory ? <CircularProgress size={20} /> : 'Add'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* New Slot — creates storage_locations row for the selected warehouse */}
+      <Dialog open={slotDialogOpen} onClose={() => !creatingSlot && setSlotDialogOpen(false)}>
+        <DialogTitle>Add New Slot</DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            fullWidth
+            required
+            label="Slot code"
+            value={newSlotCode}
+            onChange={(e) => setNewSlotCode(e.target.value)}
+            placeholder="e.g. A-12-03"
+            sx={{ mt: 1 }}
+            helperText={
+              selectedWarehouse
+                ? `Creates a unique storage location in ${selectedWarehouse.name}.`
+                : 'Select a warehouse in the form first.'
+            }
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setSlotDialogOpen(false)} disabled={creatingSlot}>
+            Cancel
+          </Button>
+          <Button
+            onClick={() => void handleAddNewSlot()}
+            disabled={!newSlotCode.trim() || !selectedWarehouse || creatingSlot}
+            variant="contained"
+          >
+            {creatingSlot ? <CircularProgress size={20} /> : 'Add slot'}
           </Button>
         </DialogActions>
       </Dialog>

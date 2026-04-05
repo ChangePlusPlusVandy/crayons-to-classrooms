@@ -1,5 +1,13 @@
 import { useEffect, useState } from 'react';
-import { Card, CardContent, Typography, Box, LinearProgress, CircularProgress, Alert } from '@mui/material';
+import {
+  Card,
+  CardContent,
+  Typography,
+  Box,
+  LinearProgress,
+  CircularProgress,
+  Alert,
+} from '@mui/material';
 import { getInventoryStats, InventoryStats } from '../../api/itemInfo';
 
 export default function InventoryHealthOverview() {
@@ -18,9 +26,8 @@ export default function InventoryHealthOverview() {
   }, []);
 
   const openSlots = stats ? stats.total_slots - stats.occupied_slots : 0;
-  const openPct = stats && stats.total_slots > 0
-    ? Math.round((openSlots / stats.total_slots) * 100)
-    : 0;
+  const openPct =
+    stats && stats.total_slots > 0 ? Math.round((openSlots / stats.total_slots) * 100) : 0;
 
   return (
     <Box>
@@ -41,7 +48,9 @@ export default function InventoryHealthOverview() {
                   <CircularProgress size={24} />
                 </Box>
               ) : error ? (
-                <Alert severity="error" sx={{ mt: 1 }}>{error}</Alert>
+                <Alert severity="error" sx={{ mt: 1 }}>
+                  {error}
+                </Alert>
               ) : (
                 <>
                   <Typography variant="h5" sx={{ mb: 2, fontWeight: 600 }}>
