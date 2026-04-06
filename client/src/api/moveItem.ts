@@ -38,6 +38,17 @@ export async function getItemsByLocation(locationId: string): Promise<Item[]> {
   return response.json();
 }
 
+export async function getItemsByWarehouse(warehouseId: string): Promise<Item[]> {
+  const response = await authFetch(`${API_BASE_URL}/items/warehouse/${warehouseId}`);
+  if (!response.ok) {
+    if (response.status === 404) {
+      return [];
+    }
+    throw new Error('Failed to fetch items for warehouse');
+  }
+  return response.json();
+}
+
 export async function createInventoryMovement(
   movement: Omit<InventoryMovement, 'id' | 'performed_at'>
 ): Promise<InventoryMovement> {

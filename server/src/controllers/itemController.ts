@@ -293,7 +293,7 @@ export const getItemsByLocationId = async (req: Request, res: Response) => {
 export const getItemsByWarehouseId = async (req: Request, res: Response) => {
   try {
     const { warehouseId } = warehouseIdParamSchema.parse(req.params);
-    const items = await pool.query('SELECT * FROM items WHERE warehouse = $1', [warehouseId]);
+    const items = await pool.query("SELECT * FROM items WHERE warehouse = $1 AND status = 'active'", [warehouseId]);
     if (!countRows(items.rows, res)) {
       return;
     }
