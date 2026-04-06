@@ -473,7 +473,7 @@ export default function MoveItemForm({
         <Autocomplete
           id="item-in-slot-select"
           options={itemGroupsInSourceSlot}
-          getOptionLabel={(option) => `${option.name} - Qty: ${option.quantity} items`}
+          getOptionLabel={(option) => option.name}
           value={selectedItemGroup}
           onChange={(_, newValue) => {
             setSelectedItemGroup(newValue);

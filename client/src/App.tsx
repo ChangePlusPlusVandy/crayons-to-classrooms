@@ -34,14 +34,6 @@ function App() {
                   <Route path="/inventory" element={<Inventory />} />
                   <Route path="/activity-log" element={<Activities />} />
                   <Route path="/limbo-items" element={<Limbo />} />
-                  <Route
-                    path="/analytics"
-                    element={<div style={{ padding: '2rem' }}>Analytics Page (Coming Soon)</div>}
-                  />
-                  <Route
-                    path="/settings"
-                    element={<div style={{ padding: '2rem' }}>Settings Page (Coming Soon)</div>}
-                  />
                 </Routes>
               </DashboardLayout>
             </PrivateRoute>

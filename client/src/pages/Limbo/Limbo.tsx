@@ -511,7 +511,7 @@ export default function Limbo() {
                             alignItems: 'center',
                             justifyContent: 'flex-start',
                             gap: 1,
-                            flexWrap: 'wrap',
+                            flexWrap: 'nowrap',
                           }}
                         >
                           <Button
@@ -543,7 +543,7 @@ export default function Limbo() {
                               setTableActionError('');
                               setItemToDelete(item);
                             }}
-                            sx={{ textTransform: 'none' }}
+                            sx={{ textTransform: 'none', whiteSpace: 'nowrap', minWidth: 0 }}
                           >
                             Delete
                           </Button>

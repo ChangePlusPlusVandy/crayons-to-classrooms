@@ -22,9 +22,7 @@ import { StorageLocation } from '../../types/StorageLocation';
 import { Product } from '../../types/Product';
 import {
   AddItemFormLabel,
-  ProductOptionContainer,
   ProductNameText,
-  ProductDetailsText,
   HighlightedText,
 } from './AddItemForm.styles';
 import { WarehouseSelector } from '../WarehouseSelector/WarehouseSelector';
@@ -581,16 +579,7 @@ export default function AddItemForm({
 
                 return (
                   <li key={key} {...otherProps}>
-                    <ProductOptionContainer>
-                      <ProductNameText>
-                        {highlightText(option.name || 'Unknown', searchTerm)}
-                      </ProductNameText>
-                      <ProductDetailsText>
-                        {option.product_name ? `Product: ${option.product_name} · ` : ''}
-                        {option.category || 'No category'} | Value: ${option.value ?? 0} | Stock:{' '}
-                        {option.stock}
-                      </ProductDetailsText>
-                    </ProductOptionContainer>
+                    <ProductNameText>{highlightText(option.name || 'Unknown', searchTerm)}</ProductNameText>
                   </li>
                 );
               }}
