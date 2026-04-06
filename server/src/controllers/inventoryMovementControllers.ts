@@ -96,7 +96,13 @@ export async function getAllMovementsDetailed(req: Request, res: Response): Prom
           im.note,
           im.performed_at,
           im.inventory_action,
-          CASE WHEN im.product_id IS NOT NULL THEN COALESCE(ii.name, i.name, p.name) END AS product_name,
+          CASE
+            WHEN im.product_id IS NULL
+              AND im.quantity > 1
+              AND im.inventory_action IN ('MOVE', 'DONATED', 'DISCARD')
+            THEN NULL
+            ELSE COALESCE(ii.name, i.name, p.name)
+          END AS product_name,
           from_loc.slot AS from_location_name,
           to_loc.slot AS to_location_name,
           pu.name AS user_name,
