@@ -871,7 +871,8 @@ export const moveItemsWithMovement = async (req: Request, res: Response) => {
     // Update all items' location in a single query, ensuring they are currently at from_location_id
     const updateResult = await client.query(
       `UPDATE items
-       SET current_location_id = $1,
+       SET current_location_id = $1::uuid,
+           warehouse = (SELECT warehouse_id FROM storage_locations WHERE id = $1::uuid),
            updated_at = NOW()
        WHERE id = ANY($2::uuid[])
          AND current_location_id IS NOT DISTINCT FROM $3
@@ -1122,10 +1123,14 @@ export const editInventoryMovementMove = async (req: Request, res: Response) => 
 
     // Move each item to the new destination
     const itemIds: string[] = itemsAtSource.rows.map((row: { id: string }) => row.id);
-    await client.query('UPDATE items SET current_location_id = $1 WHERE id = ANY($2::uuid[])', [
-      moveData.to_location_id,
-      itemIds,
-    ]);
+    await client.query(
+      `UPDATE items
+       SET current_location_id = $1::uuid,
+           warehouse = (SELECT warehouse_id FROM storage_locations WHERE id = $1::uuid),
+           updated_at = NOW()
+       WHERE id = ANY($2::uuid[])`,
+      [moveData.to_location_id, itemIds]
+    );
 
     // Create new MOVE movement record
     const representativeItemId = itemIds[0];
@@ -1208,7 +1213,11 @@ export const undoInventoryMovementCore = async (
 
     // Update items, verifying they're still at the expected location (prevents race conditions)
     const updateResult = await db.query(
-      'UPDATE items SET current_location_id = $1, updated_at = NOW() WHERE id = ANY($2::uuid[]) AND current_location_id = $3',
+      `UPDATE items
+       SET current_location_id = $1::uuid,
+           warehouse = (SELECT warehouse_id FROM storage_locations WHERE id = $1::uuid),
+           updated_at = NOW()
+       WHERE id = ANY($2::uuid[]) AND current_location_id = $3`,
       [inventoryMovement.from_location_id, itemIds, inventoryMovement.to_location_id]
     );
 
