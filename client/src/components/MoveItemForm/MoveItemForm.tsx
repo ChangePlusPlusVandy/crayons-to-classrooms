@@ -15,7 +15,7 @@ import {
 } from '@mui/material';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import AddIcon from '@mui/icons-material/Add';
-import { getStorageLocations, getItemsByLocation, groupItemsByLocation } from '../../api/moveItem';
+import { getStorageLocations, getItemsByLocation, getItemsByWarehouse, groupItemsByLocation } from '../../api/moveItem';
 import { createStorageLocation } from '../../api/storageLocation';
 import { Warehouse } from '../../types/Warehouse';
 import { StorageLocation } from '../../types/StorageLocation';
@@ -113,16 +113,7 @@ export default function MoveItemForm({
 
       try {
         setError('');
-        const warehouseLocations = storageLocations.filter(
-          (loc) => loc.warehouse_id === selectedWarehouse.id
-        );
-
-        // TODO: Kiersten's PR will allow directly fetching items by warehouse id
-        const itemsPromises = warehouseLocations.map((loc) =>
-          getItemsByLocation(loc.id).catch(() => [])
-        );
-        const itemsArrays = await Promise.all(itemsPromises);
-        const items = itemsArrays.flat();
+        const items = await getItemsByWarehouse(selectedWarehouse.id);
         setAllItems(items);
       } catch (err) {
         setError('Failed to load items for the selected warehouse.');
@@ -130,7 +121,7 @@ export default function MoveItemForm({
     }
 
     fetchWarehouseItems();
-  }, [selectedWarehouse, storageLocations]);
+  }, [selectedWarehouse]);
 
   // Fetch items when source slot is selected
   useEffect(() => {
