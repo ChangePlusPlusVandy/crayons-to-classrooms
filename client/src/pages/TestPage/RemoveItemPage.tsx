@@ -310,10 +310,11 @@ export default function RemoveItemPage() {
                   label="Warehouse"
                   placeholder="Select warehouse"
                   fullWidth
+                  required
                 />
                 {/* Removal Action */}
                 <FormControl>
-                  <RemoveItemFormLabel htmlFor="removal-action-select">
+                  <RemoveItemFormLabel htmlFor="removal-action-select" required>
                     Removal Action
                   </RemoveItemFormLabel>
                   <Autocomplete
@@ -337,7 +338,7 @@ export default function RemoveItemPage() {
                 </FormControl>
                 {/* Item Name */}
                 <FormControl>
-                  <RemoveItemFormLabel>Item Name</RemoveItemFormLabel>
+                  <RemoveItemFormLabel required>Item Name</RemoveItemFormLabel>
                   <Autocomplete
                     options={groupOptions}
                     value={selectedGroupLive}
@@ -367,7 +368,7 @@ export default function RemoveItemPage() {
                 </FormControl>
                 {/* Quantity to remove */}
                 <FormControl>
-                  <RemoveItemFormLabel htmlFor="quantity-select">
+                  <RemoveItemFormLabel htmlFor="quantity-select" required>
                     Quantity To Remove
                   </RemoveItemFormLabel>
                   <TextField

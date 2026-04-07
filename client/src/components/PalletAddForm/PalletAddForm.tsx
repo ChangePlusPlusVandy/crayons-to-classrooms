@@ -356,6 +356,7 @@ export default function PalletAddForm({
         label="Warehouse"
         placeholder="Select warehouse"
         fullWidth
+        required
       />
 
       <SlotSelector
@@ -368,6 +369,7 @@ export default function PalletAddForm({
         storageLocations={storageLocations}
         label="Destination Slot"
         placeholder="Select destination slot"
+        required
       >
         <Button
           startIcon={<AddIcon />}
@@ -391,7 +393,7 @@ export default function PalletAddForm({
 
       {/* Item Manifest */}
       <FormControl fullWidth>
-        <AddItemFormLabel>Item Manifest</AddItemFormLabel>
+        <AddItemFormLabel required>Item Manifest</AddItemFormLabel>
         <Stack spacing={2}>
           {manifestRows.map((row, index) => (
             <Box key={index} sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>

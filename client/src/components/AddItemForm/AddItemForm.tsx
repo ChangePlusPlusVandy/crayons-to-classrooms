@@ -396,11 +396,12 @@ export default function AddItemForm({
         label="Warehouse"
         placeholder="Select warehouse"
         fullWidth
+        required
       />
 
       {/* Item name (item_info) */}
       <FormControl fullWidth>
-        <AddItemFormLabel htmlFor="item-name-select">Item Name</AddItemFormLabel>
+        <AddItemFormLabel htmlFor="item-name-select" required>Item Name</AddItemFormLabel>
         {isNewItemMode ? (
           <>
             <TextField
@@ -638,6 +639,7 @@ export default function AddItemForm({
         }}
         warehouse={selectedWarehouse}
         storageLocations={storageLocations}
+        required
       >
         <Button
           startIcon={<AddIcon />}
@@ -661,7 +663,7 @@ export default function AddItemForm({
 
       {/* Quantity to Add */}
       <FormControl fullWidth>
-        <AddItemFormLabel htmlFor="quantity-input">Quantity to Add</AddItemFormLabel>
+        <AddItemFormLabel htmlFor="quantity-input" required>Quantity to Add</AddItemFormLabel>
         <TextField
           id="quantity-input"
           type="number"
