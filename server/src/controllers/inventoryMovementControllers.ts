@@ -1302,9 +1302,22 @@ export const undoInventoryMovementCore = async (
       throw new UndoConflictError('Cannot undo: movement has no from_location_id');
     }
 
-    // Get from_location details (warehouse and location info)
+    // Get the original item details to recreate
+    const originalItemResult = await db.query(
+      `SELECT name, product_id, quantity, category, item_limit, value, limbo, notes, item_info, warehouse
+       FROM items WHERE id = $1`,
+      [inventoryMovement.item_id]
+    );
+
+    if (originalItemResult.rows.length === 0) {
+      throw new UndoConflictError('Cannot undo: original item not found');
+    }
+
+    const originalItem = originalItemResult.rows[0];
+
+    // Get from_location details (warehouse_id)
     const fromLocationResult = await db.query(
-      'SELECT id, location_code, fixture, warehouse FROM storage_locations WHERE id = $1',
+      'SELECT warehouse_id FROM storage_locations WHERE id = $1',
       [inventoryMovement.from_location_id]
     );
 
@@ -1312,66 +1325,28 @@ export const undoInventoryMovementCore = async (
       throw new UndoConflictError('Cannot undo: original location no longer exists');
     }
 
-    const fromLocation = fromLocationResult.rows[0];
+    const warehouseId = fromLocationResult.rows[0].warehouse_id;
 
-    // Find inactive items with matching product_id to reactivate (LIFO - most recently updated first)
-    const inactiveItemsResult = await db.query(
-      `SELECT id, name FROM items
-       WHERE product_id = $1
-         AND status = 'inactive'
-       ORDER BY updated_at DESC
-       LIMIT $2`,
-      [inventoryMovement.product_id, inventoryMovement.quantity]
+    // Use createItemCore to add items back (this also handles stock increment)
+    await createItemCore(
+      {
+        name: originalItem.name,
+        product_id: originalItem.product_id,
+        current_location_id: inventoryMovement.from_location_id,
+        quantity: originalItem.quantity,
+        status: 'active',
+        warehouse: warehouseId ?? originalItem.warehouse,
+        category: originalItem.category,
+        item_limit: originalItem.item_limit,
+        value: originalItem.value ?? 0,
+        limbo: originalItem.limbo ?? false,
+        notes: originalItem.notes,
+        item_info: originalItem.item_info,
+        created_by: inventoryMovement.performed_by,
+      },
+      inventoryMovement.quantity,
+      db
     );
-
-    if (inactiveItemsResult.rows.length < inventoryMovement.quantity) {
-      throw new UndoConflictError(
-        `Cannot undo: only found ${inactiveItemsResult.rows.length} inactive items, need ${inventoryMovement.quantity}`
-      );
-    }
-
-    const itemIds = inactiveItemsResult.rows.map((row: { id: string }) => row.id);
-
-    // Reactivate items: set status back to 'active' and restore location
-    const updateResult = await db.query(
-      `UPDATE items
-       SET status = 'active',
-           current_location_id = $1,
-           warehouse = $2,
-           updated_at = NOW()
-       WHERE id = ANY($3::uuid[])
-         AND status = 'inactive'
-       RETURNING name`,
-      [inventoryMovement.from_location_id, fromLocation.warehouse, itemIds]
-    );
-
-    if (updateResult.rowCount !== itemIds.length) {
-      throw new UndoConflictError('Cannot undo: some items could not be reactivated');
-    }
-
-    // Increment item_info stock for each reactivated item (grouped by name)
-    const countsByName: Record<string, number> = {};
-    for (const row of updateResult.rows) {
-      const name = (row as { name: string }).name;
-      countsByName[name] = (countsByName[name] || 0) + 1;
-    }
-
-    for (const [itemName, count] of Object.entries(countsByName)) {
-      await syncItemInfoStock(
-        itemName,
-        undefined, // productId - don't update
-        undefined, // category - don't update
-        undefined, // quantity - don't update
-        undefined, // value - don't update
-        undefined, // itemLimit - don't update
-        undefined, // limbo - don't update
-        fromLocation.fixture ?? null,
-        fromLocation.location_code ?? null,
-        count, // stockDelta - increment by count to reverse the removal
-        false, // createIfMissing - don't create new item_info
-        db
-      );
-    }
 
     // Delete movement record
     await db.query('DELETE FROM "inventory movement" WHERE id = $1', [id]);
