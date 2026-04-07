@@ -83,7 +83,7 @@ export function EditRemoveDialog({ open, onClose, movement, onSuccess }: EditRem
     await editRemoveMovementTransaction(movement.id!, {
       inventory_action: data.removalAction,
       from_location_id: data.fromLocationId,
-      product_id: data.productId,
+      product_id: data.productId || undefined,
       quantity: data.quantity,
       performed_by: user!.id,
       note: data.notes || undefined,

@@ -127,7 +127,7 @@ export type EditMoveInput = z.infer<typeof editMoveSchema>;
 export const editRemoveSchema = z.object({
   inventory_action: z.enum(['DONATED', 'DISCARD']),
   from_location_id: uuidSchema,
-  product_id: uuidSchema,
+  product_id: uuidSchema.nullable().optional(),
   quantity: z.number().int().positive('Quantity must be a positive integer'),
   performed_by: uuidSchema,
   note: z.string().optional(),
