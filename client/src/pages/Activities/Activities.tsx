@@ -88,11 +88,11 @@ export default function Activities() {
       return;
     }
 
-    // Only MOVE and ADD can be undone
-    if (activity.inventory_action !== 'MOVE' && activity.inventory_action !== 'ADD') {
+    // Only MOVE, ADD, DONATED, and DISCARD can be undone
+    if (activity.inventory_action !== 'MOVE' && activity.inventory_action !== 'ADD' && activity.inventory_action !== 'DONATED' && activity.inventory_action !== 'DISCARD') {
       setSnackbar({
         open: true,
-        message: `Cannot undo ${activity.inventory_action} actions. Only MOVE and ADD can be undone.`,
+        message: `Cannot undo ${activity.inventory_action} actions. Only MOVE, ADD, DONATED, and DISCARD can be undone.`,
         severity: 'error',
       });
       return;
