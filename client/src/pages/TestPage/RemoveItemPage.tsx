@@ -371,6 +371,16 @@ export default function RemoveItemPage() {
                         a.name === b.name && a.locationId === b.locationId
                       }
                       getOptionLabel={(option) => option.name}
+                      renderOption={(props, option) => (
+                        <li {...props} key={`${option.name}|${option.locationId}`}>
+                          <Box>
+                            <Typography fontWeight={500}>{option.name}</Typography>
+                            <Typography variant="body2" color="text.secondary">
+                              {option.locationCode}
+                            </Typography>
+                          </Box>
+                        </li>
+                      )}
                       renderInput={(params) => (
                         <TextField
                           {...params}

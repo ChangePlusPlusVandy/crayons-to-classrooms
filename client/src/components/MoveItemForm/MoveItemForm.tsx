@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 import {
   Box,
   TextField,
+  Typography,
   Button,
   CircularProgress,
   Alert,
@@ -474,6 +475,19 @@ export default function MoveItemForm({
           id="item-in-slot-select"
           options={itemGroupsInSourceSlot}
           getOptionLabel={(option) => option.name}
+          renderOption={(props, option) => {
+            const { key, ...otherProps } = props;
+            return (
+              <li key={key} {...otherProps}>
+                <Box>
+                  <Typography fontWeight={500}>{option.name}</Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Quantity: {option.quantity}
+                  </Typography>
+                </Box>
+              </li>
+            );
+          }}
           value={selectedItemGroup}
           onChange={(_, newValue) => {
             setSelectedItemGroup(newValue);
