@@ -424,10 +424,11 @@ export default function MoveItemForm({
         label="Warehouse"
         placeholder="Select warehouse"
         fullWidth
+        required
       />
 
       <FormControl fullWidth disabled={!selectedWarehouse}>
-        <MoveItemFormLabel htmlFor="source-slot-select">
+        <MoveItemFormLabel htmlFor="source-slot-select" required>
           Source Slot (Search by location code or item name)
         </MoveItemFormLabel>
         <Autocomplete
@@ -473,7 +474,7 @@ export default function MoveItemForm({
       </FormControl>
 
       <FormControl fullWidth disabled={!selectedSourceSlot}>
-        <MoveItemFormLabel htmlFor="item-in-slot-select">Item in Source Slot</MoveItemFormLabel>
+        <MoveItemFormLabel htmlFor="item-in-slot-select" required>Item in Source Slot</MoveItemFormLabel>
         <Autocomplete
           id="item-in-slot-select"
           options={itemGroupsInSourceSlot}
@@ -513,7 +514,7 @@ export default function MoveItemForm({
         disabled={!selectedItemGroup}
         error={selectedItemGroup ? !isQuantityValid() : false}
       >
-        <MoveItemFormLabel htmlFor="quantity-input">Quantity to Move</MoveItemFormLabel>
+        <MoveItemFormLabel htmlFor="quantity-input" required>Quantity to Move</MoveItemFormLabel>
         <TextField
           id="quantity-input"
           type="number"
@@ -554,6 +555,7 @@ export default function MoveItemForm({
         label="Destination Warehouse"
         placeholder="Select destination warehouse"
         fullWidth
+        required
       />
       <SlotSelector
         value={selectedDestinationSlot}
@@ -565,6 +567,7 @@ export default function MoveItemForm({
         storageLocations={storageLocations}
         label="Destination Slot"
         placeholder="Select destination slot"
+        required
       >
         <Button
           startIcon={<AddIcon />}
