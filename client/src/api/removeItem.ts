@@ -13,7 +13,7 @@ export async function removeItemsWithMovement(payload: {
     note?: string;
   };
 }): Promise<{ updatedCount: number; movement: InventoryMovement }> {
-  const response = await authFetch(`${API_BASE_URL}/inventory-movement/with-remove`, {
+  const response = await authFetch(`${API_BASE_URL}/inventory-movement/with-removal`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

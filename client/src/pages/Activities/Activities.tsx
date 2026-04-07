@@ -177,7 +177,13 @@ export default function Activities() {
 
   const formatAction = (activity: ActivityDisplay) => {
     const action = activity.inventory_action;
-    const product = activity.product_name || 'Unknown Item';
+    const product =
+      activity.product_name ||
+      (!activity.product_id &&
+      activity.quantity > 1 &&
+      (action === 'MOVE' || action === 'DONATED' || action === 'DISCARD')
+        ? 'Entire Pallet'
+        : 'Unknown item');
     const from = activity.from_location_name;
     const to = activity.to_location_name;
 
@@ -190,6 +196,8 @@ export default function Activities() {
         return `CHECKOUT ${product} from ${from || to || 'Unknown Location'}`;
       case 'DISCARD':
         return `DISCARD ${product} from ${from || to || 'Unknown Location'}`;
+      case 'DONATED':
+        return `DONATED ${product} from ${from || to || 'Unknown Location'}`;
       case 'ADJUSTMENT':
         return `ADJUSTMENT ${product} at ${to || from || 'Unknown Location'}`;
       default:
@@ -326,7 +334,14 @@ export default function Activities() {
                         {activity.user_name ?? activity.user_email ?? 'Unknown User'}
                       </TableCell>
                       <TableCell sx={activitiesStyles.tableCell}>
-                        {activity.product_name || 'Unknown Item'}
+                        {activity.product_name ||
+                          (!activity.product_id &&
+                          activity.quantity > 1 &&
+                          (activity.inventory_action === 'MOVE' ||
+                            activity.inventory_action === 'DONATED' ||
+                            activity.inventory_action === 'DISCARD')
+                            ? 'Entire Pallet'
+                            : 'Unknown item')}
                       </TableCell>
                       <TableCell sx={activitiesStyles.tableCell}>
                         {formatAction(activity)}
@@ -377,20 +392,20 @@ export default function Activities() {
           {renderPagination()}
         </>
       )}
-      {editingMovement?.inventory_action === 'ADD' && (
+      {editingMovement?.inventory_action === 'ADD' && editingMovement.product_id && (
         <EditAddDialog
           open={!!editingMovement}
           onClose={handleEditClose}
-          movement={editingMovement}
+          movement={{ ...editingMovement, product_id: editingMovement.product_id }}
           onSuccess={handleEditSuccess}
         />
       )}
 
-      {editingMovement?.inventory_action === 'MOVE' && (
+      {editingMovement?.inventory_action === 'MOVE' && editingMovement.product_id && (
         <EditMoveDialog
           open={!!editingMovement}
           onClose={handleEditClose}
-          movement={editingMovement}
+          movement={{ ...editingMovement, product_id: editingMovement.product_id }}
           onSuccess={handleEditSuccess}
         />
       )}

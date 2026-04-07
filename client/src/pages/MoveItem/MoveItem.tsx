@@ -2,13 +2,15 @@ import { useState } from 'react';
 import { Container, Typography, Paper, Alert } from '@mui/material';
 import { getItemsByLocation, moveItemsWithMovement } from '../../api/moveItem';
 import MoveItemForm, { MoveItemFormData } from '../../components/MoveItemForm/MoveItemForm';
+import PalletMoveForm, { PalletMoveFormData } from '../../components/PalletMoveForm/PalletMoveForm';
+import FormModeToggle, { FormMode } from '../../components/FormModeToggle/FormModeToggle';
 import { useAuth } from '../../context/AuthContext';
-
 export default function MoveItem() {
   const { user } = useAuth();
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [formKey, setFormKey] = useState(0);
+  const [mode, setMode] = useState<FormMode>('individual');
 
   const handleSubmit = async (data: MoveItemFormData) => {
     const { sourceSlot, itemGroup, destinationLocationId, quantity, notes } = data;
@@ -58,6 +60,53 @@ export default function MoveItem() {
     }
   };
 
+  const handlePalletMoveSubmit = async (data: PalletMoveFormData) => {
+    const { sourceSlotId, destinationLocationId, notes } = data;
+
+    setError('');
+    setSuccess('');
+
+    try {
+      const allItems = await getItemsByLocation(sourceSlotId);
+      const activeItems = allItems.filter((item) => item.status === 'active');
+
+      if (activeItems.length === 0) {
+        throw new Error('No active items found in the source slot.');
+      }
+
+      await moveItemsWithMovement({
+        item_ids: activeItems.map((item) => item.id),
+        movement: {
+          inventory_action: 'MOVE',
+          from_location_id: sourceSlotId,
+          to_location_id: destinationLocationId,
+          quantity: activeItems.length,
+          performed_by: user!.id,
+          note: notes || undefined,
+        },
+      });
+
+      setSuccess(
+        `${activeItems.length} item${activeItems.length > 1 ? 's' : ''} moved successfully!`
+      );
+      setFormKey((k) => k + 1);
+    } catch (err: unknown) {
+      console.error('Error moving pallet:', err);
+      const errorMessage =
+        err instanceof Error && err.message
+          ? `Failed to move pallet. ${err.message}`
+          : 'Failed to move pallet. Please check the inventory and try again.';
+      setError(errorMessage);
+    }
+  };
+
+  const handleModeChange = (newMode: FormMode) => {
+    setMode(newMode);
+    setFormKey((k) => k + 1);
+    setError('');
+    setSuccess('');
+  };
+
   return (
     <Container maxWidth="md" sx={{ py: 4 }}>
       <Paper
@@ -72,7 +121,7 @@ export default function MoveItem() {
         <Typography variant="h4" sx={{ mb: 3, textAlign: 'left' }}>
           Move Item
         </Typography>
-
+        <FormModeToggle value={mode} onChange={handleModeChange} />
         {error && (
           <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
             {error}
@@ -85,16 +134,29 @@ export default function MoveItem() {
           </Alert>
         )}
 
-        <MoveItemForm
-          key={formKey}
-          onSubmit={handleSubmit}
-          onCancel={() => {
-            setFormKey((k) => k + 1);
-            setError('');
-            setSuccess('');
-          }}
-          submitLabel="Confirm Move"
-        />
+        {mode === 'individual' ? (
+          <MoveItemForm
+            key={formKey}
+            onSubmit={handleSubmit}
+            onCancel={() => {
+              setFormKey((k) => k + 1);
+              setError('');
+              setSuccess('');
+            }}
+            submitLabel="Confirm Move"
+          />
+        ) : (
+          <PalletMoveForm
+            key={formKey}
+            onSubmit={handlePalletMoveSubmit}
+            onCancel={() => {
+              setFormKey((k) => k + 1);
+              setError('');
+              setSuccess('');
+            }}
+            submitLabel="Move All Items"
+          />
+        )}
       </Paper>
     </Container>
   );

@@ -1,33 +1,80 @@
 import { SxProps, Theme } from '@mui/material';
 
 export const alertsSectionStyles: Record<string, SxProps<Theme>> = {
-  card: {
-    bgcolor: '#fff5d9',
-    boxShadow: 1,
-    borderRadius: 2,
-    p: 1,
+  /** Spacing to Quick Actions below matches Quick Actions title `mb: 2` rhythm */
+  root: {
+    mb: 2,
   },
 
-  header: {
+  /**
+   * Alerts title row: same typography and padding rhythm as Quick Actions
+   * (`CardContent` + `Typography variant="h6"` / `fontWeight: 600`).
+   */
+  alertsTableHeaderCell: {
+    bgcolor: '#FFFFFF',
+    p: 0,
+    px: 2,
+    py: 2,
+    verticalAlign: 'middle',
+    borderBottom: 'none',
+  },
+
+  dropdownHeader: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    mb: 2.5,
-    flexDirection: { xs: 'column', sm: 'row' },
-    gap: 1.5,
-  },
-
-  alertItem: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    width: '100%',
     cursor: 'pointer',
-    p: 1.5,
-    borderRadius: 2,
-    bgcolor: 'white',
-    border: '1px solid #d0d0d0',
+    userSelect: 'none',
+  },
+
+  /** Nested table under Collapse — flush with header row */
+  nestedTable: {
+    width: '100%',
+  },
+
+  collapseCell: {
+    p: 0,
+    border: 'none',
+    verticalAlign: 'top',
+  },
+
+  /** Matches Quick Actions “Add Item” / “Remove Item” palette */
+  outOfStockQuickActionGreen: {
+    height: 36,
+    borderRadius: '10px',
+    minWidth: 'unset',
+    px: 1.5,
+    textTransform: 'none',
+    boxShadow: 'none',
+    bgcolor: '#d4edda',
+    color: '#1e7e34',
+    border: 'none',
+    '&.MuiButton-outlined': { border: 'none' },
     '&:hover': {
-      bgcolor: '#f9f9f9',
+      bgcolor: '#d4edda',
+      border: 'none',
+      opacity: 0.85,
+      boxShadow: 'none',
+    },
+  },
+
+  outOfStockQuickActionRed: {
+    height: 36,
+    borderRadius: '10px',
+    minWidth: 'unset',
+    px: 1.5,
+    textTransform: 'none',
+    boxShadow: 'none',
+    bgcolor: '#f8d7da',
+    color: '#a71d2a',
+    border: 'none',
+    '&.MuiButton-outlined': { border: 'none' },
+    '&:hover': {
+      bgcolor: '#f8d7da',
+      border: 'none',
+      opacity: 0.85,
+      boxShadow: 'none',
     },
   },
 };

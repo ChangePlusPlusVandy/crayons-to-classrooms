@@ -19,7 +19,8 @@ import { InventoryMovement } from '../../types/InventoryMovement';
 import { Item } from '../../types/Item';
 import { Warehouse } from '../../types/Warehouse';
 import { StorageLocation } from '../../types/StorageLocation';
-import { getProductById, getStorageLocationById, getWarehouseById } from '../../api/addItem';
+import { getStorageLocationById, getWarehouseById } from '../../api/addItem';
+import { getItemById } from '../../api/items';
 
 interface EditRemoveDialogProps {
   open: boolean;
@@ -42,10 +43,16 @@ export function EditRemoveDialog({ open, onClose, movement, onSuccess }: EditRem
     setFetchError('');
 
     async function fetchData() {
+      if (movement.from_location_id == null) {
+        setFetchError('Failed to load movement details');
+        setLoading(false);
+        return;
+      }
+
       try {
-        const [location, prod] = await Promise.all([
-          getStorageLocationById(movement.from_location_id!),
-          getProductById(movement.product_id),
+        const [location, item] = await Promise.all([
+          getStorageLocationById(movement.from_location_id),
+          getItemById(movement.item_id!),
         ]);
         const wh = await getWarehouseById(location.warehouse_id);
 
@@ -55,11 +62,12 @@ export function EditRemoveDialog({ open, onClose, movement, onSuccess }: EditRem
         // Build a virtual group from movement data so the item name pre-populates even when
         // the removed items are inactive (and thus absent from the active items list).
         setInitialGroup({
-          name: prod.name,
+          name: item.name,
           locationCode: location.location_code,
           locationId: location.id,
-          productId: movement.product_id,
-          items: Array.from({ length: movement.quantity }, () => ({} as Item)),
+          productId: movement.product_id ?? '',
+          itemInfoId: movement.product_id ?? '',
+          items: Array.from({ length: movement.quantity }, () => ({}) as Item),
         });
       } catch {
         setFetchError('Failed to load movement details');
@@ -69,13 +77,13 @@ export function EditRemoveDialog({ open, onClose, movement, onSuccess }: EditRem
     }
 
     fetchData();
-  }, [open, movement.from_location_id, movement.product_id, movement.quantity]);
+  }, [open, movement.from_location_id, movement.item_id, movement.product_id, movement.quantity]);
 
   const handleSubmit = async (data: RemoveItemFormData) => {
     await editRemoveMovementTransaction(movement.id!, {
       inventory_action: data.removalAction,
       from_location_id: data.fromLocationId,
-      product_id: data.productId,
+      product_id: data.productId || undefined,
       quantity: data.quantity,
       performed_by: user!.id,
       note: data.notes || undefined,
@@ -104,10 +112,8 @@ export function EditRemoveDialog({ open, onClose, movement, onSuccess }: EditRem
           <RemoveItemForm
             initialWarehouse={warehouse}
             initialSourceLocation={sourceLocation}
-            initialProductId={movement.product_id}
-            initialRemovalAction={
-              (movement.inventory_action as 'DONATED' | 'DISCARD') ?? 'DONATED'
-            }
+            initialProductId={movement.product_id ?? ''}
+            initialRemovalAction={(movement.inventory_action as 'DONATED' | 'DISCARD') ?? 'DONATED'}
             initialQuantity={movement.quantity}
             initialNotes={movement.note || ''}
             initialGroup={initialGroup}

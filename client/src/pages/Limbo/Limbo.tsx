@@ -19,16 +19,28 @@ import {
   DialogContent,
   DialogActions,
   Card,
+  Autocomplete,
+  Snackbar,
 } from '@mui/material';
-import { getLimboItems, ItemInfo } from '../../api/itemInfo';
+import { deleteItemInfo, getLimboItems, ItemInfo } from '../../api/itemInfo';
+import { createItemWithMovement, getStorageLocations, getWarehouses } from '../../api/addItem';
+import { createStorageLocation } from '../../api/storageLocation';
+import { Warehouse } from '../../types/Warehouse';
+import { StorageLocation } from '../../types/StorageLocation';
+import { useAuth } from '../../context/AuthContext';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import { limboStyles } from './Limbo.styles';
 import itemIcon from '../../assets/item.svg';
 import clockIcon from '../../assets/clock.svg';
 import upArrowIcon from '../../assets/up_arrow.svg';
 import searchIcon from '../../assets/search.svg';
+import exitIcon from '../../assets/exit.svg';
 
 export default function Limbo() {
+  const { user } = useAuth();
   const [items, setItems] = useState<ItemInfo[]>([]);
+  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
+  const [storageLocations, setStorageLocations] = useState<StorageLocation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchName, setSearchName] = useState('');
@@ -38,42 +50,122 @@ export default function Limbo() {
   const [restockItem, setRestockItem] = useState<ItemInfo | null>(null);
   const [restockQuantity, setRestockQuantity] = useState<number | null>(null);
   const [restockNote, setRestockNote] = useState('');
-  const [restockWarehouse, setRestockWarehouse] = useState('');
-  const [restockAisle, setRestockAisle] = useState('');
-  const [restockFixture, setRestockFixture] = useState('');
-  const [restockSlot, setRestockSlot] = useState('');
+  const [restockWarehouse, setRestockWarehouse] = useState<string>('');
+  /** Location code / slot — chosen from warehouse storage locations only */
+  const [restockSlotCode, setRestockSlotCode] = useState('');
+  const [restockError, setRestockError] = useState('');
+  const [restockSubmitting, setRestockSubmitting] = useState(false);
+  const [restockSuccessOpen, setRestockSuccessOpen] = useState(false);
+  const [restockSuccessMessage, setRestockSuccessMessage] = useState('');
+  const [newSlotDialogOpen, setNewSlotDialogOpen] = useState(false);
+  const [newSlotCode, setNewSlotCode] = useState('');
+  const [creatingNewSlot, setCreatingNewSlot] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState<ItemInfo | null>(null);
+  const [deleteSubmitting, setDeleteSubmitting] = useState(false);
+  const [tableActionError, setTableActionError] = useState('');
+
+  const tableRowActionsLocked =
+    deleteSubmitting || itemToDelete !== null || restockSubmitting;
+
+  const warehouseNameOptions = useMemo(
+    () => [...warehouses].map((w) => w.name).sort((a, b) => a.localeCompare(b)),
+    [warehouses]
+  );
+
+  const warehouseSlotOptions = useMemo(() => {
+    const w = warehouses.find((x) => x.name === restockWarehouse);
+    if (!w) return [] as string[];
+    const codes = new Set<string>();
+    for (const loc of storageLocations) {
+      if (loc.warehouse_id === w.id && loc.location_code?.trim()) {
+        codes.add(loc.location_code.trim());
+      }
+    }
+    return Array.from(codes).sort((a, b) => a.localeCompare(b));
+  }, [warehouses, restockWarehouse, storageLocations]);
+
+  /** Resolved slot string from options (exact casing) for Autocomplete value */
+  const slotAutocompleteValue = useMemo(() => {
+    if (!restockSlotCode.trim()) return null;
+    return (
+      warehouseSlotOptions.find((c) => c.toLowerCase() === restockSlotCode.trim().toLowerCase()) ??
+      null
+    );
+  }, [restockSlotCode, warehouseSlotOptions]);
+
+  /** After warehouse changes, drop slot if it is not valid for that warehouse */
+  useEffect(() => {
+    if (!restockOpen || !restockWarehouse) return;
+    if (
+      restockSlotCode &&
+      !warehouseSlotOptions.some((c) => c.toLowerCase() === restockSlotCode.toLowerCase())
+    ) {
+      setRestockSlotCode('');
+    }
+  }, [restockOpen, restockWarehouse, warehouseSlotOptions, restockSlotCode]);
 
   useEffect(() => {
-    async function loadLimboItems() {
+    async function loadData() {
       try {
         setLoading(true);
         setError('');
-        const data = await getLimboItems();
-        setItems(data);
+        const [limboData, warehouseData, locationData] = await Promise.all([
+          getLimboItems(),
+          getWarehouses(),
+          getStorageLocations(),
+        ]);
+        setItems(limboData);
+        setWarehouses(warehouseData);
+        setStorageLocations(locationData);
       } catch (err) {
         console.error(err);
-        setError('Failed to load limbo items.');
+        setError('Failed to load limbo restock data.');
       } finally {
         setLoading(false);
       }
     }
 
-    loadLimboItems();
+    loadData();
   }, []);
 
   const filteredItems = useMemo(() => {
     const name = searchName.trim().toLowerCase();
-    const updatedAfterMs = updatedAfter ? new Date(updatedAfter).getTime() : null;
 
-    return items.filter((item) => {
+    /** Start of the selected local calendar day (inclusive): show items updated on or after this instant. */
+    let startOfSelectedDayMs: number | null = null;
+    if (updatedAfter) {
+      const parts = updatedAfter.split('-').map(Number);
+      if (parts.length === 3 && parts.every((n) => !Number.isNaN(n))) {
+        const [y, m, d] = parts;
+        startOfSelectedDayMs = new Date(y, m - 1, d, 0, 0, 0, 0).getTime();
+      }
+    }
+
+    const filtered = items.filter((item) => {
       const matchesName = !name || item.name.toLowerCase().includes(name);
       const itemUpdatedMs = item.time_last_updated
         ? new Date(item.time_last_updated).getTime()
         : null;
-      const matchesUpdatedAfter =
-        updatedAfterMs === null || (itemUpdatedMs !== null && itemUpdatedMs >= updatedAfterMs);
 
-      return matchesName && matchesUpdatedAfter;
+      const matchesChangesAfter =
+        startOfSelectedDayMs === null ||
+        (itemUpdatedMs !== null && itemUpdatedMs >= startOfSelectedDayMs);
+
+      return matchesName && matchesChangesAfter;
+    });
+
+    return filtered.sort((a, b) => {
+      const ta = a.time_last_updated
+        ? new Date(a.time_last_updated).getTime()
+        : Number.NEGATIVE_INFINITY;
+      const tb = b.time_last_updated
+        ? new Date(b.time_last_updated).getTime()
+        : Number.NEGATIVE_INFINITY;
+      const byTime = tb - ta;
+      if (Number.isNaN(byTime) || byTime === 0) {
+        return a.name.localeCompare(b.name);
+      }
+      return byTime;
     });
   }, [items, searchName, updatedAfter]);
 
@@ -82,20 +174,181 @@ export default function Limbo() {
     setRestockQuantity(null);
     setRestockNote('');
     setRestockWarehouse('');
-    setRestockAisle('');
-    setRestockFixture('');
-    setRestockSlot('');
+    setRestockSlotCode(item.last_known_location_code?.trim() ?? '');
+    setRestockError('');
+    setNewSlotDialogOpen(false);
+    setNewSlotCode('');
     setRestockOpen(true);
   };
 
   const closeRestockDialog = () => {
     setRestockOpen(false);
     setRestockItem(null);
+    setRestockError('');
+    setNewSlotDialogOpen(false);
+    setNewSlotCode('');
+  };
+
+  const closeDeleteDialog = () => {
+    if (!deleteSubmitting) setItemToDelete(null);
+  };
+
+  const handleConfirmDeleteItemInfo = async () => {
+    if (!itemToDelete) return;
+    const target = itemToDelete;
+    setTableActionError('');
+    setDeleteSubmitting(true);
+    try {
+      await deleteItemInfo(target.id);
+      setItems((prev) => prev.filter((i) => i.id !== target.id));
+      if (restockItem?.id === target.id) {
+        closeRestockDialog();
+      }
+      setItemToDelete(null);
+    } catch (e) {
+      setItemToDelete(null);
+      setTableActionError(e instanceof Error ? e.message : 'Could not delete item.');
+    } finally {
+      setDeleteSubmitting(false);
+    }
+  };
+
+  const handleAddNewSlotFromRestock = async () => {
+    const slot = newSlotCode.trim();
+    const wh = warehouses.find((w) => w.name === restockWarehouse);
+    if (!wh) {
+      setRestockError('Select a warehouse before adding a slot.');
+      return;
+    }
+    if (!slot) {
+      setRestockError('Enter a slot code.');
+      return;
+    }
+
+    setCreatingNewSlot(true);
+    setRestockError('');
+    try {
+      const created = await createStorageLocation({
+        slot,
+        active: true,
+        warehouse_id: wh.id,
+      });
+      setStorageLocations((prev) => [...prev, created]);
+      setRestockSlotCode(created.location_code);
+      setNewSlotCode('');
+      setNewSlotDialogOpen(false);
+    } catch (e) {
+      setRestockError(e instanceof Error ? e.message : 'Failed to create slot.');
+      setNewSlotCode('');
+      setNewSlotDialogOpen(false);
+    } finally {
+      setCreatingNewSlot(false);
+    }
+  };
+
+  const handleRestock = async () => {
+    if (!restockItem) {
+      setRestockError('No item selected for restock.');
+      return;
+    }
+    if (!user) {
+      setRestockError('You must be signed in to restock.');
+      return;
+    }
+    if (!restockWarehouse) {
+      setRestockError('Please select a warehouse.');
+      return;
+    }
+    if (!restockQuantity || restockQuantity < 1 || !Number.isInteger(restockQuantity)) {
+      setRestockError('Please enter a valid whole number quantity.');
+      return;
+    }
+
+    const selectedWarehouse = warehouses.find((w) => w.name === restockWarehouse);
+    if (!selectedWarehouse) {
+      setRestockError('Selected warehouse could not be resolved.');
+      return;
+    }
+
+    const slotCode = restockSlotCode.trim();
+    if (!slotCode) {
+      setRestockError('Please select a slot.');
+      return;
+    }
+
+    try {
+      setRestockSubmitting(true);
+      setRestockError('');
+
+      const destinationLocation = storageLocations.find(
+        (loc) =>
+          loc.warehouse_id === selectedWarehouse.id &&
+          loc.location_code?.trim().toLowerCase() === slotCode.toLowerCase()
+      );
+      if (!destinationLocation) {
+        setRestockError(
+          'No matching storage location row for this warehouse and slot. Refresh and try again.'
+        );
+        return;
+      }
+
+      const unitQuantity = restockItem.quantity ?? 1;
+      const parsedItemLimit =
+        typeof restockItem.item_limit === 'number' && Number.isFinite(restockItem.item_limit)
+          ? restockItem.item_limit
+          : undefined;
+      const parsedValue =
+        typeof restockItem.value === 'number' && Number.isFinite(restockItem.value)
+          ? restockItem.value
+          : undefined;
+
+      await createItemWithMovement({
+        item: {
+          name: restockItem.name,
+          ...(restockItem.product_id ? { product_id: restockItem.product_id } : {}),
+          quantity: unitQuantity,
+          stock: unitQuantity,
+          current_location_id: destinationLocation.id,
+          status: 'active',
+          created_by: user.id,
+          warehouse: selectedWarehouse.id,
+          category: restockItem.category ?? undefined,
+          item_limit: parsedItemLimit,
+          value: parsedValue,
+          limbo: false,
+          notes: restockNote || restockItem.notes || undefined,
+        },
+        movement: {
+          inventory_action: 'ADD',
+          from_location_id: null,
+          to_location_id: destinationLocation.id,
+          quantity: restockQuantity,
+          performed_by: user.id,
+          note: restockNote || undefined,
+        },
+      });
+
+      const refreshed = await getLimboItems();
+      setItems(refreshed);
+
+      const successQty = restockQuantity;
+      const successName = restockItem.name;
+      closeRestockDialog();
+      setRestockSuccessMessage(
+        successQty === 1
+          ? `Successfully restocked “${successName}”.`
+          : `Successfully restocked ${successQty} units of “${successName}”.`
+      );
+      setRestockSuccessOpen(true);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to restock item.';
+      setRestockError(message);
+    } finally {
+      setRestockSubmitting(false);
+    }
   };
 
   const rowsInTable = filteredItems.length;
-  // Dummy metric placeholder (backend not implemented yet)
-  const resolvedLast7DaysDummy = 0;
 
   return (
     <Container maxWidth="lg" sx={limboStyles.container}>
@@ -137,32 +390,6 @@ export default function Limbo() {
                 Total Limbo Items - {rowsInTable}
               </Typography>
             </Box>
-
-            <Box
-              sx={{
-                ...limboStyles.metricsBoxBase,
-                ...limboStyles.metricsBoxGreen,
-              }}
-            >
-              <Typography
-                variant="body2"
-                sx={{
-                  color: '#1F2937',
-                  fontFamily: 'Inter, sans-serif',
-                  fontWeight: 500,
-                  fontStyle: 'normal',
-                  fontSize: 14,
-                  lineHeight: '21px',
-                  letterSpacing: '-0.15px',
-                  width: '149.9609375px',
-                  height: '21px',
-                  opacity: 1,
-                  overflow: 'hidden',
-                }}
-              >
-                Resolved (Last 7 Days) - {resolvedLast7DaysDummy}
-              </Typography>
-            </Box>
           </Box>
 
           {/* Search bars (above the table shadow) */}
@@ -170,6 +397,11 @@ export default function Limbo() {
             {error && (
               <Alert severity="error" sx={{ mb: 1 }}>
                 {error}
+              </Alert>
+            )}
+            {tableActionError && (
+              <Alert severity="error" sx={{ mb: 1 }} onClose={() => setTableActionError('')}>
+                {tableActionError}
               </Alert>
             )}
 
@@ -196,7 +428,7 @@ export default function Limbo() {
 
               <Box sx={limboStyles.searchTimeArea}>
                 <TextField
-                  label="Filter by Updated Time"
+                  label="Changes after"
                   type="date"
                   value={updatedAfter}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
@@ -231,8 +463,8 @@ export default function Limbo() {
                     <TableCell sx={{ ...limboStyles.tableHeadCell, width: 401 }}>
                       Last Updated
                     </TableCell>
-                    <TableCell sx={{ ...limboStyles.tableHeadCell, width: 183 }} align="left">
-                      Restock Action
+                    <TableCell sx={{ ...limboStyles.tableHeadCell, width: 260 }} align="left">
+                      Limbo Actions
                     </TableCell>
                   </TableRow>
                 </TableHead>
@@ -271,19 +503,25 @@ export default function Limbo() {
                             : '-'}
                         </Box>
                       </TableCell>
-                      <TableCell sx={{ ...limboStyles.tableCell, width: 183, py: 0 }} align="left">
+                      <TableCell sx={{ ...limboStyles.tableCell, width: 260, py: 0 }} align="left">
                         <Box
                           sx={{
-                            height: '69px',
+                            minHeight: '69px',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'flex-start',
+                            gap: 1,
+                            flexWrap: 'nowrap',
                           }}
                         >
                           <Button
                             variant="contained"
                             size="small"
-                            onClick={() => openRestockDialog(item)}
+                            disabled={tableRowActionsLocked}
+                            onClick={() => {
+                              setTableActionError('');
+                              openRestockDialog(item);
+                            }}
                             sx={limboStyles.restockButton}
                           >
                             <Box sx={{ display: 'flex', alignItems: 'center' }}>
@@ -295,6 +533,19 @@ export default function Limbo() {
                               />
                               Restock
                             </Box>
+                          </Button>
+                          <Button
+                            size="small"
+                            color="error"
+                            startIcon={<DeleteOutlineIcon />}
+                            disabled={tableRowActionsLocked}
+                            onClick={() => {
+                              setTableActionError('');
+                              setItemToDelete(item);
+                            }}
+                            sx={{ textTransform: 'none', whiteSpace: 'nowrap', minWidth: 0 }}
+                          >
+                            Delete
                           </Button>
                         </Box>
                       </TableCell>
@@ -327,17 +578,20 @@ export default function Limbo() {
       >
         <DialogContent sx={limboStyles.restockDialogContent}>
           <Box sx={limboStyles.restockDialogClose} onClick={closeRestockDialog}>
-            ×
+            <Box
+              component="img"
+              src={exitIcon}
+              alt="Close"
+              sx={{ width: 16, height: 16, display: 'block' }}
+            />
           </Box>
           <Typography sx={limboStyles.restockDialogTitle}>Restock item from limbo</Typography>
 
           <Box sx={limboStyles.restockOptionsBox}>
+            {restockError && <Alert severity="error">{restockError}</Alert>}
             <Box sx={limboStyles.restockOptionCard}>
               <Typography sx={limboStyles.restockingLabel}>Restocking:</Typography>
               <Typography sx={limboStyles.restockItemName}>{restockItem?.name ?? '-'}</Typography>
-              <Typography sx={limboStyles.restockItemId}>
-                ID: {restockItem?.product_id ?? '-'}
-              </Typography>
             </Box>
 
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
@@ -369,94 +623,87 @@ export default function Limbo() {
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
               <Typography sx={limboStyles.restockFieldHeader}>Warehouse</Typography>
               <Box sx={limboStyles.restockFieldBox}>
-                <TextField
-                  variant="standard"
-                  select
-                  placeholder="Select warehouse"
-                  value={restockWarehouse}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                    setRestockWarehouse(e.target.value)
+                <Autocomplete
+                  fullWidth
+                  disabled={warehouseNameOptions.length === 0}
+                  options={warehouseNameOptions}
+                  value={
+                    restockWarehouse !== '' && warehouseNameOptions.includes(restockWarehouse)
+                      ? restockWarehouse
+                      : null
                   }
-                  sx={limboStyles.restockInput}
-                  InputProps={{ disableUnderline: true }}
-                  SelectProps={{ native: true }}
-                >
-                  <option value="" disabled>
-                    Select warehouse
-                  </option>
-                  <option value="warehouse-1">Warehouse 1</option>
-                  <option value="warehouse-2">Warehouse 2</option>
-                  <option value="warehouse-3">Warehouse 3</option>
-                </TextField>
-              </Box>
-            </Box>
-
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-              <Typography sx={limboStyles.restockFieldHeader}>Aisle</Typography>
-              <Box sx={limboStyles.restockFieldBox}>
-                <TextField
-                  variant="standard"
-                  placeholder="Enter aisle"
-                  value={restockAisle}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                    setRestockAisle(e.target.value)
-                  }
-                  sx={limboStyles.restockInput}
-                  InputProps={{ disableUnderline: true }}
+                  onChange={(_, newValue) => setRestockWarehouse(newValue ?? '')}
+                  getOptionLabel={(option) => option}
+                  isOptionEqualToValue={(a, b) => a === b}
+                  filterOptions={(opts) => opts}
+                  selectOnFocus={false}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      variant="standard"
+                      placeholder={
+                        warehouseNameOptions.length === 0 ? 'No warehouses' : 'Select warehouse'
+                      }
+                      sx={limboStyles.restockInput}
+                      InputProps={{
+                        ...params.InputProps,
+                        disableUnderline: true,
+                        readOnly: true,
+                      }}
+                    />
+                  )}
                 />
-              </Box>
-            </Box>
-
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-              <Typography sx={limboStyles.restockFieldHeader}>Fixture</Typography>
-              <Box sx={limboStyles.restockFieldBox}>
-                <TextField
-                  variant="standard"
-                  select
-                  placeholder="Select fixture"
-                  value={restockFixture}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                    setRestockFixture(e.target.value)
-                  }
-                  sx={limboStyles.restockInput}
-                  InputProps={{ disableUnderline: true }}
-                  SelectProps={{ native: true }}
-                >
-                  <option value="" disabled>
-                    Select fixture
-                  </option>
-                  <option value="fixture-a">Fixture A</option>
-                  <option value="fixture-b">Fixture B</option>
-                  <option value="fixture-c">Fixture C</option>
-                </TextField>
               </Box>
             </Box>
 
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
               <Typography sx={limboStyles.restockFieldHeader}>Slot</Typography>
               <Box sx={limboStyles.restockFieldBox}>
-                <TextField
-                  variant="standard"
-                  select
-                  placeholder="Select slot"
-                  value={restockSlot}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                    setRestockSlot(e.target.value)
-                  }
-                  sx={limboStyles.restockInput}
-                  InputProps={{
-                    disableUnderline: true,
-                    inputMode: 'numeric',
+                <Autocomplete
+                  fullWidth
+                  disabled={!restockWarehouse}
+                  options={warehouseSlotOptions}
+                  value={slotAutocompleteValue}
+                  onChange={(_, newValue) => setRestockSlotCode(newValue ?? '')}
+                  getOptionLabel={(option) => option}
+                  isOptionEqualToValue={(a, b) => a === b}
+                  filterOptions={(opts) => opts}
+                  selectOnFocus={false}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      variant="standard"
+                      placeholder={
+                        !restockWarehouse
+                          ? 'Select a warehouse first'
+                          : warehouseSlotOptions.length === 0
+                            ? 'No slots yet — add one below'
+                            : 'Select slot'
+                      }
+                      sx={limboStyles.restockInput}
+                      InputProps={{
+                        ...params.InputProps,
+                        disableUnderline: true,
+                        readOnly: true,
+                      }}
+                    />
+                  )}
+                />
+              </Box>
+              <Box sx={{ width: 462, display: 'flex', justifyContent: 'flex-start' }}>
+                <Button
+                  type="button"
+                  variant="text"
+                  disabled={!restockWarehouse || creatingNewSlot}
+                  onClick={() => {
+                    setRestockError('');
+                    setNewSlotCode('');
+                    setNewSlotDialogOpen(true);
                   }}
-                  SelectProps={{ native: true }}
+                  sx={limboStyles.restockNewSlotLink}
                 >
-                  <option value="" disabled>
-                    Select slot
-                  </option>
-                  <option value="slot-1">Slot 1</option>
-                  <option value="slot-2">Slot 2</option>
-                  <option value="slot-3">Slot 3</option>
-                </TextField>
+                  Add new slot
+                </Button>
               </Box>
             </Box>
 
@@ -498,10 +745,8 @@ export default function Limbo() {
           </Button>
           <Button
             variant="contained"
-            onClick={() => {
-              // TODO: hook up restock endpoint
-              closeRestockDialog();
-            }}
+            onClick={handleRestock}
+            disabled={restockSubmitting}
             sx={{
               ...limboStyles.restockButton,
               width: '135px',
@@ -511,6 +756,181 @@ export default function Limbo() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <Dialog
+        open={newSlotDialogOpen}
+        onClose={() => !creatingNewSlot && setNewSlotDialogOpen(false)}
+        maxWidth={false}
+        slotProps={{ paper: { sx: limboStyles.restockDialogPaper } }}
+      >
+        <DialogContent sx={limboStyles.restockDialogContent}>
+          <Box
+            sx={limboStyles.restockDialogClose}
+            onClick={() => !creatingNewSlot && setNewSlotDialogOpen(false)}
+          >
+            <Box
+              component="img"
+              src={exitIcon}
+              alt="Close"
+              sx={{ width: 16, height: 16, display: 'block' }}
+            />
+          </Box>
+          <Typography sx={limboStyles.restockDialogTitle}>Add new slot</Typography>
+          <Box sx={limboStyles.restockOptionsBox}>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+              <Typography sx={limboStyles.restockFieldHeader}>Slot code</Typography>
+              <Box sx={limboStyles.restockFieldBox}>
+                <TextField
+                  autoFocus
+                  fullWidth
+                  variant="standard"
+                  placeholder="e.g. A-12-03"
+                  value={newSlotCode}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                    setNewSlotCode(e.target.value)
+                  }
+                  sx={limboStyles.restockInput}
+                  InputProps={{ disableUnderline: true }}
+                />
+              </Box>
+              <Typography sx={limboStyles.restockingLabel}>
+                {restockWarehouse
+                  ? `Creates a unique storage location in ${restockWarehouse}.`
+                  : 'Select a warehouse in the restock form first.'}
+              </Typography>
+            </Box>
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ justifyContent: 'flex-end', pr: 3, pb: 2, gap: 1.5 }}>
+          <Button
+            onClick={() => !creatingNewSlot && setNewSlotDialogOpen(false)}
+            disabled={creatingNewSlot}
+            sx={{
+              height: 36,
+              width: '79.3515625px',
+              textTransform: 'none',
+              bgcolor: '#FFFFFF',
+              color: '#0A0A0A',
+              borderRadius: '10px',
+              px: 2.5,
+              boxShadow: 'none',
+              '&:hover': {
+                bgcolor: '#F3F4F6',
+                boxShadow: 'none',
+              },
+            }}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            onClick={() => void handleAddNewSlotFromRestock()}
+            disabled={!newSlotCode.trim() || !restockWarehouse || creatingNewSlot}
+            sx={{
+              ...limboStyles.restockButton,
+              minWidth: 120,
+            }}
+          >
+            {creatingNewSlot ? (
+              <CircularProgress size={20} sx={{ color: '#FFFFFF' }} />
+            ) : (
+              'Add slot'
+            )}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={itemToDelete !== null}
+        onClose={() => {
+          if (!deleteSubmitting) closeDeleteDialog();
+        }}
+        maxWidth={false}
+        fullWidth={false}
+        slotProps={{ paper: { sx: limboStyles.restockDialogPaper } }}
+        aria-labelledby="limbo-delete-item-info-dialog-title"
+      >
+        <DialogContent sx={limboStyles.restockDialogContent}>
+          <Box sx={limboStyles.restockDialogClose} onClick={closeDeleteDialog}>
+            <Box
+              component="img"
+              src={exitIcon}
+              alt="Close"
+              sx={{ width: 16, height: 16, display: 'block' }}
+            />
+          </Box>
+          <Typography id="limbo-delete-item-info-dialog-title" sx={limboStyles.restockDialogTitle}>
+            Delete Item Info
+          </Typography>
+
+          <Box sx={limboStyles.restockOptionsBox}>
+            <Typography
+              component="p"
+              sx={{
+                ...limboStyles.restockingLabel,
+                m: 0,
+              }}
+            >
+              Are you sure you want to delete{' '}
+              <Box component="span" sx={limboStyles.restockItemName}>
+                {itemToDelete?.name ?? ''}
+              </Box>
+              ?
+            </Typography>
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ justifyContent: 'flex-end', pr: 3, pb: 2, gap: 1.5 }}>
+          <Button
+            onClick={closeDeleteDialog}
+            disabled={deleteSubmitting}
+            sx={{
+              height: 36,
+              width: '79.3515625px',
+              textTransform: 'none',
+              bgcolor: '#FFFFFF',
+              color: '#0A0A0A',
+              borderRadius: '10px',
+              px: 2.5,
+              boxShadow: 'none',
+              '&:hover': {
+                bgcolor: '#F3F4F6',
+                boxShadow: 'none',
+              },
+            }}
+          >
+            Cancel
+          </Button>
+          <Button
+            size="small"
+            color="error"
+            startIcon={<DeleteOutlineIcon />}
+            disabled={deleteSubmitting}
+            onClick={() => void handleConfirmDeleteItemInfo()}
+            sx={{ textTransform: 'none' }}
+          >
+            {deleteSubmitting ? 'Deleting…' : 'Delete'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Snackbar
+        open={restockSuccessOpen}
+        autoHideDuration={6000}
+        onClose={(_e, reason) => {
+          if (reason === 'clickaway') return;
+          setRestockSuccessOpen(false);
+        }}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert
+          onClose={() => setRestockSuccessOpen(false)}
+          severity="success"
+          variant="filled"
+          sx={{ width: '100%', alignItems: 'center' }}
+        >
+          {restockSuccessMessage}
+        </Alert>
+      </Snackbar>
     </Container>
   );
 }
