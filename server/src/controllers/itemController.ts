@@ -489,7 +489,7 @@ export async function createItemCore(
     const syncedItemInfoId = await syncItemInfoStock(
       insertName,
       insertProductId ?? undefined,
-      insertCategory ?? 'UNKNOWN',
+      insertCategory ?? 'No Category',
       quantity,
       insertValue,
       insertItemLimit ?? undefined,
@@ -690,7 +690,7 @@ export const updateItem = async (req: Request, res: Response) => {
       await syncItemInfoStock(
         newName,
         updatedItem.product_id,
-        updatedItem.category ?? 'UNKNOWN',
+        updatedItem.category ?? 'No Category',
         updatedItem.quantity,
         updatedItem.value,
         updatedItem.item_limit ?? undefined,
@@ -704,7 +704,7 @@ export const updateItem = async (req: Request, res: Response) => {
       await syncItemInfoStock(
         newName,
         updatedItem.product_id,
-        updatedItem.category ?? 'UNKNOWN',
+        updatedItem.category ?? 'No Category',
         updatedItem.quantity,
         updatedItem.value,
         updatedItem.item_limit ?? undefined,
