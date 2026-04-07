@@ -49,6 +49,9 @@ export default function NewItemDialog({
   const [newSubcategoryProductName, setNewSubcategoryProductName] = useState('');
   const [customCategories, setCustomCategories] = useState<string[]>([]);
   const [pendingSubcategories, setPendingSubcategories] = useState<Product[]>([]);
+  const [fixtureDialogOpen, setFixtureDialogOpen] = useState(false);
+  const [newFixtureName, setNewFixtureName] = useState('');
+  const [customFixtures, setCustomFixtures] = useState<string[]>([]);
   const [error, setError] = useState('');
 
   const isEditMode = initialData !== null;
@@ -60,8 +63,9 @@ export default function NewItemDialog({
         fixtureSet.add(info.fixture);
       }
     });
+    customFixtures.forEach((f) => fixtureSet.add(f));
     return Array.from(fixtureSet).sort();
-  }, [itemInfoList]);
+  }, [itemInfoList, customFixtures]);
 
   // Reset / pre-fill fields when dialog opens
   useEffect(() => {
@@ -118,6 +122,16 @@ export default function NewItemDialog({
 
   // Combined subcategory options: real products + pending placeholders
   const subcategoryOptions = [...products, ...pendingSubcategories];
+
+  const handleAddFixture = () => {
+    const trimmed = newFixtureName.trim();
+    if (trimmed && !availableFixtures.includes(trimmed)) {
+      setCustomFixtures((prev) => [...prev, trimmed]);
+    }
+    setFixture(trimmed);
+    setNewFixtureName('');
+    setFixtureDialogOpen(false);
+  };
 
   const handleAddCategory = () => {
     const trimmed = newCategoryName.trim();
@@ -348,18 +362,27 @@ export default function NewItemDialog({
             <FormControl fullWidth>
               <AddItemFormLabel>Fixture</AddItemFormLabel>
               <Autocomplete
-                freeSolo
                 options={availableFixtures}
-                value={fixture ?? ''}
-                onChange={(_, newValue) => setFixture(newValue || null)}
-                onInputChange={(_, newValue, reason) => {
-                  if (reason === 'input') setFixture(newValue || null);
-                }}
+                value={fixture}
+                onChange={(_, newValue) => setFixture(newValue)}
                 renderInput={(params) => (
-                  <TextField {...params} placeholder="Enter or select a fixture (optional)" size="small" />
+                  <TextField {...params} placeholder="Select or add a fixture (optional)" size="small" />
                 )}
                 size="small"
               />
+              <Button
+                startIcon={<AddIcon />}
+                onClick={() => setFixtureDialogOpen(true)}
+                sx={{
+                  justifyContent: 'flex-start',
+                  textTransform: 'none',
+                  color: 'primary.main',
+                  mt: 0,
+                  '&:hover': { backgroundColor: 'transparent' },
+                }}
+              >
+                New Fixture
+              </Button>
             </FormControl>
 
           </Stack>
@@ -409,6 +432,27 @@ export default function NewItemDialog({
         <DialogActions>
           <Button onClick={() => setSubcategoryDialogOpen(false)}>Cancel</Button>
           <Button onClick={handleAddSubcategory} disabled={!newSubcategoryProductName.trim()}>
+            Add
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Nested: New Fixture Dialog */}
+      <Dialog open={fixtureDialogOpen} onClose={() => setFixtureDialogOpen(false)}>
+        <DialogTitle>Add New Fixture</DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            fullWidth
+            label="Fixture Name"
+            value={newFixtureName}
+            onChange={(e) => setNewFixtureName(e.target.value)}
+            sx={{ mt: 1 }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setFixtureDialogOpen(false)}>Cancel</Button>
+          <Button onClick={handleAddFixture} disabled={!newFixtureName.trim()}>
             Add
           </Button>
         </DialogActions>
