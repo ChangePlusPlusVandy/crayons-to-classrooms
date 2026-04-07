@@ -16,8 +16,6 @@ import {
   Inventory as InventoryIcon,
   Timeline as TimelineIcon,
   Warning as WarningIcon,
-  Analytics as AnalyticsIcon,
-  Settings as SettingsIcon,
   Logout as LogoutIcon,
   PeopleAlt as PeopleAltIcon,
 } from '@mui/icons-material';
@@ -34,9 +32,7 @@ const menuItems = [
   { text: 'Inventory', icon: <InventoryIcon />, path: '/inventory' },
   { text: 'Activity Log', icon: <TimelineIcon />, path: '/activity-log' },
   { text: 'Limbo Items', icon: <WarningIcon />, path: '/limbo-items' },
-  { text: 'Analytics', icon: <AnalyticsIcon />, path: '/analytics' },
   { text: 'Users', icon: <PeopleAltIcon />, path: '/users' },
-  { text: 'Settings', icon: <SettingsIcon />, path: '/settings' },
 ];
 
 export default function Sidebar({ mobileOpen, onDrawerToggle }: SidebarProps) {

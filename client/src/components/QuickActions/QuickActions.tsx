@@ -27,7 +27,7 @@ export default function QuickActions() {
     },
     {
       icon: <ArrowForwardIcon />,
-      text: 'Move Pallet',
+      text: 'Move Item',
       borderColor: '#17a2b8',
       bgColor: '#d1ecf1',
       iconColor: '#117a8b',

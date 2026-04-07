@@ -90,12 +90,12 @@ export default function AlertsSection() {
   };
 
   const alertsTitle = loading
-    ? 'Alerts - Loading…'
+    ? 'Limbo Alerts - Loading…'
     : loadError
-      ? 'Alerts - Could not load count'
+      ? 'Limbo Alerts - Could not load count'
       : items.length === 1
-        ? 'Alerts - 1 item out of stock'
-        : `Alerts - ${items.length} items out of stock`;
+        ? 'Limbo Alerts - 1 item out of stock'
+        : `Limbo Alerts - ${items.length} items out of stock`;
 
   return (
     <Box sx={alertsSectionStyles.root}>
