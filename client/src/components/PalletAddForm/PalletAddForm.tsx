@@ -26,9 +26,7 @@ import { StorageLocation } from '../../types/StorageLocation';
 import { Product } from '../../types/Product';
 import {
   AddItemFormLabel,
-  ProductOptionContainer,
   ProductNameText,
-  ProductDetailsText,
 } from '../AddItemForm/AddItemForm.styles';
 import { WarehouseSelector } from '../WarehouseSelector/WarehouseSelector';
 import { SlotSelector } from '../SlotSelector/SlotSelector';
@@ -235,8 +233,12 @@ export default function PalletAddForm({
       return;
     }
 
+    // Resolve destination: prefer location with null/empty fixture, fall back to first match
+    const slotLocations = warehouseLocations.filter((loc) => loc.slot === selectedSlot);
     const destinationLocation =
-      warehouseLocations.find((loc) => loc.slot === selectedSlot) ?? null;
+      slotLocations.find((loc) => !loc.fixture || loc.fixture.trim() === '') ??
+      slotLocations[0] ??
+      null;
 
     if (!destinationLocation) {
       setError('Could not find a location for the selected slot.');
@@ -357,6 +359,7 @@ export default function PalletAddForm({
         label="Warehouse"
         placeholder="Select warehouse"
         fullWidth
+        required
       />
 
       <SlotSelector
@@ -369,6 +372,7 @@ export default function PalletAddForm({
         storageLocations={storageLocations}
         label="Destination Slot"
         placeholder="Select destination slot"
+        required
       >
         <Button
           startIcon={<AddIcon />}
@@ -392,7 +396,7 @@ export default function PalletAddForm({
 
       {/* Item Manifest */}
       <FormControl fullWidth>
-        <AddItemFormLabel>Item Manifest</AddItemFormLabel>
+        <AddItemFormLabel required>Item Manifest</AddItemFormLabel>
         <Stack spacing={2}>
           {manifestRows.map((row, index) => (
             <Box key={index} sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
@@ -416,25 +420,18 @@ export default function PalletAddForm({
                   const { key, ...otherProps } = props;
                   if (option.id === CREATE_NEW_SENTINEL.id) {
                     return (
-                      <li key={key} {...otherProps} style={{ fontStyle: 'italic', color: '#1976d2' }}>
+                      <li
+                        key={key}
+                        {...otherProps}
+                        style={{ fontStyle: 'italic', color: '#1976d2' }}
+                      >
                         {CREATE_NEW_SENTINEL.name}
                       </li>
                     );
                   }
                   return (
                     <li key={key} {...otherProps}>
-                      <ProductOptionContainer>
-                        <ProductNameText>
-                          {option.name || 'Unknown'}
-                        </ProductNameText>
-                        <ProductDetailsText>
-                          {option.product_name
-                            ? `Product: ${option.product_name} · `
-                            : ''}
-                          {option.category || 'No category'} | Value: ${option.value ?? 0} | Stock:{' '}
-                          {option.stock}
-                        </ProductDetailsText>
-                      </ProductOptionContainer>
+                      <ProductNameText>{option.name || 'Unknown'}</ProductNameText>
                     </li>
                   );
                 }}
@@ -457,11 +454,7 @@ export default function PalletAddForm({
                 slotProps={{ htmlInput: { min: 1, step: 1 } }}
               />
               {row.isNewProduct && (
-                <IconButton
-                  onClick={() => handleEditNewItem(index)}
-                  size="small"
-                  color="primary"
-                >
+                <IconButton onClick={() => handleEditNewItem(index)} size="small" color="primary">
                   <EditIcon />
                 </IconButton>
               )}
@@ -556,7 +549,7 @@ export default function PalletAddForm({
         onConfirm={handleNewItemConfirm}
         products={products}
         availableCategories={availableCategories}
-        initialData={editingRow?.isNewProduct ? editingRow.newProductData ?? null : null}
+        initialData={editingRow?.isNewProduct ? (editingRow.newProductData ?? null) : null}
       />
     </Stack>
   );

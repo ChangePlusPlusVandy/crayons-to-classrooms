@@ -169,10 +169,11 @@ export default function PalletRemoveForm({
         label="Warehouse"
         placeholder="Select warehouse"
         fullWidth
+        required
       />
 
       <FormControl fullWidth disabled={!selectedWarehouse}>
-        <RemoveItemFormLabel htmlFor="pallet-remove-source-slot-select">
+        <RemoveItemFormLabel htmlFor="pallet-remove-source-slot-select" required>
           Source Slot
         </RemoveItemFormLabel>
         <Autocomplete
@@ -238,13 +239,15 @@ export default function PalletRemoveForm({
 
       {/* Removal Action */}
       <FormControl fullWidth>
-        <RemoveItemFormLabel htmlFor="pallet-removal-action-select">
+        <RemoveItemFormLabel htmlFor="pallet-removal-action-select" required>
           Removal Action
         </RemoveItemFormLabel>
         <Autocomplete
           id="pallet-removal-action-select"
           options={removalActionOptions}
-          value={removalActionOptions.find((o) => o.value === removalAction) ?? removalActionOptions[0]}
+          value={
+            removalActionOptions.find((o) => o.value === removalAction) ?? removalActionOptions[0]
+          }
           onChange={(_, newValue) => {
             if (newValue) setRemovalAction(newValue.value);
           }}

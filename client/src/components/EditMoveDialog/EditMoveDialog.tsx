@@ -31,6 +31,7 @@ export function EditMoveDialog({ open, onClose, movement, onSuccess }: EditMoveD
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState('');
   const [warehouse, setWarehouse] = useState<Warehouse | null>(null);
+  const [destinationWarehouse, setDestinationWarehouse] = useState<Warehouse | null>(null);
   const [sourceSlot, setSourceSlot] = useState<StorageLocation | null>(null);
   const [productName, setProductName] = useState('');
   const [destinationSlot, setDestinationSlot] = useState('');
@@ -51,8 +52,12 @@ export function EditMoveDialog({ open, onClose, movement, onSuccess }: EditMoveD
           getStorageLocationById(movement.to_location_id!),
           getItemById(movement.item_id),
         ]);
-        const wh = await getWarehouseById(src.warehouse_id);
+        const [wh, destWh] = await Promise.all([
+          getWarehouseById(src.warehouse_id),
+          getWarehouseById(dest.warehouse_id),
+        ]);
         setWarehouse(wh);
+        setDestinationWarehouse(destWh);
         setSourceSlot(src);
         setProductName(itemRow.name);
         setDestinationSlot(dest.slot);
@@ -64,7 +69,13 @@ export function EditMoveDialog({ open, onClose, movement, onSuccess }: EditMoveD
     }
 
     fetchData();
-  }, [open, movement.item_id, movement.product_id, movement.from_location_id, movement.to_location_id]);
+  }, [
+    open,
+    movement.item_id,
+    movement.product_id,
+    movement.from_location_id,
+    movement.to_location_id,
+  ]);
 
   // Simulate post-undo state: adjust item group quantities based on what
   // the undo of the original movement would do to item locations
@@ -150,6 +161,7 @@ export function EditMoveDialog({ open, onClose, movement, onSuccess }: EditMoveD
             )}
             <MoveItemForm
               initialWarehouse={warehouse}
+              initialDestinationWarehouse={destinationWarehouse}
               initialSourceSlot={sourceSlot}
               initialProductId={movement.product_id}
               initialDestinationSlot={destinationSlot}

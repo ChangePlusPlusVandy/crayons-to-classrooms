@@ -35,8 +35,7 @@ export default function AlertsSection() {
   const [itemToDelete, setItemToDelete] = useState<ItemInfo | null>(null);
   const [deleteSubmitting, setDeleteSubmitting] = useState(false);
 
-  const tableActionsLocked =
-    limboActionId !== null || deleteSubmitting || itemToDelete !== null;
+  const tableActionsLocked = limboActionId !== null || deleteSubmitting || itemToDelete !== null;
 
   const loadOutOfStock = useCallback(async () => {
     setLoading(true);
@@ -91,12 +90,12 @@ export default function AlertsSection() {
   };
 
   const alertsTitle = loading
-    ? 'Alerts - Loading…'
+    ? 'Limbo Alerts - Loading…'
     : loadError
-      ? 'Alerts - Could not load count'
+      ? 'Limbo Alerts - Could not load count'
       : items.length === 1
-        ? 'Alerts - 1 item out of stock'
-        : `Alerts - ${items.length} items out of stock`;
+        ? 'Limbo Alerts - 1 item out of stock'
+        : `Limbo Alerts - ${items.length} items out of stock`;
 
   return (
     <Box sx={alertsSectionStyles.root}>
@@ -145,7 +144,9 @@ export default function AlertsSection() {
                     </Typography>
                     <IconButton
                       size="small"
-                      aria-label={expanded ? 'Collapse out-of-stock items' : 'Expand out-of-stock items'}
+                      aria-label={
+                        expanded ? 'Collapse out-of-stock items' : 'Expand out-of-stock items'
+                      }
                       onClick={(e) => {
                         e.stopPropagation();
                         setActionError(null);
@@ -168,7 +169,10 @@ export default function AlertsSection() {
               <TableRow>
                 <TableCell colSpan={2} sx={alertsSectionStyles.collapseCell}>
                   <Collapse in={expanded} timeout="auto" unmountOnExit>
-                    <Table size="small" sx={{ ...limboStyles.table, ...alertsSectionStyles.nestedTable }}>
+                    <Table
+                      size="small"
+                      sx={{ ...limboStyles.table, ...alertsSectionStyles.nestedTable }}
+                    >
                       <TableHead>
                         <TableRow>
                           <TableCell sx={limboStyles.tableHeadCell}>Item Name</TableCell>
@@ -181,7 +185,11 @@ export default function AlertsSection() {
                         {actionError && (
                           <TableRow>
                             <TableCell colSpan={2} sx={limboStyles.tableCell}>
-                              <Alert severity="error" sx={{ py: 0 }} onClose={() => setActionError(null)}>
+                              <Alert
+                                severity="error"
+                                sx={{ py: 0 }}
+                                onClose={() => setActionError(null)}
+                              >
                                 {actionError}
                               </Alert>
                             </TableCell>
@@ -190,7 +198,10 @@ export default function AlertsSection() {
 
                         {loading && (
                           <TableRow>
-                            <TableCell colSpan={2} sx={{ ...limboStyles.tableCell, py: 4, textAlign: 'center' }}>
+                            <TableCell
+                              colSpan={2}
+                              sx={{ ...limboStyles.tableCell, py: 4, textAlign: 'center' }}
+                            >
                               <CircularProgress size={28} />
                             </TableCell>
                           </TableRow>

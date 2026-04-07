@@ -15,6 +15,7 @@ import {
   UpdateInventoryInput,
   actionQuerySchema,
   editMoveSchema,
+  editRemoveSchema,
   createItemWithMovementSchema,
   bulkCreateItemsWithMovementSchema,
   moveItemsWithMovementSchema,
@@ -96,7 +97,13 @@ export async function getAllMovementsDetailed(req: Request, res: Response): Prom
           im.note,
           im.performed_at,
           im.inventory_action,
-          COALESCE(ii.name, i.name, p.name) AS product_name,
+          CASE
+            WHEN im.product_id IS NULL
+              AND im.quantity > 1
+              AND im.inventory_action IN ('MOVE', 'DONATED', 'DISCARD')
+            THEN NULL
+            ELSE COALESCE(ii.name, i.name, p.name)
+          END AS product_name,
           from_loc.slot AS from_location_name,
           to_loc.slot AS to_location_name,
           pu.name AS user_name,
@@ -436,9 +443,7 @@ export async function createInventoryMovementCore(
   const normalizedToLocationId = to_location_id ?? null;
 
   // Check if item_id, product_id (if provided), from_location_id (if provided), to_location_id (if provided) exist in tables (in parallel)
-  const checks: Promise<any>[] = [
-    db.query('SELECT id, name FROM items WHERE id = $1', [item_id]),
-  ];
+  const checks: Promise<any>[] = [db.query('SELECT id, name FROM items WHERE id = $1', [item_id])];
 
   if (normalizedToLocationId) {
     checks.push(
@@ -453,7 +458,9 @@ export async function createInventoryMovementCore(
   // Only check from_location_id if it's provided (it's optional for ADD actions)
   if (normalizedFromLocationId) {
     checks.push(
-      db.query('SELECT id, location_code FROM storage_locations WHERE id = $1', [normalizedFromLocationId])
+      db.query('SELECT id, location_code FROM storage_locations WHERE id = $1', [
+        normalizedFromLocationId,
+      ])
     );
   }
 
@@ -516,20 +523,22 @@ export async function createInventoryMovementCore(
     // Capture the return value to detect missing item_info rows
     const syncedId = await syncItemInfoStock(
       itemName,
-      undefined,        // productId — don't update
-      undefined,        // category — don't update
-      undefined,        // quantity — don't update
-      undefined,        // value — don't update
-      undefined,        // itemLimit — don't update
-      undefined,        // limbo — don't update
-      null,             // fixture — don't update (COALESCE keeps existing)
+      undefined, // productId — don't update
+      undefined, // category — don't update
+      undefined, // quantity — don't update
+      undefined, // value — don't update
+      undefined, // itemLimit — don't update
+      undefined, // limbo — don't update
+      null, // fixture — don't update (COALESCE keeps existing)
       fromLocationCode, // update last_known_location_code if we have it
-      -quantity,        // decrement stock
-      false,            // don't create if missing
+      -quantity, // decrement stock
+      false, // don't create if missing
       db
     );
     if (!syncedId) {
-      console.warn(`[createInventoryMovementCore] item_info row not found for item "${itemName}" during ${inventory_action} — stock not decremented`);
+      console.warn(
+        `[createInventoryMovementCore] item_info row not found for item "${itemName}" during ${inventory_action} — stock not decremented`
+      );
     }
   }
 
@@ -568,7 +577,7 @@ export const createInventoryMovement = async (req: Request, res: Response) => {
     res.status(201).json(createdMovement);
   } catch (error) {
     if (began) {
-      await client.query('ROLLBACK').catch(() => {});
+      await client.query('ROLLBACK').catch(() => { });
     }
     if (error instanceof ZodError) {
       return handleValidationError(error, res);
@@ -869,7 +878,8 @@ export const moveItemsWithMovement = async (req: Request, res: Response) => {
     // Update all items' location in a single query, ensuring they are currently at from_location_id
     const updateResult = await client.query(
       `UPDATE items
-       SET current_location_id = $1,
+       SET current_location_id = $1::uuid,
+           warehouse = (SELECT warehouse_id FROM storage_locations WHERE id = $1::uuid),
            updated_at = NOW()
        WHERE id = ANY($2::uuid[])
          AND current_location_id IS NOT DISTINCT FROM $3
@@ -886,11 +896,12 @@ export const moveItemsWithMovement = async (req: Request, res: Response) => {
     }
     // Use the first item as the representative for the movement record
     const representativeItem = updateResult.rows[0];
+    const uniqueProductIds = new Set(updateResult.rows.map((r) => r.product_id));
 
     const fullMovementData: CreateInventoryInput = {
       inventory_action: movementData.inventory_action,
       item_id: representativeItem.id,
-      product_id: representativeItem.product_id,
+      product_id: uniqueProductIds.size === 1 ? representativeItem.product_id : null,
       from_location_id: normalizedFromLocationId,
       to_location_id: movementData.to_location_id,
       quantity: updateResult.rowCount,
@@ -937,26 +948,28 @@ export const removeItemsWithMovement = async (req: Request, res: Response) => {
   }
 
   const { item_ids, movement: movementData } = parsedData;
+  const normalizedFromLocationId = movementData.from_location_id ?? null;
+  const removalStatus = movementData.inventory_action === 'DONATED' ? 'donated' : 'defective';
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
 
-    // Deactivate all items in a single query, ensuring they are at the expected location and active
+    // Deactivate all items in a single query, ensuring they are currently at from_location_id.
+    // Status reflects the removal reason: 'donated' for DONATED, 'defective' for DISCARD.
     const updateResult = await client.query(
       `UPDATE items
-       SET status = 'inactive',
+       SET status = $3,
            current_location_id = NULL,
            warehouse = NULL,
            updated_at = NOW()
        WHERE id = ANY($1::uuid[])
-         AND current_location_id = $2
-         AND status = 'active'
+         AND current_location_id IS NOT DISTINCT FROM $2
        RETURNING *`,
-      [item_ids, movementData.from_location_id]
+      [item_ids, normalizedFromLocationId, removalStatus]
     );
 
     if (updateResult.rows.length === 0) {
-      throw new Error('No items found with the provided IDs at the expected location');
+      throw new Error('No items found with the provided IDs and from_location_id');
     }
 
     if (updateResult.rowCount !== item_ids.length) {
@@ -989,12 +1002,13 @@ export const removeItemsWithMovement = async (req: Request, res: Response) => {
 
     // Use the first item as the representative for the movement record
     const representativeItem = updateResult.rows[0];
+    const uniqueProductIds = new Set(updateResult.rows.map((r) => r.product_id));
 
     const fullMovementData: CreateInventoryInput = {
       inventory_action: movementData.inventory_action,
       item_id: representativeItem.id,
-      product_id: representativeItem.product_id,
-      from_location_id: movementData.from_location_id,
+      product_id: uniqueProductIds.size === 1 ? representativeItem.product_id : null,
+      from_location_id: normalizedFromLocationId,
       to_location_id: null,
       quantity: updateResult.rowCount!,
       performed_by: movementData.performed_by,
@@ -1118,10 +1132,14 @@ export const editInventoryMovementMove = async (req: Request, res: Response) => 
 
     // Move each item to the new destination
     const itemIds: string[] = itemsAtSource.rows.map((row: { id: string }) => row.id);
-    await client.query('UPDATE items SET current_location_id = $1 WHERE id = ANY($2::uuid[])', [
-      moveData.to_location_id,
-      itemIds,
-    ]);
+    await client.query(
+      `UPDATE items
+       SET current_location_id = $1::uuid,
+           warehouse = (SELECT warehouse_id FROM storage_locations WHERE id = $1::uuid),
+           updated_at = NOW()
+       WHERE id = ANY($2::uuid[])`,
+      [moveData.to_location_id, itemIds]
+    );
 
     // Create new MOVE movement record
     const representativeItemId = itemIds[0];
@@ -1158,6 +1176,163 @@ export const editInventoryMovementMove = async (req: Request, res: Response) => 
       return res.status(400).json({ error: error.message });
     }
     console.error('Error editing MOVE inventory movement:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  } finally {
+    client.release();
+  }
+};
+
+export const editInventoryMovementRemove = async (req: Request, res: Response) => {
+  const client = await pool.connect();
+  try {
+    const { id } = movementIdParamSchema.parse(req.params);
+    const removeData = editRemoveSchema.parse(req.body);
+
+    await client.query('BEGIN');
+
+    // Validate original movement exists and is a remove action
+    const original = await client.query('SELECT * FROM "inventory movement" WHERE id = $1', [id]);
+    if (original.rows.length === 0) {
+      throw new NotFoundError('Inventory movement not found');
+    }
+    if (!['DONATED', 'DISCARD'].includes(original.rows[0].inventory_action)) {
+      throw new InvalidError('Can only edit DONATED or DISCARD type movements with this endpoint');
+    }
+
+    const originalMovement = original.rows[0];
+
+    // Compute delta: positive = removing more, negative = removing less
+    const oldQty: number = originalMovement.quantity;
+    const newQty: number = removeData.quantity;
+    const delta = newQty - oldQty;
+    const actionChanged = originalMovement.inventory_action !== removeData.inventory_action;
+
+    // Derive warehouse from the source location (used for both restore and remove paths)
+    const locationResult = await client.query(
+      `SELECT warehouse_id FROM storage_locations WHERE id = $1`,
+      [removeData.from_location_id]
+    );
+    const warehouseId = locationResult.rows[0]?.warehouse_id ?? null;
+
+    if (delta < 0 && !actionChanged) {
+      // Removing LESS than before — restore the difference back to active
+      const restoreCount = Math.abs(delta);
+      const originalStatus = originalMovement.inventory_action === 'DONATED' ? 'donated' : 'defective';
+
+      const itemsToRestore = await client.query(
+        `SELECT id, name FROM items
+         WHERE name = (SELECT name FROM items WHERE id = $1)
+           AND status = $2
+           AND updated_at <= $3
+         ORDER BY updated_at DESC, id DESC
+         LIMIT $4`,
+        [originalMovement.item_id, originalStatus, originalMovement.performed_at, restoreCount]
+      );
+
+      if (itemsToRestore.rows.length > 0) {
+        const restoreIds: string[] = itemsToRestore.rows.map((row: { id: string }) => row.id);
+        await client.query(
+          `UPDATE items
+           SET status = 'active', current_location_id = $1, warehouse = $2, updated_at = NOW()
+           WHERE id = ANY($3::uuid[])`,
+          [removeData.from_location_id, warehouseId, restoreIds]
+        );
+        const itemName = (itemsToRestore.rows[0] as { name: string }).name;
+        await syncItemInfoStock(
+          itemName,
+          undefined, undefined, undefined, undefined, undefined, undefined,
+          null, null,
+          +itemsToRestore.rows.length,
+          false,
+          client
+        );
+      }
+    } else if (delta > 0 || actionChanged) {
+      // Removing MORE than before — remove the additional items
+      const additionalCount = delta;
+      const newRemovalStatus = removeData.inventory_action === 'DONATED' ? 'donated' : 'defective';
+
+      const itemsAtSource = await client.query(
+        `SELECT id, name FROM items
+         WHERE name = (SELECT name FROM items WHERE id = $1)
+           AND current_location_id = $2 AND status = 'active'
+         ORDER BY created_at DESC
+         LIMIT $3`,
+        [originalMovement.item_id, removeData.from_location_id, additionalCount]
+      );
+
+      if (itemsAtSource.rows.length < additionalCount) {
+        throw new UndoConflictError(
+          `Not enough items at source location: found ${itemsAtSource.rows.length}, need ${additionalCount}`
+        );
+      }
+
+      const additionalRemoveIds: string[] = itemsAtSource.rows.map((row: { id: string }) => row.id);
+      await client.query(
+        `UPDATE items
+         SET status = $1, current_location_id = NULL, warehouse = NULL, updated_at = NOW()
+         WHERE id = ANY($2::uuid[])`,
+        [newRemovalStatus, additionalRemoveIds]
+      );
+      if (additionalRemoveIds.length > 0) {
+        const itemName = (itemsAtSource.rows[0] as { name: string }).name;
+        await syncItemInfoStock(
+          itemName,
+          undefined, undefined, undefined, undefined, undefined, undefined,
+          null, null,
+          -additionalRemoveIds.length,
+          false,
+          client
+        );
+      }
+    }
+    // delta === 0: no item state changes needed
+
+    // Update the existing movement record to reflect the new values
+    await client.query(
+      `UPDATE "inventory movement"
+       SET inventory_action = $1,
+           from_location_id = $2,
+           quantity         = $3,
+           performed_by     = $4,
+           note             = $5
+       WHERE id = $6`,
+      [
+        removeData.inventory_action,
+        removeData.from_location_id,
+        removeData.quantity,
+        removeData.performed_by,
+        removeData.note ?? null,
+        id,
+      ]
+    );
+
+    const updatedMovement = await client.query(
+      `SELECT * FROM "inventory movement" WHERE id = $1`,
+      [id]
+    );
+
+    await client.query('COMMIT');
+
+    res.status(200).json({ movement: updatedMovement.rows[0] });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    if (error instanceof ZodError) {
+      return handleValidationError(error, res);
+    }
+    if (error instanceof ForeignKeyError) {
+      return res.status(400).json({ error: error.message });
+    }
+    if (error instanceof NotFoundError) {
+      return res.status(404).json({ error: error.message });
+    }
+    if (error instanceof UndoConflictError) {
+      return res.status(400).json({ error: error.message });
+    }
+    if (error instanceof InvalidError) {
+      return res.status(400).json({ error: error.message });
+    }
+    console.error('Error editing REMOVE inventory movement:', error);
     res.status(500).json({ error: 'Internal server error' });
   } finally {
     client.release();
@@ -1204,7 +1379,11 @@ export const undoInventoryMovementCore = async (
 
     // Update items, verifying they're still at the expected location (prevents race conditions)
     const updateResult = await db.query(
-      'UPDATE items SET current_location_id = $1, updated_at = NOW() WHERE id = ANY($2::uuid[]) AND current_location_id = $3',
+      `UPDATE items
+       SET current_location_id = $1::uuid,
+           warehouse = (SELECT warehouse_id FROM storage_locations WHERE id = $1::uuid),
+           updated_at = NOW()
+       WHERE id = ANY($2::uuid[]) AND current_location_id = $3`,
       [inventoryMovement.from_location_id, itemIds, inventoryMovement.to_location_id]
     );
 
