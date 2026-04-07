@@ -235,7 +235,12 @@ export default function PalletAddForm({
       return;
     }
 
-    const destinationLocation = warehouseLocations.find((loc) => loc.slot === selectedSlot) ?? null;
+    // Resolve destination: prefer location with null/empty fixture, fall back to first match
+    const slotLocations = warehouseLocations.filter((loc) => loc.slot === selectedSlot);
+    const destinationLocation =
+      slotLocations.find((loc) => !loc.fixture || loc.fixture.trim() === '') ??
+      slotLocations[0] ??
+      null;
 
     if (!destinationLocation) {
       setError('Could not find a location for the selected slot.');

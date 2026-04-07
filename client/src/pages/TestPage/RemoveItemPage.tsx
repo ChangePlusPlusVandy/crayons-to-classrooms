@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 import {
   Container,
   Typography,
@@ -21,7 +21,6 @@ import { Warehouse } from '../../types/Warehouse';
 import { RemoveItemCard, RemoveItemFormLabel } from './RemoveItemPage.styles';
 import { WarehouseSelector } from '../../components/WarehouseSelector/WarehouseSelector';
 import { getAllStorageLocations } from '../../api/storageLocation';
-import { useMemo } from 'react';
 import FormModeToggle, { FormMode } from '../../components/FormModeToggle/FormModeToggle';
 import PalletRemoveForm, {
   PalletRemoveFormData,
@@ -30,6 +29,7 @@ import PalletRemoveForm, {
 type ItemGroupWithLocation = {
   items: Item[]; // all DB rows for this name+location group
   name: string;
+  itemInfoId: string;
   locationCode: string;
   locationId: string;
 };
@@ -234,10 +234,11 @@ export default function RemoveItemPage() {
         const allLocations = await getAllStorageLocations();
         const locationMap = new Map(allLocations.map((loc) => [loc.id, loc.location_code]));
 
-        // Group items by name + location — one dropdown entry per unique combination
+        // Group items by item_info + location — one dropdown entry per unique combination.
+        // Using item_info_id (not name) prevents merging distinct products that share a display name.
         const groupMap = new Map<string, ItemGroupWithLocation>();
         for (const item of itemsInSelectedWarehouse) {
-          const key = `${item.name}|${item.current_location_id}`;
+          const key = `${item.item_info}|${item.current_location_id}`;
           const locationCode = locationMap.get(item.current_location_id) ?? 'Unknown';
           if (groupMap.has(key)) {
             groupMap.get(key)!.items.push(item);
@@ -245,6 +246,7 @@ export default function RemoveItemPage() {
             groupMap.set(key, {
               items: [item],
               name: item.name,
+              itemInfoId: item.item_info ?? '',
               locationCode,
               locationId: item.current_location_id,
             });

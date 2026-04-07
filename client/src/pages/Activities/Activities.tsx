@@ -28,6 +28,7 @@ import undoArrow from '../../assets/undo_arrow.svg';
 import modifyPen from '../../assets/modify_pen.svg';
 import { EditAddDialog } from '../../components/EditAddDialog/EditAddDialog';
 import { EditMoveDialog } from '../../components/EditMoveDialog/EditMoveDialog';
+import { EditRemoveDialog } from '../../components/EditRemoveDialog/EditRemoveDialog';
 
 const PAGE_SIZE = 10;
 
@@ -133,7 +134,12 @@ export default function Activities() {
   };
 
   const handleEditClick = (activity: ActivityDisplay) => {
-    if (activity.inventory_action === 'ADD' || activity.inventory_action === 'MOVE') {
+    if (
+      activity.inventory_action === 'ADD' ||
+      activity.inventory_action === 'MOVE' ||
+      activity.inventory_action === 'DONATED' ||
+      activity.inventory_action === 'DISCARD'
+    ) {
       setEditingMovement(activity);
     }
   };
@@ -359,7 +365,9 @@ export default function Activities() {
                           )}
                         </IconButton>
                         {(activity.inventory_action === 'ADD' ||
-                          activity.inventory_action === 'MOVE') && (
+                          activity.inventory_action === 'MOVE' ||
+                          activity.inventory_action === 'DONATED' ||
+                          activity.inventory_action === 'DISCARD') && (
                           <IconButton
                             sx={activitiesStyles.actionButton}
                             onClick={() => handleEditClick(activity)}
@@ -398,6 +406,16 @@ export default function Activities() {
           open={!!editingMovement}
           onClose={handleEditClose}
           movement={{ ...editingMovement, product_id: editingMovement.product_id }}
+          onSuccess={handleEditSuccess}
+        />
+      )}
+
+      {(editingMovement?.inventory_action === 'DONATED' ||
+        editingMovement?.inventory_action === 'DISCARD') && (
+        <EditRemoveDialog
+          open={!!editingMovement}
+          onClose={handleEditClose}
+          movement={editingMovement}
           onSuccess={handleEditSuccess}
         />
       )}

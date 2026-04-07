@@ -62,6 +62,34 @@ export async function editAddMovementTransaction(
 }
 
 /**
+ * Edit an existing REMOVE (DONATED/DISCARD) movement using the transactional backend endpoint.
+ * Undoes the original removal, restores items to their location, then applies the new removal atomically.
+ */
+export async function editRemoveMovementTransaction(
+  movementId: string,
+  payload: {
+    inventory_action: 'DONATED' | 'DISCARD';
+    from_location_id: string;
+    product_id?: string | null;
+    quantity: number;
+    performed_by: string;
+    note?: string;
+  }
+): Promise<{ movement: InventoryMovement }> {
+  const response = await authFetch(`${API_BASE_URL}/inventory-movement/${movementId}/edit-remove`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error ?? 'Failed to edit movement');
+  }
+  const data = await response.json();
+  return { movement: InventoryMovementSchema.parse(data.movement) };
+}
+
+/**
  * Edit an existing MOVE movement using the transactional backend endpoint.
  * Undoes the original movement and relocates items atomically.
  */

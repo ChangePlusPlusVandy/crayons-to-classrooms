@@ -23,6 +23,7 @@ import { getActivities, ActivityDisplay } from '../../api/activities';
 import { undoInventoryMovement } from '../../api/moveItem';
 import { EditAddDialog } from '../EditAddDialog/EditAddDialog';
 import { EditMoveDialog } from '../EditMoveDialog/EditMoveDialog';
+import { EditRemoveDialog } from '../EditRemoveDialog/EditRemoveDialog';
 
 const ACTION_COLORS: Record<string, string> = {
   ADD: '#4caf50',
@@ -126,7 +127,12 @@ export default function ActivityLog() {
   };
 
   const handleEditClick = (activity: ActivityDisplay) => {
-    if (activity.inventory_action === 'ADD' || activity.inventory_action === 'MOVE') {
+    if (
+      activity.inventory_action === 'ADD' ||
+      activity.inventory_action === 'MOVE' ||
+      activity.inventory_action === 'DONATED' ||
+      activity.inventory_action === 'DISCARD'
+    ) {
       setEditingMovement(activity);
     }
   };
@@ -225,7 +231,9 @@ export default function ActivityLog() {
                         )}
                       </IconButton>
                       {(activity.inventory_action === 'ADD' ||
-                        activity.inventory_action === 'MOVE') && (
+                        activity.inventory_action === 'MOVE' ||
+                        activity.inventory_action === 'DONATED' ||
+                        activity.inventory_action === 'DISCARD') && (
                         <IconButton
                           size="small"
                           aria-label={`Edit ${activity.inventory_action.toLowerCase()} for ${productName}`}
@@ -282,6 +290,17 @@ export default function ActivityLog() {
             open={!!editingMovement}
             onClose={handleEditClose}
             movement={{ ...editingMovement, product_id: editingMovement.product_id }}
+            onSuccess={handleEditSuccess}
+          />
+        )}
+
+      {editingMovement &&
+        (editingMovement.inventory_action === 'DONATED' ||
+          editingMovement.inventory_action === 'DISCARD') && (
+          <EditRemoveDialog
+            open={!!editingMovement}
+            onClose={handleEditClose}
+            movement={editingMovement}
             onSuccess={handleEditSuccess}
           />
         )}
