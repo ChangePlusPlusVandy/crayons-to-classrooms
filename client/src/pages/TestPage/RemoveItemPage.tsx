@@ -42,12 +42,7 @@ export default function RemoveItemPage() {
   const [items, setItems] = useState<Item[]>([]);
   const [formKey, setFormKey] = useState(0);
   const [selectedWarehouse, setSelectedWarehouse] = useState<Warehouse | null>(null);
-  // 'slot' and 'product' modes are not yet implemented — scoped to future sprints
-  const removeByOptions: Array<'item' | 'product'> = ['item'];
-  const [removeBy, setRemoveBy] = useState<'item' | 'product'>('item');
   const [selectedGroup, setSelectedGroup] = useState<ItemGroupWithLocation | null>(null);
-  const productOptions: string[] = ['Product A', 'Product B', 'Product C']; // hardcoded for now will change in later sprints
-  const [selectedProduct, setSelectedProduct] = useState('');
 
   const removalActionOptions = [
     { value: 'DONATED' as const, label: 'Donate' },
@@ -158,11 +153,10 @@ export default function RemoveItemPage() {
       setSelectedGroup(null);
       setQuantityToRemove(null);
       setRemovalAction('DONATED');
-      setSelectedProduct('');
       setNotes('');
 
       const actionLabel = removalAction === 'DONATED' ? 'donated' : 'marked as defective';
-      setSuccess(`${quantityToRemove} item(s) ${actionLabel}.`);
+      setSuccess(`${quantityToRemove} item${quantityToRemove === 1 ? '' : 's'} ${actionLabel}.`);
     } catch (err) {
       console.error(err);
       setError('Failed to remove item.');
@@ -317,23 +311,6 @@ export default function RemoveItemPage() {
                   placeholder="Select warehouse"
                   fullWidth
                 />
-                {/* Remove By */}
-                <FormControl>
-                  <RemoveItemFormLabel htmlFor="remove-by-select">Remove By</RemoveItemFormLabel>
-                  <Autocomplete
-                    options={removeByOptions}
-                    value={removeBy}
-                    onChange={(_, newValue) => {
-                      if (newValue) {
-                        setRemoveBy(newValue);
-                      }
-                    }}
-                    getOptionLabel={(option) => option.charAt(0).toUpperCase() + option.slice(1)}
-                    renderInput={(params) => (
-                      <TextField {...params} placeholder="Remove By" fullWidth />
-                    )}
-                  />
-                </FormControl>
                 {/* Removal Action */}
                 <FormControl>
                   <RemoveItemFormLabel htmlFor="removal-action-select">
@@ -358,58 +335,36 @@ export default function RemoveItemPage() {
                     )}
                   />
                 </FormControl>
-                {/* CONDITIONAL FIELDS */}
-                {/* Remove by ITEM */}
-                {removeBy === 'item' && (
-                  <FormControl>
-                    <RemoveItemFormLabel>Item Name</RemoveItemFormLabel>
-                    <Autocomplete
-                      options={groupOptions}
-                      value={selectedGroupLive}
-                      onChange={(_, newValue) => setSelectedGroup(newValue)}
-                      isOptionEqualToValue={(a, b) =>
-                        a.name === b.name && a.locationId === b.locationId
-                      }
-                      getOptionLabel={(option) => option.name}
-                      renderOption={(props, option) => (
-                        <li {...props} key={`${option.name}|${option.locationId}`}>
-                          <Box>
-                            <Typography fontWeight={500}>{option.name}</Typography>
-                            <Typography variant="body2" color="text.secondary">
-                              {option.locationCode}
-                            </Typography>
-                          </Box>
-                        </li>
-                      )}
-                      renderInput={(params) => (
-                        <TextField
-                          {...params}
-                          placeholder="Search by location or item name"
-                          fullWidth
-                        />
-                      )}
-                    />
-                  </FormControl>
-                )}
-                {/* Remove by PRODUCT */}
-                {removeBy === 'product' && (
+                {/* Item Name */}
+                <FormControl>
+                  <RemoveItemFormLabel>Item Name</RemoveItemFormLabel>
                   <Autocomplete
-                    options={productOptions}
-                    value={selectedProduct || null}
-                    onChange={(_, newValue) => {
-                      setSelectedProduct(newValue ?? '');
-                    }}
-                    freeSolo
+                    options={groupOptions}
+                    value={selectedGroupLive}
+                    onChange={(_, newValue) => setSelectedGroup(newValue)}
+                    isOptionEqualToValue={(a, b) =>
+                      a.name === b.name && a.locationId === b.locationId
+                    }
+                    getOptionLabel={(option) => option.name}
+                    renderOption={(props, option) => (
+                      <li {...props} key={`${option.name}|${option.locationId}`}>
+                        <Box>
+                          <Typography fontWeight={500}>{option.name}</Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            {option.locationCode}
+                          </Typography>
+                        </Box>
+                      </li>
+                    )}
                     renderInput={(params) => (
                       <TextField
                         {...params}
-                        label="Product"
-                        placeholder="Select product"
+                        placeholder="Search by location or item name"
                         fullWidth
                       />
                     )}
                   />
-                )}
+                </FormControl>
                 {/* Quantity to remove */}
                 <FormControl>
                   <RemoveItemFormLabel htmlFor="quantity-select">
@@ -461,7 +416,6 @@ export default function RemoveItemPage() {
                       setSelectedGroup(null);
                       setQuantityToRemove(null);
                       setRemovalAction('DONATED');
-                      setSelectedProduct('');
                       setNotes('');
                       setError('');
                       setSuccess('');
