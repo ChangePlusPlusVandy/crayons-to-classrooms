@@ -712,17 +712,18 @@ export const createItemWithMovement = async (req: Request, res: Response) => {
       throw new Error('No items were created');
     }
 
-    // Always set fixture to null for ADD operations
+    // Update fixture on item_info if provided in the request
+    const fixtureValue = itemData.fixture ?? null;
     const firstCreated = createdItems[0];
     if (firstCreated.item_info) {
       await client.query(
-        'UPDATE item_info SET fixture = NULL, time_last_updated = NOW() WHERE id = $1',
-        [firstCreated.item_info]
+        'UPDATE item_info SET fixture = COALESCE($2, fixture), time_last_updated = NOW() WHERE id = $1',
+        [firstCreated.item_info, fixtureValue]
       );
     } else {
       await client.query(
-        'UPDATE item_info SET fixture = NULL, time_last_updated = NOW() WHERE name = $1',
-        [firstCreated.name]
+        'UPDATE item_info SET fixture = COALESCE($2, fixture), time_last_updated = NOW() WHERE name = $1',
+        [firstCreated.name, fixtureValue]
       );
     }
 
@@ -796,17 +797,18 @@ export const bulkCreateItemsWithMovement = async (req: Request, res: Response) =
         throw new Error('No items were created');
       }
 
-      // Always set fixture to null for ADD operations
+      // Update fixture on item_info if provided in the request
+      const fixtureValue = itemData.fixture ?? null;
       const firstRow = createdItems[0];
       if (firstRow.item_info) {
         await client.query(
-          'UPDATE item_info SET fixture = NULL, time_last_updated = NOW() WHERE id = $1',
-          [firstRow.item_info]
+          'UPDATE item_info SET fixture = COALESCE($2, fixture), time_last_updated = NOW() WHERE id = $1',
+          [firstRow.item_info, fixtureValue]
         );
       } else {
         await client.query(
-          'UPDATE item_info SET fixture = NULL, time_last_updated = NOW() WHERE name = $1',
-          [firstRow.name]
+          'UPDATE item_info SET fixture = COALESCE($2, fixture), time_last_updated = NOW() WHERE name = $1',
+          [firstRow.name, fixtureValue]
         );
       }
 

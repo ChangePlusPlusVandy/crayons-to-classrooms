@@ -28,6 +28,7 @@ export default function AddItem() {
       let productValue: number | undefined;
       let productCategory: string | undefined;
       let productItemLimit: number | undefined;
+      let productFixture: string | undefined;
       let packSize = 1;
 
       if (data.isNewProduct && data.newProductData) {
@@ -35,6 +36,7 @@ export default function AddItem() {
         productValue = data.newProductData.value;
         productCategory = data.newProductData.category || undefined;
         productItemLimit = data.newProductData.limit;
+        productFixture = data.newProductData.fixture;
         if (typeof data.newProductData.packSize === 'number' && data.newProductData.packSize >= 1) {
           packSize = data.newProductData.packSize;
         }
@@ -54,6 +56,7 @@ export default function AddItem() {
         productValue = itemInfo.value ?? undefined;
         productCategory = itemInfo.category || undefined;
         productItemLimit = itemInfo.item_limit ?? undefined;
+        productFixture = itemInfo.fixture || undefined;
       }
 
       await createItemWithMovement({
@@ -72,6 +75,7 @@ export default function AddItem() {
           value: productValue,
           limbo: false,
           notes: notes || undefined,
+          fixture: productFixture,
         },
         movement: {
           inventory_action: 'ADD',
@@ -115,6 +119,7 @@ export default function AddItem() {
         let productValue: number | undefined;
         let productCategory: string | undefined;
         let productItemLimit: number | undefined;
+        let productFixture: string | undefined;
         let packSize = 1;
 
         if (item.isNewProduct && item.newProductData) {
@@ -127,6 +132,7 @@ export default function AddItem() {
           productValue = item.newProductData.value;
           productCategory = item.newProductData.category || undefined;
           productItemLimit = item.newProductData.limit;
+          productFixture = item.newProductData.fixture;
           if (
             typeof item.newProductData.packSize === 'number' &&
             item.newProductData.packSize >= 1
@@ -140,6 +146,7 @@ export default function AddItem() {
           productValue = itemInfo.value ?? undefined;
           productCategory = itemInfo.category || undefined;
           productItemLimit = itemInfo.item_limit ?? undefined;
+          productFixture = itemInfo.fixture || undefined;
         }
 
         return {
@@ -158,6 +165,7 @@ export default function AddItem() {
             value: productValue,
             limbo: false,
             notes: notes || undefined,
+            fixture: productFixture,
           },
           movement: {
             inventory_action: 'ADD' as const,

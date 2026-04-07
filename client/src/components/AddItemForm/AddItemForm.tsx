@@ -148,16 +148,16 @@ export default function AddItemForm({
     return itemInfoList.filter((info) => !!info.product_id);
   }, [itemInfoList]);
 
-  // All unique fixture values across storage locations
+  // All unique fixture values from existing item_info records
   const availableFixtures = useMemo(() => {
     const fixtureSet = new Set<string>();
-    storageLocations.forEach((loc) => {
-      if (loc.fixture && loc.fixture.trim() !== '') {
-        fixtureSet.add(loc.fixture);
+    itemInfoList.forEach((info) => {
+      if (info.fixture && info.fixture.trim() !== '') {
+        fixtureSet.add(info.fixture);
       }
     });
     return Array.from(fixtureSet).sort();
-  }, [storageLocations]);
+  }, [itemInfoList]);
 
   // Compute warehouseLocations for form submission
   const warehouseLocations = useMemo(() => {
@@ -564,11 +564,15 @@ export default function AddItemForm({
               <AddItemFormLabel htmlFor="fixture-select">Fixture</AddItemFormLabel>
               <Autocomplete
                 id="fixture-select"
+                freeSolo
                 options={availableFixtures}
-                value={newItemFixture}
-                onChange={(_, newValue) => setNewItemFixture(newValue)}
+                value={newItemFixture ?? ''}
+                onChange={(_, newValue) => setNewItemFixture(newValue || null)}
+                onInputChange={(_, newValue, reason) => {
+                  if (reason === 'input') setNewItemFixture(newValue || null);
+                }}
                 renderInput={(params) => (
-                  <TextField {...params} placeholder="Select a fixture (optional)" />
+                  <TextField {...params} placeholder="Enter or select a fixture (optional)" />
                 )}
               />
             </FormControl>

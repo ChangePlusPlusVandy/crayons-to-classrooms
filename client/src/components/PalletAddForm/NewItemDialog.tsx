@@ -12,7 +12,6 @@ import {
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import { Product } from '../../types/Product';
-import { StorageLocation } from '../../types/StorageLocation';
 import { ItemInfo } from '../../api/itemInfo';
 import { AddItemFormLabel } from '../AddItemForm/AddItemForm.styles';
 import { NewProductData } from './PalletAddForm';
@@ -24,7 +23,7 @@ interface NewItemDialogProps {
   products: Product[];
   availableCategories: string[];
   initialData?: NewProductData | null;
-  storageLocations: StorageLocation[];
+  itemInfoList: ItemInfo[];
 }
 
 export default function NewItemDialog({
@@ -34,7 +33,7 @@ export default function NewItemDialog({
   products,
   availableCategories,
   initialData = null,
-  storageLocations,
+  itemInfoList,
 }: NewItemDialogProps) {
   const [name, setName] = useState('');
   const [category, setCategory] = useState<string | null>(null);
@@ -56,13 +55,13 @@ export default function NewItemDialog({
 
   const availableFixtures = useMemo(() => {
     const fixtureSet = new Set<string>();
-    storageLocations.forEach((loc) => {
-      if (loc.fixture && loc.fixture.trim() !== '') {
-        fixtureSet.add(loc.fixture);
+    itemInfoList.forEach((info) => {
+      if (info.fixture && info.fixture.trim() !== '') {
+        fixtureSet.add(info.fixture);
       }
     });
     return Array.from(fixtureSet).sort();
-  }, [storageLocations]);
+  }, [itemInfoList]);
 
   // Reset / pre-fill fields when dialog opens
   useEffect(() => {
@@ -349,11 +348,15 @@ export default function NewItemDialog({
             <FormControl fullWidth>
               <AddItemFormLabel>Fixture</AddItemFormLabel>
               <Autocomplete
+                freeSolo
                 options={availableFixtures}
-                value={fixture}
-                onChange={(_, newValue) => setFixture(newValue)}
+                value={fixture ?? ''}
+                onChange={(_, newValue) => setFixture(newValue || null)}
+                onInputChange={(_, newValue, reason) => {
+                  if (reason === 'input') setFixture(newValue || null);
+                }}
                 renderInput={(params) => (
-                  <TextField {...params} placeholder="Select a fixture (optional)" size="small" />
+                  <TextField {...params} placeholder="Enter or select a fixture (optional)" size="small" />
                 )}
                 size="small"
               />
