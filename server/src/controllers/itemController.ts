@@ -293,7 +293,7 @@ export const getItemsByLocationId = async (req: Request, res: Response) => {
 export const getItemsByWarehouseId = async (req: Request, res: Response) => {
   try {
     const { warehouseId } = warehouseIdParamSchema.parse(req.params);
-    const items = await pool.query('SELECT * FROM items WHERE warehouse = $1', [warehouseId]);
+    const items = await pool.query("SELECT * FROM items WHERE warehouse = $1 AND status = 'active'", [warehouseId]);
     if (!countRows(items.rows, res)) {
       return;
     }
@@ -637,10 +637,21 @@ export const updateItem = async (req: Request, res: Response) => {
     const setClauses: string[] = [];
     const values: any[] = [];
     let idx = 1;
+    let locationParamIdx: number | null = null;
 
     for (const [key, value] of Object.entries(validatedData)) {
+      if (key === 'current_location_id') {
+        locationParamIdx = idx;
+      }
       setClauses.push(`${key} = $${idx++}`);
       values.push(value);
+    }
+
+    // Auto-sync warehouse when location changes but warehouse is not explicitly set
+    if (locationParamIdx !== null && !('warehouse' in validatedData)) {
+      setClauses.push(
+        `warehouse = (SELECT warehouse_id FROM storage_locations WHERE id = $${locationParamIdx}::uuid)`
+      );
     }
 
     setClauses.push(`updated_at = NOW()`);

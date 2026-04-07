@@ -180,8 +180,8 @@ export default function Activities() {
     const product =
       activity.product_name ||
       (!activity.product_id &&
-        activity.quantity > 1 &&
-        (action === 'MOVE' || action === 'DONATED' || action === 'DISCARD')
+      activity.quantity > 1 &&
+      (action === 'MOVE' || action === 'DONATED' || action === 'DISCARD')
         ? 'Entire Pallet'
         : 'Unknown item');
     const from = activity.from_location_name;
