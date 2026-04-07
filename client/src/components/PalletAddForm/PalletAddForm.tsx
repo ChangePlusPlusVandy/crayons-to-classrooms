@@ -431,7 +431,7 @@ export default function PalletAddForm({
                       <ProductOptionContainer>
                         <ProductNameText>{option.name || 'Unknown'}</ProductNameText>
                         <ProductDetailsText>
-                          {option.product_name ? `Product: ${option.product_name} · ` : ''}
+                          {option.product_name ? `Subcategory: ${option.product_name} · ` : ''}
                           {option.category || 'No category'} | Value: ${option.value ?? 0} | Stock:{' '}
                           {option.stock}
                         </ProductDetailsText>

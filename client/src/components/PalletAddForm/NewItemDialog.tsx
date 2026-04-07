@@ -234,7 +234,7 @@ export default function NewItemDialog({
               <AddItemFormLabel>Subcategory</AddItemFormLabel>
               <Autocomplete
                 options={subcategoryOptions}
-                getOptionLabel={(option) => option.name || 'Unknown Product'}
+                getOptionLabel={(option) => option.name || 'Unknown'}
                 filterOptions={(options, state) => {
                   const searchTerm = state.inputValue.toLowerCase().trim();
                   if (!searchTerm) return options;
@@ -250,7 +250,7 @@ export default function NewItemDialog({
                     size="small"
                   />
                 )}
-                noOptionsText="No matching products found"
+                noOptionsText="No matching subcategories found"
                 size="small"
               />
               <Button
@@ -366,7 +366,7 @@ export default function NewItemDialog({
           <TextField
             autoFocus
             fullWidth
-            label="Product Name"
+            label="Subcategory Name"
             value={newSubcategoryProductName}
             onChange={(e) => setNewSubcategoryProductName(e.target.value)}
             sx={{ mt: 1 }}

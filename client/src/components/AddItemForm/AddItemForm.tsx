@@ -446,7 +446,7 @@ export default function AddItemForm({
               <Autocomplete
                 id="subcategory-select"
                 options={products}
-                getOptionLabel={(option) => option.name || 'Unknown Product'}
+                getOptionLabel={(option) => option.name || 'Unknown'}
                 filterOptions={(options, state) => {
                   const searchTerm = state.inputValue.toLowerCase().trim();
                   if (!searchTerm) return options;
@@ -457,7 +457,7 @@ export default function AddItemForm({
                 renderInput={(params) => (
                   <TextField {...params} placeholder="Select a subcategory (optional)" />
                 )}
-                noOptionsText="No matching products found"
+                noOptionsText="No matching subcategories found"
               />
               <Button
                 startIcon={<AddIcon />}
@@ -587,7 +587,7 @@ export default function AddItemForm({
                         {highlightText(option.name || 'Unknown', searchTerm)}
                       </ProductNameText>
                       <ProductDetailsText>
-                        {option.product_name ? `Product: ${option.product_name} · ` : ''}
+                        {option.product_name ? `Subcategory: ${option.product_name} · ` : ''}
                         {option.category || 'No category'} | Value: ${option.value ?? 0} | Stock:{' '}
                         {option.stock}
                       </ProductDetailsText>
@@ -739,7 +739,7 @@ export default function AddItemForm({
           <TextField
             autoFocus
             fullWidth
-            label="Product Name"
+            label="Subcategory Name"
             value={newSubcategoryProductName}
             onChange={(e) => setNewSubcategoryProductName(e.target.value)}
             sx={{ mt: 1 }}
