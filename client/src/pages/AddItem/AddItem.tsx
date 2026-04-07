@@ -87,6 +87,7 @@ export default function AddItem() {
         },
       });
       setSuccess(`${quantity} item${quantity > 1 ? 's' : ''} added successfully!`);
+      setFormKey((k) => k + 1);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to add item. Please try again.';
       setError(message);
