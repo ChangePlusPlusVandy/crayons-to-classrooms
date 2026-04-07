@@ -418,7 +418,8 @@ export const getMovementsOnAndAfterDate = async (req: Request<{ date: string }>,
  */
 export async function createInventoryMovementCore(
   data: CreateInventoryInput,
-  db: DbClient = pool
+  db: DbClient = pool,
+  skipStockSync = false
 ): Promise<any> {
   const {
     inventory_action,
@@ -509,7 +510,7 @@ export async function createInventoryMovementCore(
   const createdMovement = newInventoryAction.rows[0];
 
   const REMOVE_ACTIONS = ['CHECKOUT', 'DISCARD', 'DONATED'];
-  if (REMOVE_ACTIONS.includes(inventory_action)) {
+  if (!skipStockSync && REMOVE_ACTIONS.includes(inventory_action)) {
     const itemName = itemCheck.rows[0].name as string;
 
     const fromLocationCode = fromLocationCheck?.rows[0]?.location_code ?? null;
@@ -1009,7 +1010,8 @@ export const removeItemsWithMovement = async (req: Request, res: Response) => {
       note: movementData.note,
     };
 
-    const createdMovement = await createInventoryMovementCore(fullMovementData, client);
+    // skipStockSync = true because the loop above already decremented stock per item name (correctly handles multi-type pallets)
+    const createdMovement = await createInventoryMovementCore(fullMovementData, client, true);
 
     await client.query('COMMIT');
 
