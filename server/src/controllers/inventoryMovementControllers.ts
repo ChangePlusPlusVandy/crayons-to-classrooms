@@ -1476,9 +1476,63 @@ export const undoInventoryMovementCore = async (
         db
       );
     }
+  } else if (inventoryMovement.inventory_action === 'DONATED' || inventoryMovement.inventory_action === 'DISCARD') {
+    // Validate that from_location_id exists (needed to restore items)
+    if (!inventoryMovement.from_location_id) {
+      throw new UndoConflictError('Cannot undo: movement has no from_location_id');
+    }
+
+    // Get the original item details to recreate
+    const originalItemResult = await db.query(
+      `SELECT name, product_id, quantity, category, item_limit, value, limbo, notes, item_info, warehouse
+       FROM items WHERE id = $1`,
+      [inventoryMovement.item_id]
+    );
+
+    if (originalItemResult.rows.length === 0) {
+      throw new UndoConflictError('Cannot undo: original item not found');
+    }
+
+    const originalItem = originalItemResult.rows[0];
+
+    // Get from_location details (warehouse_id)
+    const fromLocationResult = await db.query(
+      'SELECT warehouse_id FROM storage_locations WHERE id = $1',
+      [inventoryMovement.from_location_id]
+    );
+
+    if (fromLocationResult.rows.length === 0) {
+      throw new UndoConflictError('Cannot undo: original location no longer exists');
+    }
+
+    const warehouseId = fromLocationResult.rows[0].warehouse_id;
+
+    // Use createItemCore to add items back (this also handles stock increment)
+    await createItemCore(
+      {
+        name: originalItem.name,
+        product_id: originalItem.product_id,
+        current_location_id: inventoryMovement.from_location_id,
+        quantity: originalItem.quantity,
+        status: 'active',
+        warehouse: warehouseId ?? originalItem.warehouse,
+        category: originalItem.category,
+        item_limit: originalItem.item_limit,
+        value: originalItem.value ?? 0,
+        limbo: originalItem.limbo ?? false,
+        notes: originalItem.notes,
+        item_info: originalItem.item_info,
+        created_by: inventoryMovement.performed_by,
+      },
+      inventoryMovement.quantity,
+      db
+    );
+
+    // Delete movement record
+    await db.query('DELETE FROM "inventory movement" WHERE id = $1', [id]);
   } else {
     throw new UndoConflictError(
-      'Undo operation is only supported for MOVE and ADD inventory actions'
+      'Undo operation is only supported for MOVE, ADD, DONATED, and DISCARD inventory actions'
     );
   }
 };

@@ -232,10 +232,11 @@ export default function PalletMoveForm({
         label="Warehouse"
         placeholder="Select warehouse"
         fullWidth
+        required
       />
 
       <FormControl fullWidth disabled={!selectedWarehouse}>
-        <MoveItemFormLabel htmlFor="pallet-source-slot-select">Source Slot</MoveItemFormLabel>
+        <MoveItemFormLabel htmlFor="pallet-source-slot-select" required>Source Slot</MoveItemFormLabel>
         <Autocomplete
           id="pallet-source-slot-select"
           options={warehouseLocations}
@@ -312,6 +313,7 @@ export default function PalletMoveForm({
         label="Destination Warehouse"
         placeholder="Select destination warehouse"
         fullWidth
+        required
       />
 
       <SlotSelector
@@ -324,6 +326,7 @@ export default function PalletMoveForm({
         storageLocations={storageLocations}
         label="Destination Slot"
         placeholder="Select destination slot"
+        required
       >
         <Button
           startIcon={<AddIcon />}
