@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 import {
   Box,
   TextField,
+  Typography,
   Button,
   CircularProgress,
   Alert,
@@ -15,7 +16,7 @@ import {
 } from '@mui/material';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import AddIcon from '@mui/icons-material/Add';
-import { getStorageLocations, getItemsByLocation, groupItemsByLocation } from '../../api/moveItem';
+import { getStorageLocations, getItemsByLocation, getItemsByWarehouse, groupItemsByLocation } from '../../api/moveItem';
 import { createStorageLocation } from '../../api/storageLocation';
 import { Warehouse } from '../../types/Warehouse';
 import { StorageLocation } from '../../types/StorageLocation';
@@ -41,6 +42,7 @@ export interface MoveItemFormData {
 
 interface MoveItemFormProps {
   initialWarehouse?: Warehouse | null;
+  initialDestinationWarehouse?: Warehouse | null;
   initialSourceSlot?: StorageLocation | null;
   initialProductId?: string | null;
   initialDestinationSlot?: string | null;
@@ -54,6 +56,7 @@ interface MoveItemFormProps {
 
 export default function MoveItemForm({
   initialWarehouse = null,
+  initialDestinationWarehouse = null,
   initialSourceSlot = null,
   initialProductId = null,
   initialDestinationSlot = null,
@@ -72,6 +75,8 @@ export default function MoveItemForm({
   );
   const [itemGroupsInSourceSlot, setItemGroupsInSourceSlot] = useState<ItemGroup[]>([]);
   const [selectedItemGroup, setSelectedItemGroup] = useState<ItemGroup | null>(null);
+  const [selectedDestinationWarehouse, setSelectedDestinationWarehouse] =
+    useState<Warehouse | null>(initialDestinationWarehouse ?? initialWarehouse);
   const [selectedDestinationSlot, setSelectedDestinationSlot] = useState<string | null>(
     initialDestinationSlot
   );
@@ -113,16 +118,7 @@ export default function MoveItemForm({
 
       try {
         setError('');
-        const warehouseLocations = storageLocations.filter(
-          (loc) => loc.warehouse_id === selectedWarehouse.id
-        );
-
-        // TODO: Kiersten's PR will allow directly fetching items by warehouse id
-        const itemsPromises = warehouseLocations.map((loc) =>
-          getItemsByLocation(loc.id).catch(() => [])
-        );
-        const itemsArrays = await Promise.all(itemsPromises);
-        const items = itemsArrays.flat();
+        const items = await getItemsByWarehouse(selectedWarehouse.id);
         setAllItems(items);
       } catch (err) {
         setError('Failed to load items for the selected warehouse.');
@@ -130,7 +126,7 @@ export default function MoveItemForm({
     }
 
     fetchWarehouseItems();
-  }, [selectedWarehouse, storageLocations]);
+  }, [selectedWarehouse]);
 
   // Fetch items when source slot is selected
   useEffect(() => {
@@ -273,12 +269,19 @@ export default function MoveItemForm({
     );
   };
 
-  // Compute warehouseLocations for form submission and source slot filtering
+  // Compute warehouseLocations for source slot filtering
   const warehouseLocations = useMemo(() => {
     return selectedWarehouse
       ? storageLocations.filter((loc) => loc.warehouse_id === selectedWarehouse.id)
       : [];
   }, [selectedWarehouse, storageLocations]);
+
+  // Compute destinationWarehouseLocations for destination slot filtering
+  const destinationWarehouseLocations = useMemo(() => {
+    return selectedDestinationWarehouse
+      ? storageLocations.filter((loc) => loc.warehouse_id === selectedDestinationWarehouse.id)
+      : [];
+  }, [selectedDestinationWarehouse, storageLocations]);
 
   const isQuantityValid = (): boolean => {
     if (!selectedItemGroup) return false;
@@ -296,8 +299,8 @@ export default function MoveItemForm({
 
   const handleAddNewSlot = async () => {
     const slot = newSlotCode.trim();
-    if (!selectedWarehouse) {
-      setError('Please select a warehouse before adding a slot.');
+    if (!selectedDestinationWarehouse) {
+      setError('Please select a destination warehouse before adding a slot.');
       return;
     }
     if (!slot) {
@@ -311,7 +314,7 @@ export default function MoveItemForm({
       const created = await createStorageLocation({
         slot,
         active: true,
-        warehouse_id: selectedWarehouse.id,
+        warehouse_id: selectedDestinationWarehouse.id,
       });
       setStorageLocations((prev) => [...prev, created]);
       setSelectedDestinationSlot(created.slot);
@@ -328,7 +331,7 @@ export default function MoveItemForm({
 
   const handleSubmit = async () => {
     const destinationLocation =
-      warehouseLocations.find((loc) => loc.slot === selectedDestinationSlot) ?? null;
+      destinationWarehouseLocations.find((loc) => loc.slot === selectedDestinationSlot) ?? null;
 
     // Validation
     if (!selectedWarehouse) {
@@ -413,6 +416,7 @@ export default function MoveItemForm({
           setSelectedSourceSlot(null);
           setItemGroupsInSourceSlot([]);
           setSelectedItemGroup(null);
+          setSelectedDestinationWarehouse(newWarehouse);
           setSelectedDestinationSlot(null);
           setQuantityToMove(0);
           setError('');
@@ -420,10 +424,11 @@ export default function MoveItemForm({
         label="Warehouse"
         placeholder="Select warehouse"
         fullWidth
+        required
       />
 
       <FormControl fullWidth disabled={!selectedWarehouse}>
-        <MoveItemFormLabel htmlFor="source-slot-select">
+        <MoveItemFormLabel htmlFor="source-slot-select" required>
           Source Slot (Search by location code or item name)
         </MoveItemFormLabel>
         <Autocomplete
@@ -469,11 +474,24 @@ export default function MoveItemForm({
       </FormControl>
 
       <FormControl fullWidth disabled={!selectedSourceSlot}>
-        <MoveItemFormLabel htmlFor="item-in-slot-select">Item in Source Slot</MoveItemFormLabel>
+        <MoveItemFormLabel htmlFor="item-in-slot-select" required>Item in Source Slot</MoveItemFormLabel>
         <Autocomplete
           id="item-in-slot-select"
           options={itemGroupsInSourceSlot}
-          getOptionLabel={(option) => `${option.name} - Qty: ${option.quantity} items`}
+          getOptionLabel={(option) => option.name}
+          renderOption={(props, option) => {
+            const { key, ...otherProps } = props;
+            return (
+              <li key={key} {...otherProps}>
+                <Box>
+                  <Typography fontWeight={500}>{option.name}</Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Quantity: {option.quantity}
+                  </Typography>
+                </Box>
+              </li>
+            );
+          }}
           value={selectedItemGroup}
           onChange={(_, newValue) => {
             setSelectedItemGroup(newValue);
@@ -496,7 +514,7 @@ export default function MoveItemForm({
         disabled={!selectedItemGroup}
         error={selectedItemGroup ? !isQuantityValid() : false}
       >
-        <MoveItemFormLabel htmlFor="quantity-input">Quantity to Move</MoveItemFormLabel>
+        <MoveItemFormLabel htmlFor="quantity-input" required>Quantity to Move</MoveItemFormLabel>
         <TextField
           id="quantity-input"
           type="number"
@@ -527,16 +545,29 @@ export default function MoveItemForm({
       <Box sx={{ display: 'flex', justifyContent: 'center', my: 2 }}>
         <ArrowDownwardIcon aria-hidden="true" sx={{ fontSize: '2rem', color: 'text.secondary' }} />
       </Box>
+      <WarehouseSelector
+        value={selectedDestinationWarehouse}
+        onChange={(newWarehouse) => {
+          setSelectedDestinationWarehouse(newWarehouse);
+          setSelectedDestinationSlot(null);
+          setError('');
+        }}
+        label="Destination Warehouse"
+        placeholder="Select destination warehouse"
+        fullWidth
+        required
+      />
       <SlotSelector
         value={selectedDestinationSlot}
         onChange={(newSlot) => {
           setSelectedDestinationSlot(newSlot);
           setError('');
         }}
-        warehouse={selectedWarehouse}
+        warehouse={selectedDestinationWarehouse}
         storageLocations={storageLocations}
         label="Destination Slot"
         placeholder="Select destination slot"
+        required
       >
         <Button
           startIcon={<AddIcon />}
@@ -554,7 +585,7 @@ export default function MoveItemForm({
             setNewSlotCode('');
             setSlotDialogOpen(true);
           }}
-          disabled={!selectedWarehouse}
+          disabled={!selectedDestinationWarehouse}
         >
           New Slot
         </Button>
@@ -573,9 +604,9 @@ export default function MoveItemForm({
             placeholder="e.g. A-12-03"
             sx={{ mt: 1 }}
             helperText={
-              selectedWarehouse
-                ? `Creates a unique storage location in ${selectedWarehouse.name}.`
-                : 'Select a warehouse in the form first.'
+              selectedDestinationWarehouse
+                ? `Creates a unique storage location in ${selectedDestinationWarehouse.name}.`
+                : 'Select a destination warehouse first.'
             }
           />
         </DialogContent>
@@ -585,7 +616,7 @@ export default function MoveItemForm({
           </Button>
           <Button
             onClick={() => void handleAddNewSlot()}
-            disabled={!newSlotCode.trim() || !selectedWarehouse || creatingSlot}
+            disabled={!newSlotCode.trim() || !selectedDestinationWarehouse || creatingSlot}
             variant="contained"
           >
             {creatingSlot ? <CircularProgress size={20} /> : 'Add slot'}

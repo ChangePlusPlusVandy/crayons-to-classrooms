@@ -28,6 +28,7 @@ import undoArrow from '../../assets/undo_arrow.svg';
 import modifyPen from '../../assets/modify_pen.svg';
 import { EditAddDialog } from '../../components/EditAddDialog/EditAddDialog';
 import { EditMoveDialog } from '../../components/EditMoveDialog/EditMoveDialog';
+import { EditRemoveDialog } from '../../components/EditRemoveDialog/EditRemoveDialog';
 
 const PAGE_SIZE = 10;
 
@@ -87,11 +88,11 @@ export default function Activities() {
       return;
     }
 
-    // Only MOVE and ADD can be undone
-    if (activity.inventory_action !== 'MOVE' && activity.inventory_action !== 'ADD') {
+    // Only MOVE, ADD, DONATED, and DISCARD can be undone
+    if (activity.inventory_action !== 'MOVE' && activity.inventory_action !== 'ADD' && activity.inventory_action !== 'DONATED' && activity.inventory_action !== 'DISCARD') {
       setSnackbar({
         open: true,
-        message: `Cannot undo ${activity.inventory_action} actions. Only MOVE and ADD can be undone.`,
+        message: `Cannot undo ${activity.inventory_action} actions. Only MOVE, ADD, DONATED, and DISCARD can be undone.`,
         severity: 'error',
       });
       return;
@@ -133,7 +134,12 @@ export default function Activities() {
   };
 
   const handleEditClick = (activity: ActivityDisplay) => {
-    if (activity.inventory_action === 'ADD' || activity.inventory_action === 'MOVE') {
+    if (
+      activity.inventory_action === 'ADD' ||
+      activity.inventory_action === 'MOVE' ||
+      activity.inventory_action === 'DONATED' ||
+      activity.inventory_action === 'DISCARD'
+    ) {
       setEditingMovement(activity);
     }
   };
@@ -171,7 +177,13 @@ export default function Activities() {
 
   const formatAction = (activity: ActivityDisplay) => {
     const action = activity.inventory_action;
-    const product = activity.product_name || 'Unknown Item';
+    const product =
+      activity.product_name ||
+      (!activity.product_id &&
+      activity.quantity > 1 &&
+      (action === 'MOVE' || action === 'DONATED' || action === 'DISCARD')
+        ? 'Entire Pallet'
+        : 'Unknown item');
     const from = activity.from_location_name;
     const to = activity.to_location_name;
 
@@ -184,6 +196,8 @@ export default function Activities() {
         return `CHECKOUT ${product} from ${from || to || 'Unknown Location'}`;
       case 'DISCARD':
         return `DISCARD ${product} from ${from || to || 'Unknown Location'}`;
+      case 'DONATED':
+        return `DONATED ${product} from ${from || to || 'Unknown Location'}`;
       case 'ADJUSTMENT':
         return `ADJUSTMENT ${product} at ${to || from || 'Unknown Location'}`;
       default:
@@ -320,7 +334,14 @@ export default function Activities() {
                         {activity.user_name ?? activity.user_email ?? 'Unknown User'}
                       </TableCell>
                       <TableCell sx={activitiesStyles.tableCell}>
-                        {activity.product_name || 'Unknown Item'}
+                        {activity.product_name ||
+                          (!activity.product_id &&
+                          activity.quantity > 1 &&
+                          (activity.inventory_action === 'MOVE' ||
+                            activity.inventory_action === 'DONATED' ||
+                            activity.inventory_action === 'DISCARD')
+                            ? 'Entire Pallet'
+                            : 'Unknown item')}
                       </TableCell>
                       <TableCell sx={activitiesStyles.tableCell}>
                         {formatAction(activity)}
@@ -344,7 +365,9 @@ export default function Activities() {
                           )}
                         </IconButton>
                         {(activity.inventory_action === 'ADD' ||
-                          activity.inventory_action === 'MOVE') && (
+                          activity.inventory_action === 'MOVE' ||
+                          activity.inventory_action === 'DONATED' ||
+                          activity.inventory_action === 'DISCARD') && (
                           <IconButton
                             sx={activitiesStyles.actionButton}
                             onClick={() => handleEditClick(activity)}
@@ -383,6 +406,16 @@ export default function Activities() {
           open={!!editingMovement}
           onClose={handleEditClose}
           movement={{ ...editingMovement, product_id: editingMovement.product_id }}
+          onSuccess={handleEditSuccess}
+        />
+      )}
+
+      {(editingMovement?.inventory_action === 'DONATED' ||
+        editingMovement?.inventory_action === 'DISCARD') && (
+        <EditRemoveDialog
+          open={!!editingMovement}
+          onClose={handleEditClose}
+          movement={editingMovement}
           onSuccess={handleEditSuccess}
         />
       )}

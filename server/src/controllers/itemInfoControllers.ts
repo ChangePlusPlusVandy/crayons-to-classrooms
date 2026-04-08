@@ -77,8 +77,12 @@ export const getItemsInfoPaginated = async (req: Request, res: Response) => {
     }
 
     if (category) {
-      conditions.push(`ii.category = $${paramIdx++}`);
-      params.push(category);
+      if (category === 'No Category') {
+        conditions.push(`(ii.category IS NULL OR ii.category = 'UNKNOWN' OR ii.category = 'No Category')`);
+      } else {
+        conditions.push(`ii.category = $${paramIdx++}`);
+        params.push(category);
+      }
     }
 
     if (stock_status === 'in_stock') {
@@ -569,7 +573,10 @@ export const deleteItemInfo = async (req: Request, res: Response) => {
 export const getItemInfoCategories = async (_req: Request, res: Response) => {
   try {
     const result = await pool.query(
-      'SELECT DISTINCT category FROM item_info WHERE category IS NOT NULL ORDER BY category'
+      `SELECT DISTINCT
+         CASE WHEN category IS NULL OR category = 'UNKNOWN' THEN 'No Category' ELSE category END AS category
+       FROM item_info
+       ORDER BY category`
     );
     res.json(result.rows.map((row: { category: string }) => row.category));
   } catch (error) {

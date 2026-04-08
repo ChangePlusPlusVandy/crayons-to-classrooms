@@ -295,7 +295,7 @@ export const getItemsByLocationId = async (req: Request, res: Response) => {
 export const getItemsByWarehouseId = async (req: Request, res: Response) => {
   try {
     const { warehouseId } = warehouseIdParamSchema.parse(req.params);
-    const items = await pool.query('SELECT * FROM items WHERE warehouse = $1', [warehouseId]);
+    const items = await pool.query("SELECT * FROM items WHERE warehouse = $1 AND status = 'active'", [warehouseId]);
     if (!countRows(items.rows, res)) {
       return;
     }
@@ -491,7 +491,7 @@ export async function createItemCore(
     const syncedResult = await syncItemInfoStock(
       insertName,
       insertProductId ?? undefined,
-      insertCategory ?? 'UNKNOWN',
+      insertCategory ?? 'No Category',
       quantity,
       insertValue,
       insertItemLimit ?? undefined,
@@ -639,10 +639,21 @@ export const updateItem = async (req: Request, res: Response) => {
     const setClauses: string[] = [];
     const values: any[] = [];
     let idx = 1;
+    let locationParamIdx: number | null = null;
 
     for (const [key, value] of Object.entries(validatedData)) {
+      if (key === 'current_location_id') {
+        locationParamIdx = idx;
+      }
       setClauses.push(`${key} = $${idx++}`);
       values.push(value);
+    }
+
+    // Auto-sync warehouse when location changes but warehouse is not explicitly set
+    if (locationParamIdx !== null && !('warehouse' in validatedData)) {
+      setClauses.push(
+        `warehouse = (SELECT warehouse_id FROM storage_locations WHERE id = $${locationParamIdx}::uuid)`
+      );
     }
 
     setClauses.push(`updated_at = NOW()`);
@@ -681,7 +692,7 @@ export const updateItem = async (req: Request, res: Response) => {
       await syncItemInfoStock(
         newName,
         updatedItem.product_id,
-        updatedItem.category ?? 'UNKNOWN',
+        updatedItem.category ?? 'No Category',
         updatedItem.quantity,
         updatedItem.value,
         updatedItem.item_limit ?? undefined,
@@ -695,7 +706,7 @@ export const updateItem = async (req: Request, res: Response) => {
       await syncItemInfoStock(
         newName,
         updatedItem.product_id,
-        updatedItem.category ?? 'UNKNOWN',
+        updatedItem.category ?? 'No Category',
         updatedItem.quantity,
         updatedItem.value,
         updatedItem.item_limit ?? undefined,

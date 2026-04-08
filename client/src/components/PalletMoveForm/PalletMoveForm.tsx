@@ -49,6 +49,8 @@ export default function PalletMoveForm({
   const [selectedWarehouse, setSelectedWarehouse] = useState<Warehouse | null>(initialWarehouse);
   const [selectedSourceSlot, setSelectedSourceSlot] = useState<StorageLocation | null>(null);
   const [itemGroups, setItemGroups] = useState<ItemGroup[]>([]);
+  const [selectedDestinationWarehouse, setSelectedDestinationWarehouse] =
+    useState<Warehouse | null>(initialWarehouse);
   const [selectedDestinationSlot, setSelectedDestinationSlot] = useState<string | null>(null);
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(true);
@@ -110,14 +112,15 @@ export default function PalletMoveForm({
       !!selectedWarehouse &&
       !!selectedSourceSlot &&
       itemGroups.length > 0 &&
+      !!selectedDestinationWarehouse &&
       !!selectedDestinationSlot
     );
   };
 
   const handleAddNewSlot = async () => {
     const slot = newSlotCode.trim();
-    if (!selectedWarehouse) {
-      setError('Please select a warehouse before adding a slot.');
+    if (!selectedDestinationWarehouse) {
+      setError('Please select a destination warehouse before adding a slot.');
       return;
     }
     if (!slot) {
@@ -131,7 +134,7 @@ export default function PalletMoveForm({
       const created = await createStorageLocation({
         slot,
         active: true,
-        warehouse_id: selectedWarehouse.id,
+        warehouse_id: selectedDestinationWarehouse.id,
       });
       setStorageLocations((prev) => [...prev, created]);
       setSelectedDestinationSlot(created.slot);
@@ -147,8 +150,11 @@ export default function PalletMoveForm({
   };
 
   const handleSubmit = async () => {
+    const destinationWarehouseLocations = storageLocations.filter(
+      (loc) => loc.warehouse_id === selectedDestinationWarehouse?.id
+    );
     const destinationLocation =
-      warehouseLocations.find((loc) => loc.slot === selectedDestinationSlot) ?? null;
+      destinationWarehouseLocations.find((loc) => loc.slot === selectedDestinationSlot) ?? null;
 
     if (!selectedWarehouse) {
       setError('Please select a warehouse.');
@@ -160,6 +166,10 @@ export default function PalletMoveForm({
     }
     if (itemGroups.length === 0) {
       setError('No items found in the source slot.');
+      return;
+    }
+    if (!selectedDestinationWarehouse) {
+      setError('Please select a destination warehouse.');
       return;
     }
     if (!selectedDestinationSlot || !destinationLocation) {
@@ -215,16 +225,18 @@ export default function PalletMoveForm({
           setSelectedWarehouse(newWarehouse);
           setSelectedSourceSlot(null);
           setItemGroups([]);
+          setSelectedDestinationWarehouse(newWarehouse);
           setSelectedDestinationSlot(null);
           setError('');
         }}
         label="Warehouse"
         placeholder="Select warehouse"
         fullWidth
+        required
       />
 
       <FormControl fullWidth disabled={!selectedWarehouse}>
-        <MoveItemFormLabel htmlFor="pallet-source-slot-select">Source Slot</MoveItemFormLabel>
+        <MoveItemFormLabel htmlFor="pallet-source-slot-select" required>Source Slot</MoveItemFormLabel>
         <Autocomplete
           id="pallet-source-slot-select"
           options={warehouseLocations}
@@ -291,16 +303,30 @@ export default function PalletMoveForm({
         <ArrowDownwardIcon aria-hidden="true" sx={{ fontSize: '2rem', color: 'text.secondary' }} />
       </Box>
 
+      <WarehouseSelector
+        value={selectedDestinationWarehouse}
+        onChange={(newWarehouse) => {
+          setSelectedDestinationWarehouse(newWarehouse);
+          setSelectedDestinationSlot(null);
+          setError('');
+        }}
+        label="Destination Warehouse"
+        placeholder="Select destination warehouse"
+        fullWidth
+        required
+      />
+
       <SlotSelector
         value={selectedDestinationSlot}
         onChange={(newSlot) => {
           setSelectedDestinationSlot(newSlot);
           setError('');
         }}
-        warehouse={selectedWarehouse}
+        warehouse={selectedDestinationWarehouse}
         storageLocations={storageLocations}
         label="Destination Slot"
         placeholder="Select destination slot"
+        required
       >
         <Button
           startIcon={<AddIcon />}
@@ -309,7 +335,7 @@ export default function PalletMoveForm({
             setNewSlotCode('');
             setSlotDialogOpen(true);
           }}
-          disabled={!selectedWarehouse}
+          disabled={!selectedDestinationWarehouse}
           sx={{
             justifyContent: 'flex-start',
             textTransform: 'none',
@@ -335,9 +361,9 @@ export default function PalletMoveForm({
             placeholder="e.g. A-12-03"
             sx={{ mt: 1 }}
             helperText={
-              selectedWarehouse
-                ? `Creates a unique storage location in ${selectedWarehouse.name}.`
-                : 'Select a warehouse in the form first.'
+              selectedDestinationWarehouse
+                ? `Creates a unique storage location in ${selectedDestinationWarehouse.name}.`
+                : 'Select a destination warehouse first.'
             }
           />
         </DialogContent>
@@ -347,7 +373,7 @@ export default function PalletMoveForm({
           </Button>
           <Button
             onClick={() => void handleAddNewSlot()}
-            disabled={!newSlotCode.trim() || !selectedWarehouse || creatingSlot}
+            disabled={!newSlotCode.trim() || !selectedDestinationWarehouse || creatingSlot}
             variant="contained"
           >
             {creatingSlot ? <CircularProgress size={20} /> : 'Add slot'}

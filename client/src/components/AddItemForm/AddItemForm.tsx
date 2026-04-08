@@ -22,9 +22,7 @@ import { StorageLocation } from '../../types/StorageLocation';
 import { Product } from '../../types/Product';
 import {
   AddItemFormLabel,
-  ProductOptionContainer,
   ProductNameText,
-  ProductDetailsText,
   HighlightedText,
 } from './AddItemForm.styles';
 import { WarehouseSelector } from '../WarehouseSelector/WarehouseSelector';
@@ -229,7 +227,12 @@ export default function AddItemForm({
   };
 
   const handleSubmit = async () => {
-    const destinationLocation = warehouseLocations.find((loc) => loc.slot === selectedSlot) ?? null;
+    // Resolve destination: prefer location with null/empty fixture, fall back to first match
+    const slotLocations = warehouseLocations.filter((loc) => loc.slot === selectedSlot);
+    const destinationLocation =
+      slotLocations.find((loc) => !loc.fixture || loc.fixture.trim() === '') ??
+      slotLocations[0] ??
+      null;
 
     // Validation
     if (!selectedWarehouse) {
@@ -419,11 +422,12 @@ export default function AddItemForm({
         label="Warehouse"
         placeholder="Select warehouse"
         fullWidth
+        required
       />
 
       {/* Item name (item_info) */}
       <FormControl fullWidth>
-        <AddItemFormLabel htmlFor="item-name-select">Item Name</AddItemFormLabel>
+        <AddItemFormLabel htmlFor="item-name-select" required>Item Name</AddItemFormLabel>
         {isNewItemMode ? (
           <>
             <TextField
@@ -631,16 +635,7 @@ export default function AddItemForm({
 
                 return (
                   <li key={key} {...otherProps}>
-                    <ProductOptionContainer>
-                      <ProductNameText>
-                        {highlightText(option.name || 'Unknown', searchTerm)}
-                      </ProductNameText>
-                      <ProductDetailsText>
-                        {option.product_name ? `Product: ${option.product_name} · ` : ''}
-                        {option.category || 'No category'} | Value: ${option.value ?? 0} | Stock:{' '}
-                        {option.stock}
-                      </ProductDetailsText>
-                    </ProductOptionContainer>
+                    <ProductNameText>{highlightText(option.name || 'Unknown', searchTerm)}</ProductNameText>
                   </li>
                 );
               }}
@@ -688,6 +683,7 @@ export default function AddItemForm({
         }}
         warehouse={selectedWarehouse}
         storageLocations={storageLocations}
+        required
       >
         <Button
           startIcon={<AddIcon />}
@@ -711,7 +707,7 @@ export default function AddItemForm({
 
       {/* Quantity to Add */}
       <FormControl fullWidth>
-        <AddItemFormLabel htmlFor="quantity-input">Quantity to Add</AddItemFormLabel>
+        <AddItemFormLabel htmlFor="quantity-input" required>Quantity to Add</AddItemFormLabel>
         <TextField
           id="quantity-input"
           type="number"
