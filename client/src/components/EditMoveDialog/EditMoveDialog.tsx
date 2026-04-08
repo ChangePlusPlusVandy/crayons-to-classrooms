@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { useAuth } from '../../context/AuthContext';
 import {
   Dialog,
   DialogTitle,
@@ -28,7 +27,6 @@ interface EditMoveDialogProps {
 }
 
 export function EditMoveDialog({ open, onClose, movement, onSuccess }: EditMoveDialogProps) {
-  const { user } = useAuth();
   const [submitError, setSubmitError] = useState('');
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState('');
