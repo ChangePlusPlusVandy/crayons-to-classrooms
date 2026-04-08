@@ -84,7 +84,7 @@ export function EditAddDialog({ open, onClose, movement, onSuccess }: EditAddDia
           stock: 1,
           current_location_id: data.destinationLocationId,
           status: 'active',
-          created_by: user!.id,
+          created_by: userId,
           warehouse: data.warehouse.id,
           category: itemInfo.category || undefined,
           item_limit: itemLimit,
@@ -97,7 +97,7 @@ export function EditAddDialog({ open, onClose, movement, onSuccess }: EditAddDia
           from_location_id: null,
           to_location_id: data.destinationLocationId,
           quantity: data.quantity,
-          performed_by: user!.id,
+          performed_by: userId,
           note: data.notes || undefined,
         },
       });

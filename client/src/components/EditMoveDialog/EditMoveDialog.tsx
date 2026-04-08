@@ -126,7 +126,7 @@ export function EditMoveDialog({ open, onClose, movement, onSuccess }: EditMoveD
         to_location_id: data.destinationLocationId,
         product_id: data.itemGroup.product_id,
         quantity: data.quantity,
-        performed_by: user!.id,
+        performed_by: userId,
         note: data.notes || undefined,
       });
 
