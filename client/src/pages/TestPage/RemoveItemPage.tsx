@@ -257,6 +257,19 @@ export default function RemoveItemPage() {
     buildGroupOptions();
   }, [itemsInSelectedWarehouse, selectedWarehouse]);
 
+  const filterGroupOptions = (
+    options: ItemGroupWithLocation[],
+    state: { inputValue: string }
+  ): ItemGroupWithLocation[] => {
+    const searchTerm = state.inputValue.toLowerCase().trim();
+    if (!searchTerm) return options;
+    return options.filter(
+      (option) =>
+        option.name.toLowerCase().includes(searchTerm) ||
+        option.locationCode.toLowerCase().includes(searchTerm)
+    );
+  };
+
   const handleModeChange = (newMode: FormMode) => {
     setMode(newMode);
     setFormKey((k) => k + 1);
@@ -349,6 +362,7 @@ export default function RemoveItemPage() {
                       a.name === b.name && a.locationId === b.locationId
                     }
                     getOptionLabel={(option) => option.name}
+                    filterOptions={filterGroupOptions}
                     renderOption={(props, option) => (
                       <li {...props} key={`${option.name}|${option.locationId}`}>
                         <Box>
