@@ -142,6 +142,7 @@ export async function createItemWithMovement(payload: {
     value?: number;
     limbo?: boolean;
     notes?: string;
+    fixture?: string;
   };
   movement: {
     inventory_action: 'ADD';
@@ -180,6 +181,7 @@ export async function bulkCreateItemsWithMovement(payload: {
       value?: number;
       limbo?: boolean;
       notes?: string;
+      fixture?: string;
     };
     movement: {
       inventory_action: 'ADD';

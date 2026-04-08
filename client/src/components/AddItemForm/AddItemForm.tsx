@@ -93,6 +93,7 @@ export default function AddItemForm({
   const [newItemLimit, setNewItemLimit] = useState<number | ''>('');
   const [newItemValue, setNewItemValue] = useState<number | ''>('');
   const [newItemPackSize, setNewItemPackSize] = useState<number | ''>('');
+  const [newItemFixture, setNewItemFixture] = useState<string | null>(null);
 
   // Category/subcategory dialog states
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
@@ -101,6 +102,9 @@ export default function AddItemForm({
   const [newSubcategoryProductName, setNewSubcategoryProductName] = useState('');
   const [customCategories, setCustomCategories] = useState<string[]>([]);
   const [creatingSubcategory, setCreatingSubcategory] = useState(false);
+  const [fixtureDialogOpen, setFixtureDialogOpen] = useState(false);
+  const [newFixtureName, setNewFixtureName] = useState('');
+  const [customFixtures, setCustomFixtures] = useState<string[]>([]);
 
   const [slotDialogOpen, setSlotDialogOpen] = useState(false);
   const [newSlotCode, setNewSlotCode] = useState('');
@@ -139,11 +143,19 @@ export default function AddItemForm({
     fetchInitialData();
   }, [initialItemInfoId, initialItemInfo]);
 
-  // Exclude item_info rows without a product_id — downstream flows
-  // (undo, edit, grouping) require a non-null product_id on movements.
-  const selectableItemInfoList = useMemo(() => {
-    return itemInfoList.filter((info) => !!info.product_id);
-  }, [itemInfoList]);
+  const selectableItemInfoList = itemInfoList;
+
+  // All unique fixture values from existing item_info records + custom ones
+  const availableFixtures = useMemo(() => {
+    const fixtureSet = new Set<string>();
+    itemInfoList.forEach((info) => {
+      if (info.fixture && info.fixture.trim() !== '') {
+        fixtureSet.add(info.fixture);
+      }
+    });
+    customFixtures.forEach((f) => fixtureSet.add(f));
+    return Array.from(fixtureSet).sort();
+  }, [itemInfoList, customFixtures]);
 
   // Compute warehouseLocations for form submission
   const warehouseLocations = useMemo(() => {
@@ -267,7 +279,7 @@ export default function AddItemForm({
           value: typeof newItemValue === 'number' ? newItemValue : null,
           item_limit: typeof newItemLimit === 'number' ? newItemLimit : null,
           stock: 0,
-          fixture: null,
+          fixture: newItemFixture,
           last_known_location_code: null,
           time_last_updated: null,
           notes: null,
@@ -288,6 +300,7 @@ export default function AddItemForm({
             limit: typeof newItemLimit === 'number' ? newItemLimit : undefined,
             value: typeof newItemValue === 'number' ? newItemValue : undefined,
             packSize: typeof newItemPackSize === 'number' ? newItemPackSize : undefined,
+            fixture: newItemFixture || undefined,
           },
         });
       } else {
@@ -303,6 +316,16 @@ export default function AddItemForm({
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleAddFixture = () => {
+    const trimmed = newFixtureName.trim();
+    if (trimmed && !availableFixtures.includes(trimmed)) {
+      setCustomFixtures((prev) => [...prev, trimmed]);
+    }
+    setNewItemFixture(trimmed);
+    setNewFixtureName('');
+    setFixtureDialogOpen(false);
   };
 
   const handleAddCategory = () => {
@@ -550,6 +573,33 @@ export default function AddItemForm({
               />
             </FormControl>
 
+            {/* Fixture */}
+            <FormControl fullWidth sx={{ mt: 2 }}>
+              <AddItemFormLabel htmlFor="fixture-select">Fixture</AddItemFormLabel>
+              <Autocomplete
+                id="fixture-select"
+                options={availableFixtures}
+                value={newItemFixture}
+                onChange={(_, newValue) => setNewItemFixture(newValue)}
+                renderInput={(params) => (
+                  <TextField {...params} placeholder="Select or add a fixture (optional)" />
+                )}
+              />
+              <Button
+                startIcon={<AddIcon />}
+                onClick={() => setFixtureDialogOpen(true)}
+                sx={{
+                  justifyContent: 'flex-start',
+                  textTransform: 'none',
+                  color: 'primary.main',
+                  marginTop: 0,
+                  '&:hover': { backgroundColor: 'transparent' },
+                }}
+              >
+                New Fixture
+              </Button>
+            </FormControl>
+
             <Button
               onClick={() => {
                 setIsNewItemMode(false);
@@ -748,6 +798,27 @@ export default function AddItemForm({
             disabled={!newSubcategoryProductName.trim() || creatingSubcategory}
           >
             {creatingSubcategory ? <CircularProgress size={20} /> : 'Add'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* New Fixture Dialog */}
+      <Dialog open={fixtureDialogOpen} onClose={() => setFixtureDialogOpen(false)}>
+        <DialogTitle>Add New Fixture</DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            fullWidth
+            label="Fixture Name"
+            value={newFixtureName}
+            onChange={(e) => setNewFixtureName(e.target.value)}
+            sx={{ mt: 1 }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setFixtureDialogOpen(false)}>Cancel</Button>
+          <Button onClick={handleAddFixture} disabled={!newFixtureName.trim()}>
+            Add
           </Button>
         </DialogActions>
       </Dialog>

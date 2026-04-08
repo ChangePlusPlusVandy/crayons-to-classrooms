@@ -550,6 +550,7 @@ export default function PalletAddForm({
         products={products}
         availableCategories={availableCategories}
         initialData={editingRow?.isNewProduct ? (editingRow.newProductData ?? null) : null}
+        itemInfoList={itemInfoList}
       />
     </Stack>
   );

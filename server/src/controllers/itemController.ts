@@ -86,10 +86,11 @@ export const syncItemInfoStock = async (
   try {
     if (!createIfMissing) {
       const updateResult = await db.query(
-        'UPDATE item_info SET stock = GREATEST(stock + $1, 0), fixture = COALESCE($2, fixture), last_known_location_code = COALESCE($3, last_known_location_code), time_last_updated = NOW() WHERE name = $4 RETURNING id',
+        'UPDATE item_info SET stock = GREATEST(stock + $1, 0), fixture = COALESCE($2, fixture), last_known_location_code = COALESCE($3, last_known_location_code), time_last_updated = NOW() WHERE name = $4 RETURNING id, stock',
         [stockDelta, fixture ?? null, lastKnownLocationCode ?? null, itemName]
       );
-      return updateResult.rows[0]?.id ?? null;
+      const row = updateResult.rows[0];
+      return row ? { id: row.id, stock: row.stock } : null;
     }
 
     const upsertResult = await db.query(
@@ -106,7 +107,7 @@ export const syncItemInfoStock = async (
            fixture = COALESCE(EXCLUDED.fixture, item_info.fixture),
            last_known_location_code = COALESCE(EXCLUDED.last_known_location_code, item_info.last_known_location_code),
            time_last_updated = NOW()
-       RETURNING id`,
+       RETURNING id, stock`,
       [
         itemName,
         productId ?? null,
@@ -121,7 +122,8 @@ export const syncItemInfoStock = async (
         null,
       ]
     );
-    return upsertResult.rows[0]?.id ?? null;
+    const row = upsertResult.rows[0];
+    return row ? { id: row.id, stock: row.stock } : null;
   } catch (error) {
     console.error('Error syncing item info stock:', {
       itemName,
@@ -486,7 +488,7 @@ export async function createItemCore(
       [count, fixtureOverride ?? null, locationCode ?? null, insertItemInfoId]
     );
   } else {
-    const syncedItemInfoId = await syncItemInfoStock(
+    const syncedResult = await syncItemInfoStock(
       insertName,
       insertProductId ?? undefined,
       insertCategory ?? 'No Category',
@@ -500,10 +502,10 @@ export async function createItemCore(
       true,
       db
     );
-    if (syncedItemInfoId) {
+    if (syncedResult) {
       await db.query(
         'UPDATE items SET item_info = $1, updated_at = NOW() WHERE id = ANY($2::uuid[])',
-        [syncedItemInfoId, newItems.rows.map((r: { id: string }) => r.id)]
+        [syncedResult.id, newItems.rows.map((r: { id: string }) => r.id)]
       );
     }
   }
