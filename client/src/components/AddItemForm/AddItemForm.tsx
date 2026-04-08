@@ -145,11 +145,7 @@ export default function AddItemForm({
     fetchInitialData();
   }, [initialItemInfoId, initialItemInfo]);
 
-  // Exclude item_info rows without a product_id — downstream flows
-  // (undo, edit, grouping) require a non-null product_id on movements.
-  const selectableItemInfoList = useMemo(() => {
-    return itemInfoList.filter((info) => !!info.product_id);
-  }, [itemInfoList]);
+  const selectableItemInfoList = itemInfoList;
 
   // All unique fixture values from existing item_info records + custom ones
   const availableFixtures = useMemo(() => {
