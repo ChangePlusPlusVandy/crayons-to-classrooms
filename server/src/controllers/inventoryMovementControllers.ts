@@ -417,7 +417,8 @@ export const getMovementsOnAndAfterDate = async (req: Request<{ date: string }>,
  */
 export async function createInventoryMovementCore(
   data: CreateInventoryInput,
-  db: DbClient = pool
+  db: DbClient = pool,
+  options?: { skipStockSync?: boolean }
 ): Promise<any> {
   const {
     inventory_action,
@@ -436,7 +437,7 @@ export async function createInventoryMovementCore(
   const normalizedToLocationId = to_location_id ?? null;
 
   // Check if item_id, product_id (if provided), from_location_id (if provided), to_location_id (if provided) exist in tables (in parallel)
-  const checks: Promise<any>[] = [db.query('SELECT id FROM items WHERE id = $1', [item_id])];
+  const checks: Promise<any>[] = [db.query('SELECT id, name FROM items WHERE id = $1', [item_id])];
 
   if (normalizedToLocationId) {
     checks.push(
@@ -508,13 +509,13 @@ export async function createInventoryMovementCore(
   const createdMovement = newInventoryAction.rows[0];
 
   const REMOVE_ACTIONS = ['CHECKOUT', 'DISCARD', 'DONATED'];
-  if (REMOVE_ACTIONS.includes(inventory_action)) {
+  if (REMOVE_ACTIONS.includes(inventory_action) && !options?.skipStockSync) {
     const itemName = itemCheck.rows[0].name as string;
 
     const fromLocationCode = fromLocationCheck?.rows[0]?.location_code ?? null;
 
-    // Capture the return value to detect missing item_info rows
-    const syncedId = await syncItemInfoStock(
+    // Decrement stock first without updating location
+    const syncResult = await syncItemInfoStock(
       itemName,
       undefined, // productId — don't update
       undefined, // category — don't update
@@ -523,14 +524,25 @@ export async function createInventoryMovementCore(
       undefined, // itemLimit — don't update
       undefined, // limbo — don't update
       null, // fixture — don't update (COALESCE keeps existing)
-      fromLocationCode, // update last_known_location_code if we have it
+      null, // locationCode — don't update yet
       -quantity, // decrement stock
       false, // don't create if missing
       db
     );
-    if (!syncedId) {
+    if (!syncResult) {
       console.warn(
         `[createInventoryMovementCore] item_info row not found for item "${itemName}" during ${inventory_action} — stock not decremented`
+      );
+    } else if (syncResult.stock === 0 && fromLocationCode) {
+      // Only update last_known_location_code when stock reaches 0
+      await syncItemInfoStock(
+        itemName,
+        undefined, undefined, undefined, undefined, undefined, undefined,
+        null, // fixture — don't update
+        fromLocationCode, // update location to where the last item was removed from
+        0, // no stock change
+        false,
+        db
       );
     }
   }
@@ -967,6 +979,13 @@ export const removeItemsWithMovement = async (req: Request, res: Response) => {
       throw new Error('Some items were not at the expected location or were already inactive');
     }
 
+    // Look up from-location code for potential last_known_location_code update
+    const fromLocResult = await client.query(
+      'SELECT location_code FROM storage_locations WHERE id = $1',
+      [movementData.from_location_id]
+    );
+    const fromLocationCode = fromLocResult.rows[0]?.location_code ?? null;
+
     // Sync item_info stock: group by name and decrement
     const countsByName: Record<string, number> = {};
     for (const row of updateResult.rows) {
@@ -975,7 +994,7 @@ export const removeItemsWithMovement = async (req: Request, res: Response) => {
     }
 
     for (const [itemName, count] of Object.entries(countsByName)) {
-      await syncItemInfoStock(
+      const syncResult = await syncItemInfoStock(
         itemName,
         undefined, // productId
         undefined, // category
@@ -984,11 +1003,24 @@ export const removeItemsWithMovement = async (req: Request, res: Response) => {
         undefined, // itemLimit
         false, // limbo
         null, // fixture
-        null, // locationCode
+        null, // locationCode — don't update yet
         -count, // stockDelta - decrement by removed count
         false, // createIfMissing
         client
       );
+
+      // Only update last_known_location_code when stock reaches 0
+      if (syncResult && syncResult.stock === 0 && fromLocationCode) {
+        await syncItemInfoStock(
+          itemName,
+          undefined, undefined, undefined, undefined, undefined, undefined,
+          null, // fixture
+          fromLocationCode, // update location to where the last item was removed from
+          0, // no stock change
+          false,
+          client
+        );
+      }
     }
 
     // Use the first item as the representative for the movement record
@@ -1005,7 +1037,7 @@ export const removeItemsWithMovement = async (req: Request, res: Response) => {
       note: movementData.note,
     };
 
-    const createdMovement = await createInventoryMovementCore(fullMovementData, client);
+    const createdMovement = await createInventoryMovementCore(fullMovementData, client, { skipStockSync: true });
 
     await client.query('COMMIT');
 
