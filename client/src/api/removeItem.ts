@@ -1,4 +1,5 @@
 import { InventoryMovement } from '../types/InventoryMovement';
+import { authFetch } from './authFetch';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
 
@@ -12,7 +13,7 @@ export async function removeItemsWithMovement(payload: {
     note?: string;
   };
 }): Promise<{ updatedCount: number; movement: InventoryMovement }> {
-  const response = await fetch(`${API_BASE_URL}/inventory-movement/with-remove`, {
+  const response = await authFetch(`${API_BASE_URL}/inventory-movement/with-removal`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

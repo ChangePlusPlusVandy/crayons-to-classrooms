@@ -1312,6 +1312,7 @@ export const editInventoryMovementRemove = async (req: Request, res: Response) =
       [id]
     );
 
+
     await client.query('COMMIT');
 
     res.status(200).json({ movement: updatedMovement.rows[0] });

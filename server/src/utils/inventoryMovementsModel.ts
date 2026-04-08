@@ -45,7 +45,7 @@ export const ActionParamSchema = z.enum([
 /**
  * Schema for inventory movement creation
  * Requires: inventory_action, item_id, quantity, performed_by
- * Optional: from_location_id (nullable — null for ADD actions),
+ * Optional: product_id, from_location_id (nullable — null for ADD actions),
  *           to_location_id (nullable), note
  */
 export const createInventoryMovementSchema = z.object({
@@ -161,6 +161,8 @@ export const removeItemsWithMovementSchema = z.object({
   }),
 });
 
+export type RemoveItemsWithMovementInput = z.infer<typeof removeItemsWithMovementSchema>;
+
 export type CreateInventoryInput = z.infer<typeof createInventoryMovementSchema>;
 export type UpdateInventoryInput = z.infer<typeof updateInventoryMovementSchema>;
 export type InventoryStatusType = z.infer<typeof actionQuerySchema>;
@@ -182,6 +184,3 @@ export const bulkCreateItemsWithMovementSchema = z.object({
 export type BulkCreateItemsWithMovementInput = z.infer<typeof bulkCreateItemsWithMovementSchema>;
 export type MovementIdParamType = z.infer<typeof movementIdParamSchema>;
 export type MoveItemsWithMovementInput = z.infer<typeof moveItemsWithMovementSchema>;
-
-
-export type RemoveItemsWithMovementInput = z.infer<typeof removeItemsWithMovementSchema>;
