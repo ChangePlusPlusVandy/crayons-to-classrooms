@@ -34,6 +34,7 @@ export function EditMoveDialog({ open, onClose, movement, onSuccess }: EditMoveD
   const [destinationWarehouse, setDestinationWarehouse] = useState<Warehouse | null>(null);
   const [sourceSlot, setSourceSlot] = useState<StorageLocation | null>(null);
   const [productName, setProductName] = useState('');
+  const [itemValue, setItemValue] = useState(0);
   const [destinationSlot, setDestinationSlot] = useState('');
 
   useEffect(() => {
@@ -60,6 +61,7 @@ export function EditMoveDialog({ open, onClose, movement, onSuccess }: EditMoveD
         setDestinationWarehouse(destWh);
         setSourceSlot(src);
         setProductName(itemRow.name);
+        setItemValue(typeof itemRow.value === 'number' ? itemRow.value : 0);
         setDestinationSlot(dest.slot);
       } catch {
         setFetchError('Failed to load movement details');
@@ -95,6 +97,7 @@ export function EditMoveDialog({ open, onClose, movement, onSuccess }: EditMoveD
           name: productName,
           product_id: movement.product_id!,
           quantity: movement.quantity,
+          value: itemValue,
         });
       }
     } else if (sourceSlotId === movement.to_location_id) {

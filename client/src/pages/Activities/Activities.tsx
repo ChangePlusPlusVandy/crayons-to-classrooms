@@ -186,20 +186,23 @@ export default function Activities() {
         : 'Unknown item');
     const from = activity.from_location_name;
     const to = activity.to_location_name;
+    /** Matches dashboard ActivityLog: e.g. ADD (x6) */
+    const quantitySuffix =
+      typeof activity.quantity === 'number' ? ` (x${activity.quantity})` : '';
 
     switch (action) {
       case 'ADD':
-        return `ADD ${product} to ${to || 'Unknown Location'}`;
+        return `ADD${quantitySuffix} ${product} to ${to || 'Unknown Location'}`;
       case 'MOVE':
-        return `MOVE ${product} from ${from || 'Unknown Location'} to ${to || 'Unknown Location'}`;
+        return `MOVE${quantitySuffix} ${product} from ${from || 'Unknown Location'} to ${to || 'Unknown Location'}`;
       case 'CHECKOUT':
-        return `CHECKOUT ${product} from ${from || to || 'Unknown Location'}`;
+        return `CHECKOUT${quantitySuffix} ${product} from ${from || to || 'Unknown Location'}`;
       case 'DISCARD':
-        return `DISCARD ${product} from ${from || to || 'Unknown Location'}`;
+        return `DISCARD${quantitySuffix} ${product} from ${from || to || 'Unknown Location'}`;
       case 'DONATED':
-        return `DONATED ${product} from ${from || to || 'Unknown Location'}`;
+        return `DONATED${quantitySuffix} ${product} from ${from || to || 'Unknown Location'}`;
       case 'ADJUSTMENT':
-        return `ADJUSTMENT ${product} at ${to || from || 'Unknown Location'}`;
+        return `ADJUSTMENT${quantitySuffix} ${product} at ${to || from || 'Unknown Location'}`;
       default:
         return action;
     }

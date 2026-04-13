@@ -207,7 +207,8 @@ export default function AddItemForm({
   };
 
   const hasNewItemFieldErrors = (): boolean => {
-    if (typeof newItemValue === 'number' && newItemValue < 0) return true;
+    if (newItemValue === '') return true;
+    if (typeof newItemValue !== 'number' || newItemValue < 0) return true;
     if (typeof newItemLimit === 'number' && newItemLimit < 0) return true;
     if (typeof newItemPackSize === 'number' && newItemPackSize < 1) return true;
     return false;
@@ -245,6 +246,10 @@ export default function AddItemForm({
     }
     if (isNewItemMode && !newItemName.trim()) {
       setError('Please enter an item name.');
+      return;
+    }
+    if (isNewItemMode && (newItemValue === '' || typeof newItemValue !== 'number' || newItemValue < 0)) {
+      setError('Please enter a value (0 or greater) for the new item.');
       return;
     }
     if (isNewItemMode && hasNewItemFieldErrors()) {
@@ -525,7 +530,9 @@ export default function AddItemForm({
 
             {/* Value */}
             <FormControl fullWidth sx={{ mt: 2 }}>
-              <AddItemFormLabel htmlFor="value-input">Value</AddItemFormLabel>
+              <AddItemFormLabel htmlFor="value-input" required>
+                Value
+              </AddItemFormLabel>
               <TextField
                 id="value-input"
                 type="number"
@@ -535,10 +542,10 @@ export default function AddItemForm({
                   const val = parseFloat(e.target.value);
                   setNewItemValue(isNaN(val) ? '' : val);
                 }}
-                placeholder="Enter item value (optional)"
-                error={newItemValue !== '' && typeof newItemValue === 'number' && newItemValue < 0}
+                placeholder="Enter item value"
+                error={typeof newItemValue === 'number' && newItemValue < 0}
                 helperText={
-                  newItemValue !== '' && typeof newItemValue === 'number' && newItemValue < 0
+                  typeof newItemValue === 'number' && newItemValue < 0
                     ? 'Value cannot be negative'
                     : ''
                 }
