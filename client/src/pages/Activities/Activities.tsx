@@ -29,6 +29,8 @@ import modifyPen from '../../assets/modify_pen.svg';
 import { EditAddDialog } from '../../components/EditAddDialog/EditAddDialog';
 import { EditMoveDialog } from '../../components/EditMoveDialog/EditMoveDialog';
 import { EditRemoveDialog } from '../../components/EditRemoveDialog/EditRemoveDialog';
+import { PalletDetailsDialog } from '../../components/PalletDetailsDialog/PalletDetailsDialog';
+import VisibilityIcon from '@mui/icons-material/Visibility';
 
 const PAGE_SIZE = 10;
 
@@ -57,6 +59,12 @@ export default function Activities() {
     open: false,
     activity: null,
   });
+  const [palletDetailsDialog, setPalletDetailsDialog] = useState<{
+    open: boolean;
+    movementId: string;
+    locationName: string | null;
+    action: string;
+  }>({ open: false, movementId: '', locationName: null, action: '' });
 
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
@@ -152,6 +160,22 @@ export default function Activities() {
     setShowSuccessAlert(true);
     setEditingMovement(null);
     await fetchActivities();
+  };
+
+  const isPalletOperation = (activity: ActivityDisplay) =>
+    !activity.product_id &&
+    activity.quantity > 1 &&
+    (activity.inventory_action === 'MOVE' ||
+      activity.inventory_action === 'DONATED' ||
+      activity.inventory_action === 'DISCARD');
+
+  const handleViewPalletDetails = (activity: ActivityDisplay) => {
+    setPalletDetailsDialog({
+      open: true,
+      movementId: activity.id,
+      locationName: activity.from_location_name,
+      action: activity.inventory_action,
+    });
   };
 
   const formatTimestamp = (timestamp: string) => {
@@ -347,6 +371,15 @@ export default function Activities() {
                         {formatAction(activity)}
                       </TableCell>
                       <TableCell sx={activitiesStyles.tableCell} align="right">
+                        {isPalletOperation(activity) && (
+                          <IconButton
+                            sx={activitiesStyles.actionButton}
+                            onClick={() => handleViewPalletDetails(activity)}
+                            aria-label="View pallet contents"
+                          >
+                            <VisibilityIcon sx={activitiesStyles.actionIcon} />
+                          </IconButton>
+                        )}
                         <IconButton
                           sx={activitiesStyles.actionButton}
                           onClick={() => handleUndoClick(activity)}
@@ -445,6 +478,14 @@ export default function Activities() {
           {snackbar.message}
         </Alert>
       </Snackbar>
+
+      <PalletDetailsDialog
+        open={palletDetailsDialog.open}
+        onClose={() => setPalletDetailsDialog((prev) => ({ ...prev, open: false }))}
+        movementId={palletDetailsDialog.movementId}
+        locationName={palletDetailsDialog.locationName}
+        action={palletDetailsDialog.action}
+      />
 
       <Dialog
         open={undoConfirmDialog.open}

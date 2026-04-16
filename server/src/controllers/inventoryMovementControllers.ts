@@ -925,6 +925,12 @@ export const moveItemsWithMovement = async (req: Request, res: Response) => {
 
     const createdMovement = await createInventoryMovementCore(fullMovementData, client);
 
+    const movedItemIds = updateResult.rows.map((r: { id: string }) => r.id);
+    await client.query(
+      'UPDATE "inventory movement" SET item_ids = $1 WHERE id = $2',
+      [movedItemIds, createdMovement.id]
+    );
+
     await client.query('COMMIT');
 
     res.status(201).json({ updatedCount: updateResult.rowCount, movement: createdMovement });
@@ -1051,6 +1057,12 @@ export const removeItemsWithMovement = async (req: Request, res: Response) => {
 
     // skipStockSync = true because the loop above already decremented stock per item name (correctly handles multi-type pallets)
     const createdMovement = await createInventoryMovementCore(fullMovementData, client, true);
+
+    const removedItemIds = updateResult.rows.map((r: { id: string }) => r.id);
+    await client.query(
+      'UPDATE "inventory movement" SET item_ids = $1 WHERE id = $2',
+      [removedItemIds, createdMovement.id]
+    );
 
     await client.query('COMMIT');
 
@@ -1601,5 +1613,34 @@ export const undoInventoryMovement = async (req: Request, res: Response) => {
     res.status(500).json({ error: 'Internal server error' });
   } finally {
     client.release();
+  }
+};
+
+/**
+ * Returns a grouped item summary for a pallet movement by joining item_ids back to the items table.
+ * Groups by item name + category and sums quantity.
+ * Returns [] for movements that have no item_ids (pre-feature or non-pallet operations).
+ *
+ * GET /api/inventory-movement/:id/pallet-items
+ */
+export const getPalletMovementItems = async (req: Request, res: Response) => {
+  const { id } = req.params;
+  try {
+    const result = await pool.query(
+      `SELECT
+         i.name,
+         i.category,
+         SUM(i.quantity)::int AS total_quantity
+       FROM "inventory movement" m
+       JOIN items i ON i.id = ANY(m.item_ids)
+       WHERE m.id = $1
+       GROUP BY i.name, i.category
+       ORDER BY i.name ASC`,
+      [id]
+    );
+    res.json({ items: result.rows });
+  } catch (error) {
+    console.error('Error fetching pallet movement items:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 };

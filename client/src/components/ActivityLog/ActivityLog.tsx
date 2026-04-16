@@ -18,12 +18,14 @@ import {
 import { useNavigate } from 'react-router-dom';
 import UndoIcon from '@mui/icons-material/Undo';
 import EditIcon from '@mui/icons-material/Edit';
+import VisibilityIcon from '@mui/icons-material/Visibility';
 import { activityLogStyles } from './ActivityLog.styles';
 import { getActivities, ActivityDisplay } from '../../api/activities';
 import { undoInventoryMovement } from '../../api/moveItem';
 import { EditAddDialog } from '../EditAddDialog/EditAddDialog';
 import { EditMoveDialog } from '../EditMoveDialog/EditMoveDialog';
 import { EditRemoveDialog } from '../EditRemoveDialog/EditRemoveDialog';
+import { PalletDetailsDialog } from '../PalletDetailsDialog/PalletDetailsDialog';
 
 const ACTION_COLORS: Record<string, string> = {
   ADD: '#4caf50',
@@ -78,6 +80,28 @@ export default function ActivityLog() {
     open: false,
     activity: null,
   });
+  const [palletDetailsDialog, setPalletDetailsDialog] = useState<{
+    open: boolean;
+    movementId: string;
+    locationName: string | null;
+    action: string;
+  }>({ open: false, movementId: '', locationName: null, action: '' });
+
+  const isPalletOperation = (activity: ActivityDisplay) =>
+    !activity.product_id &&
+    activity.quantity > 1 &&
+    (activity.inventory_action === 'MOVE' ||
+      activity.inventory_action === 'DONATED' ||
+      activity.inventory_action === 'DISCARD');
+
+  const handleViewPalletDetails = (activity: ActivityDisplay) => {
+    setPalletDetailsDialog({
+      open: true,
+      movementId: activity.id,
+      locationName: activity.from_location_name,
+      action: activity.inventory_action,
+    });
+  };
 
   const fetchActivities = async () => {
     try {
@@ -238,6 +262,15 @@ export default function ActivityLog() {
                         flexShrink: 0,
                       }}
                     >
+                      {isPalletOperation(activity) && (
+                        <IconButton
+                          size="small"
+                          aria-label="View pallet contents"
+                          onClick={() => handleViewPalletDetails(activity)}
+                        >
+                          <VisibilityIcon fontSize="small" />
+                        </IconButton>
+                      )}
                       <IconButton
                         size="small"
                         aria-label={`Undo ${activity.inventory_action.toLowerCase()} for ${productName}`}
@@ -350,6 +383,14 @@ export default function ActivityLog() {
           {snackbar.message}
         </Alert>
       </Snackbar>
+
+      <PalletDetailsDialog
+        open={palletDetailsDialog.open}
+        onClose={() => setPalletDetailsDialog((prev) => ({ ...prev, open: false }))}
+        movementId={palletDetailsDialog.movementId}
+        locationName={palletDetailsDialog.locationName}
+        action={palletDetailsDialog.action}
+      />
 
       <Dialog
         open={undoConfirmDialog.open}
