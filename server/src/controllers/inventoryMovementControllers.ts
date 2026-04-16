@@ -927,7 +927,7 @@ export const moveItemsWithMovement = async (req: Request, res: Response) => {
 
     const movedItemIds = updateResult.rows.map((r: { id: string }) => r.id);
     await client.query(
-      'UPDATE "inventory movement" SET item_ids = $1 WHERE id = $2',
+      'UPDATE "inventory movement" SET item_ids = $1::uuid[] WHERE id = $2',
       [movedItemIds, createdMovement.id]
     );
 
@@ -1060,7 +1060,7 @@ export const removeItemsWithMovement = async (req: Request, res: Response) => {
 
     const removedItemIds = updateResult.rows.map((r: { id: string }) => r.id);
     await client.query(
-      'UPDATE "inventory movement" SET item_ids = $1 WHERE id = $2',
+      'UPDATE "inventory movement" SET item_ids = $1::uuid[] WHERE id = $2',
       [removedItemIds, createdMovement.id]
     );
 
@@ -1624,8 +1624,25 @@ export const undoInventoryMovement = async (req: Request, res: Response) => {
  * GET /api/inventory-movement/:id/pallet-items
  */
 export const getPalletMovementItems = async (req: Request, res: Response) => {
-  const { id } = req.params;
+  let id: string;
   try {
+    ({ id } = movementIdParamSchema.parse(req.params));
+  } catch (error) {
+    if (error instanceof ZodError) {
+      return handleValidationError(error, res);
+    }
+    return res.status(400).json({ error: 'Invalid request params' });
+  }
+
+  try {
+    const movementCheck = await pool.query(
+      'SELECT id FROM "inventory movement" WHERE id = $1',
+      [id]
+    );
+    if (movementCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Inventory movement not found' });
+    }
+
     const result = await pool.query(
       `SELECT
          i.name,

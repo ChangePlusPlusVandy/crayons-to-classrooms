@@ -22,6 +22,7 @@ import {
   DialogActions,
 } from '@mui/material';
 import { getActivities, ActivityDisplay } from '../../api/activities';
+import { isPalletOperation } from '../../api/palletUtils';
 import { undoInventoryMovement } from '../../api/moveItem';
 import { activitiesStyles } from './Activities.styles';
 import undoArrow from '../../assets/undo_arrow.svg';
@@ -161,13 +162,6 @@ export default function Activities() {
     setEditingMovement(null);
     await fetchActivities();
   };
-
-  const isPalletOperation = (activity: ActivityDisplay) =>
-    !activity.product_id &&
-    activity.quantity > 1 &&
-    (activity.inventory_action === 'MOVE' ||
-      activity.inventory_action === 'DONATED' ||
-      activity.inventory_action === 'DISCARD');
 
   const handleViewPalletDetails = (activity: ActivityDisplay) => {
     setPalletDetailsDialog({

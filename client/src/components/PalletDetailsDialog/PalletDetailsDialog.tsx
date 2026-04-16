@@ -37,7 +37,11 @@ export function PalletDetailsDialog({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      setItems([]);
+      setError(null);
+      return;
+    }
     setLoading(true);
     setError(null);
     getPalletItems(movementId)
@@ -88,8 +92,8 @@ export function PalletDetailsDialog({
               </TableRow>
             </TableHead>
             <TableBody>
-              {items.map((item, idx) => (
-                <TableRow key={idx}>
+              {items.map((item) => (
+                <TableRow key={`${item.name}-${item.category}`}>
                   <TableCell>{item.name}</TableCell>
                   <TableCell>{item.category ?? '—'}</TableCell>
                   <TableCell align="right">{item.total_quantity}</TableCell>

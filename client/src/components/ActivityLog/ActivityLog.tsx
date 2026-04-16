@@ -21,6 +21,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import { activityLogStyles } from './ActivityLog.styles';
 import { getActivities, ActivityDisplay } from '../../api/activities';
+import { isPalletOperation } from '../../api/palletUtils';
 import { undoInventoryMovement } from '../../api/moveItem';
 import { EditAddDialog } from '../EditAddDialog/EditAddDialog';
 import { EditMoveDialog } from '../EditMoveDialog/EditMoveDialog';
@@ -86,13 +87,6 @@ export default function ActivityLog() {
     locationName: string | null;
     action: string;
   }>({ open: false, movementId: '', locationName: null, action: '' });
-
-  const isPalletOperation = (activity: ActivityDisplay) =>
-    !activity.product_id &&
-    activity.quantity > 1 &&
-    (activity.inventory_action === 'MOVE' ||
-      activity.inventory_action === 'DONATED' ||
-      activity.inventory_action === 'DISCARD');
 
   const handleViewPalletDetails = (activity: ActivityDisplay) => {
     setPalletDetailsDialog({
