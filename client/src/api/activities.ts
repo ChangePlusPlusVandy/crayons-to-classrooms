@@ -8,6 +8,8 @@ export const ActivityDisplaySchema = InventoryMovementSchema.extend({
   to_location_name: z.string().nullable(),
   user_name: z.string().nullable(),
   user_email: z.string().nullable(),
+  is_grouped_operation: z.boolean().optional().default(false),
+  grouped_batch_count: z.number().int().optional().default(1),
 });
 
 export const PaginatedActivitiesSchema = z.object({

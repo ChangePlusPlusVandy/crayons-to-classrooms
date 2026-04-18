@@ -86,41 +86,128 @@ export async function getAllMovementsDetailed(req: Request, res: Response): Prom
 
     const [dataResult, countResult] = await Promise.all([
       pool.query(
-        `SELECT
-          im.id,
-          im.item_id,
-          im.product_id,
-          im.from_location_id,
-          im.to_location_id,
-          im.quantity,
-          im.performed_by,
-          im.note,
-          im.performed_at,
-          im.inventory_action,
-          CASE
-            WHEN im.product_id IS NULL
-              AND im.quantity > 1
-              AND im.inventory_action IN ('MOVE', 'DONATED', 'DISCARD')
-            THEN NULL
-            ELSE COALESCE(ii.name, i.name, p.name)
-          END AS product_name,
-          from_loc.slot AS from_location_name,
-          to_loc.slot AS to_location_name,
-          pu.name AS user_name,
-          au.email AS user_email
-        FROM "inventory movement" im
-        LEFT JOIN items i ON im.item_id = i.id
-        LEFT JOIN item_info ii ON i.item_info = ii.id
-        LEFT JOIN products p ON im.product_id = p.id
-        LEFT JOIN storage_locations from_loc ON im.from_location_id = from_loc.id
-        LEFT JOIN storage_locations to_loc ON im.to_location_id = to_loc.id
-        LEFT JOIN public.users pu ON im.performed_by = pu.id
-        LEFT JOIN auth.users au ON pu.id = au.id
-        ORDER BY im.performed_at DESC NULLS LAST
-        LIMIT $1 OFFSET $2`,
+        `WITH parsed AS (
+           SELECT
+             im.*,
+             substring(im.note FROM '\\[BULK_OP:([A-Za-z0-9-]+);BATCH:[0-9]+/[0-9]+\\]') AS bulk_operation_id,
+             NULLIF(
+               trim(
+                 regexp_replace(
+                   COALESCE(im.note, ''),
+                   '\\s*\\[BULK_OP:[A-Za-z0-9-]+;BATCH:[0-9]+/[0-9]+\\]\\s*',
+                   ' ',
+                   'g'
+                 )
+               ),
+               ''
+             ) AS clean_note
+           FROM "inventory movement" im
+         ),
+         bucketed AS (
+           SELECT
+             p.*,
+             COALESCE(p.bulk_operation_id, p.id::text) AS operation_bucket
+           FROM parsed p
+         ),
+         aggregated AS (
+           SELECT
+             operation_bucket,
+             BOOL_OR(bulk_operation_id IS NOT NULL) AS is_grouped_operation,
+             COUNT(*)::int AS grouped_batch_count,
+             SUM(quantity)::int AS total_quantity,
+             MAX(performed_at) AS latest_performed_at,
+             COUNT(DISTINCT product_id)::int AS distinct_product_count,
+             BOOL_OR(product_id IS NULL) AS has_null_product_id
+           FROM bucketed
+           GROUP BY operation_bucket
+         ),
+         latest AS (
+           SELECT DISTINCT ON (b.operation_bucket)
+             b.operation_bucket,
+             b.id,
+             b.item_id,
+             b.product_id,
+             b.from_location_id,
+             b.to_location_id,
+             b.performed_by,
+             b.inventory_action,
+             b.clean_note,
+             b.performed_at
+           FROM bucketed b
+           ORDER BY b.operation_bucket, b.performed_at DESC NULLS LAST, b.id DESC
+         ),
+         final_rows AS (
+           SELECT
+             l.id,
+             l.item_id,
+             CASE
+               WHEN a.is_grouped_operation
+                 AND (a.distinct_product_count <> 1 OR a.has_null_product_id)
+               THEN NULL
+               ELSE l.product_id
+             END AS product_id,
+             l.from_location_id,
+             l.to_location_id,
+             a.total_quantity AS quantity,
+             l.performed_by,
+             l.clean_note AS note,
+             a.latest_performed_at AS performed_at,
+             l.inventory_action,
+             a.is_grouped_operation,
+             a.grouped_batch_count
+           FROM latest l
+           JOIN aggregated a ON l.operation_bucket = a.operation_bucket
+         )
+         SELECT
+           fr.id,
+           fr.item_id,
+           fr.product_id,
+           fr.from_location_id,
+           fr.to_location_id,
+           fr.quantity,
+           fr.performed_by,
+           fr.note,
+           fr.performed_at,
+           fr.inventory_action,
+           fr.is_grouped_operation,
+           fr.grouped_batch_count,
+           CASE
+             WHEN fr.product_id IS NULL
+               AND fr.quantity > 1
+               AND fr.inventory_action IN ('MOVE', 'DONATED', 'DISCARD')
+             THEN NULL
+             ELSE COALESCE(ii.name, i.name, p.name)
+           END AS product_name,
+           from_loc.slot AS from_location_name,
+           to_loc.slot AS to_location_name,
+           pu.name AS user_name,
+           au.email AS user_email
+         FROM final_rows fr
+         LEFT JOIN items i ON fr.item_id = i.id
+         LEFT JOIN item_info ii ON i.item_info = ii.id
+         LEFT JOIN products p ON fr.product_id = p.id
+         LEFT JOIN storage_locations from_loc ON fr.from_location_id = from_loc.id
+         LEFT JOIN storage_locations to_loc ON fr.to_location_id = to_loc.id
+         LEFT JOIN public.users pu ON fr.performed_by = pu.id
+         LEFT JOIN auth.users au ON pu.id = au.id
+         ORDER BY fr.performed_at DESC NULLS LAST
+         LIMIT $1 OFFSET $2`,
         [limit, offset]
       ),
-      pool.query('SELECT COUNT(*) FROM "inventory movement"'),
+      pool.query(
+        `WITH parsed AS (
+           SELECT
+             im.id,
+             substring(im.note FROM '\\[BULK_OP:([A-Za-z0-9-]+);BATCH:[0-9]+/[0-9]+\\]') AS bulk_operation_id
+           FROM "inventory movement" im
+         )
+         SELECT COUNT(*)
+         FROM (
+           SELECT COALESCE(bulk_operation_id, id::text)
+           FROM parsed
+           GROUP BY COALESCE(bulk_operation_id, id::text)
+         ) grouped`
+      ),
     ]);
 
     const total = parseInt(countResult.rows[0].count, 10);
@@ -544,7 +631,12 @@ export async function createInventoryMovementCore(
       // Only update last_known_location_code when stock reaches 0
       await syncItemInfoStock(
         itemName,
-        undefined, undefined, undefined, undefined, undefined, undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
         null, // fixture — don't update
         fromLocationCode, // update location to where the last item was removed from
         0, // no stock change
@@ -589,7 +681,7 @@ export const createInventoryMovement = async (req: Request, res: Response) => {
     res.status(201).json(createdMovement);
   } catch (error) {
     if (began) {
-      await client.query('ROLLBACK').catch(() => { });
+      await client.query('ROLLBACK').catch(() => {});
     }
     if (error instanceof ZodError) {
       return handleValidationError(error, res);
@@ -1024,7 +1116,12 @@ export const removeItemsWithMovement = async (req: Request, res: Response) => {
       if (syncResult && syncResult.stock === 0 && fromLocationCode) {
         await syncItemInfoStock(
           itemName,
-          undefined, undefined, undefined, undefined, undefined, undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
           null, // fixture
           fromLocationCode, // update location to where the last item was removed from
           0, // no stock change
@@ -1252,7 +1349,8 @@ export const editInventoryMovementRemove = async (req: Request, res: Response) =
     if (delta < 0 && !actionChanged) {
       // Removing LESS than before — restore the difference back to active
       const restoreCount = Math.abs(delta);
-      const originalStatus = originalMovement.inventory_action === 'DONATED' ? 'donated' : 'defective';
+      const originalStatus =
+        originalMovement.inventory_action === 'DONATED' ? 'donated' : 'defective';
 
       const itemsToRestore = await client.query(
         `SELECT id, name FROM items
@@ -1275,8 +1373,14 @@ export const editInventoryMovementRemove = async (req: Request, res: Response) =
         const itemName = (itemsToRestore.rows[0] as { name: string }).name;
         await syncItemInfoStock(
           itemName,
-          undefined, undefined, undefined, undefined, undefined, undefined,
-          null, null,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          null,
+          null,
           +itemsToRestore.rows.length,
           false,
           client
@@ -1313,8 +1417,14 @@ export const editInventoryMovementRemove = async (req: Request, res: Response) =
         const itemName = (itemsAtSource.rows[0] as { name: string }).name;
         await syncItemInfoStock(
           itemName,
-          undefined, undefined, undefined, undefined, undefined, undefined,
-          null, null,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          null,
+          null,
           -additionalRemoveIds.length,
           false,
           client
@@ -1342,11 +1452,9 @@ export const editInventoryMovementRemove = async (req: Request, res: Response) =
       ]
     );
 
-    const updatedMovement = await client.query(
-      `SELECT * FROM "inventory movement" WHERE id = $1`,
-      [id]
-    );
-
+    const updatedMovement = await client.query(`SELECT * FROM "inventory movement" WHERE id = $1`, [
+      id,
+    ]);
 
     await client.query('COMMIT');
 
@@ -1511,7 +1619,10 @@ export const undoInventoryMovementCore = async (
         db
       );
     }
-  } else if (inventoryMovement.inventory_action === 'DONATED' || inventoryMovement.inventory_action === 'DISCARD') {
+  } else if (
+    inventoryMovement.inventory_action === 'DONATED' ||
+    inventoryMovement.inventory_action === 'DISCARD'
+  ) {
     // Validate that from_location_id exists (needed to restore items)
     if (!inventoryMovement.from_location_id) {
       throw new UndoConflictError('Cannot undo: movement has no from_location_id');
