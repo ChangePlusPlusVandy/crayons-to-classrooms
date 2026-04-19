@@ -5,7 +5,6 @@ const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
 
 const PalletItemSummarySchema = z.object({
   name: z.string(),
-  category: z.string().nullable(),
   total_quantity: z.number().int(),
 });
 

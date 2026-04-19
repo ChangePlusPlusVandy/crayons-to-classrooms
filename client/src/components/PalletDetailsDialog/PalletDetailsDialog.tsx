@@ -85,7 +85,6 @@ export function PalletDetailsDialog({
             <TableHead>
               <TableRow>
                 <TableCell sx={{ fontWeight: 600 }}>Item</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Category</TableCell>
                 <TableCell sx={{ fontWeight: 600 }} align="right">
                   Qty
                 </TableCell>
@@ -93,9 +92,8 @@ export function PalletDetailsDialog({
             </TableHead>
             <TableBody>
               {items.map((item) => (
-                <TableRow key={`${item.name}-${item.category}`}>
+                <TableRow key={item.name}>
                   <TableCell>{item.name}</TableCell>
-                  <TableCell>{item.category ?? '—'}</TableCell>
                   <TableCell align="right">{item.total_quantity}</TableCell>
                 </TableRow>
               ))}

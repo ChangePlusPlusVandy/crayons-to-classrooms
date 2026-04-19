@@ -1755,14 +1755,26 @@ export const getPalletMovementItems = async (req: Request, res: Response) => {
     }
 
     const result = await pool.query(
-      `SELECT
+      `WITH target AS (
+         SELECT
+           substring(note FROM '\\[BULK_OP:([A-Za-z0-9-]+);BATCH:[0-9]+/[0-9]+\\]$') AS bulk_op_id
+         FROM "inventory movement"
+         WHERE id = $1
+       ),
+       related AS (
+         SELECT im.item_ids
+         FROM "inventory movement" im, target t
+         WHERE
+           (t.bulk_op_id IS NOT NULL
+            AND substring(im.note FROM '\\[BULK_OP:([A-Za-z0-9-]+);BATCH:[0-9]+/[0-9]+\\]$') = t.bulk_op_id)
+           OR (t.bulk_op_id IS NULL AND im.id = $1)
+       )
+       SELECT
          i.name,
-         i.category,
          SUM(i.quantity)::int AS total_quantity
-       FROM "inventory movement" m
-       JOIN items i ON i.id = ANY(m.item_ids)
-       WHERE m.id = $1
-       GROUP BY i.name, i.category
+       FROM related r
+       JOIN items i ON i.id = ANY(r.item_ids)
+       GROUP BY i.name
        ORDER BY i.name ASC`,
       [id]
     );
