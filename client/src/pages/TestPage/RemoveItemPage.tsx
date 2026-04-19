@@ -9,12 +9,17 @@ import {
   Button,
   Autocomplete,
   FormControl,
+  LinearProgress,
 } from '@mui/material';
 
 import { useLocation } from 'react-router-dom';
 import { getItems } from '../../api/items';
 import { getWarehouses } from '../../api/addItem';
-import { getItemsByLocation, removeItemsWithMovement } from '../../api/moveItem';
+import {
+  BulkOperationProgress,
+  getItemsByLocation,
+  removeItemsWithMovement,
+} from '../../api/moveItem';
 import { useAuth } from '../../context/AuthContext';
 import { Item } from '../../types/Item';
 import { Warehouse } from '../../types/Warehouse';
@@ -57,6 +62,7 @@ export default function RemoveItemPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [groupOptions, setGroupOptions] = useState<ItemGroupWithLocation[]>([]);
+  const [bulkProgress, setBulkProgress] = useState<BulkOperationProgress | null>(null);
 
   const [mode, setMode] = useState<FormMode>('individual');
 
@@ -143,6 +149,7 @@ export default function RemoveItemPage() {
           performed_by: user!.id,
           note: notes || undefined,
         },
+        onProgress: (progress) => setBulkProgress(progress),
       });
 
       // Refresh items
@@ -161,6 +168,7 @@ export default function RemoveItemPage() {
       console.error(err);
       setError('Failed to remove item.');
     } finally {
+      setBulkProgress(null);
       setLoading(false);
     }
   };
@@ -189,6 +197,7 @@ export default function RemoveItemPage() {
           performed_by: user!.id,
           note: palletNotes || undefined,
         },
+        onProgress: (progress) => setBulkProgress(progress),
       });
 
       // Refresh items
@@ -203,6 +212,8 @@ export default function RemoveItemPage() {
       const message =
         err instanceof Error ? err.message : 'Failed to remove pallet items. Please try again.';
       setError(message);
+    } finally {
+      setBulkProgress(null);
     }
   };
 
@@ -292,6 +303,21 @@ export default function RemoveItemPage() {
         {success && (
           <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess('')}>
             {success}
+          </Alert>
+        )}
+
+        {bulkProgress && (
+          <Alert severity="info" sx={{ mb: 2 }}>
+            <Box sx={{ mb: 1, fontWeight: 500 }}>
+              Removing items: {bulkProgress.processedItems}/{bulkProgress.totalItems}
+            </Box>
+            <LinearProgress
+              variant="determinate"
+              value={(bulkProgress.processedItems / bulkProgress.totalItems) * 100}
+            />
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+              Batch {bulkProgress.batch} of {bulkProgress.totalBatches}
+            </Typography>
           </Alert>
         )}
 

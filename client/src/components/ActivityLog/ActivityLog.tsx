@@ -122,7 +122,12 @@ export default function ActivityLog() {
       return;
     }
 
-    if (activity.inventory_action !== 'MOVE' && activity.inventory_action !== 'ADD' && activity.inventory_action !== 'DONATED' && activity.inventory_action !== 'DISCARD') {
+    if (
+      activity.inventory_action !== 'MOVE' &&
+      activity.inventory_action !== 'ADD' &&
+      activity.inventory_action !== 'DONATED' &&
+      activity.inventory_action !== 'DISCARD'
+    ) {
       setSnackbar({
         open: true,
         message: `Cannot undo ${activity.inventory_action} actions. Only MOVE, ADD, DONATED, and DISCARD can be undone.`,
@@ -217,7 +222,11 @@ export default function ActivityLog() {
                     ? 'Entire Pallet'
                     : 'Unknown item');
                 const isUndoable =
-                  activity.inventory_action === 'MOVE' || activity.inventory_action === 'ADD' || activity.inventory_action === 'DONATED' || activity.inventory_action === 'DISCARD';
+                  (activity.inventory_action === 'MOVE' ||
+                    activity.inventory_action === 'ADD' ||
+                    activity.inventory_action === 'DONATED' ||
+                    activity.inventory_action === 'DISCARD') &&
+                  !activity.is_grouped_operation;
 
                 return (
                   <Box key={activity.id} sx={activityLogStyles.activityItem}>
@@ -244,6 +253,11 @@ export default function ActivityLog() {
                         <Typography variant="caption" color="text.secondary">
                           {activity.performed_at ? formatTimestamp(activity.performed_at) : ''}
                         </Typography>
+                        {activity.is_grouped_operation && activity.grouped_batch_count > 1 && (
+                          <Typography variant="caption" color="text.secondary">
+                            Combined {activity.grouped_batch_count} batches
+                          </Typography>
+                        )}
                       </Box>
                     </Box>
 
@@ -280,15 +294,16 @@ export default function ActivityLog() {
                       {(activity.inventory_action === 'ADD' ||
                         activity.inventory_action === 'MOVE' ||
                         activity.inventory_action === 'DONATED' ||
-                        activity.inventory_action === 'DISCARD') && (
-                        <IconButton
-                          size="small"
-                          aria-label={`Edit ${activity.inventory_action.toLowerCase()} for ${productName}`}
-                          onClick={() => handleEditClick(activity)}
-                        >
-                          <EditIcon fontSize="small" />
-                        </IconButton>
-                      )}
+                        activity.inventory_action === 'DISCARD') &&
+                        !activity.is_grouped_operation && (
+                          <IconButton
+                            size="small"
+                            aria-label={`Edit ${activity.inventory_action.toLowerCase()} for ${productName}`}
+                            onClick={() => handleEditClick(activity)}
+                          >
+                            <EditIcon fontSize="small" />
+                          </IconButton>
+                        )}
                     </Box>
                   </Box>
                 );

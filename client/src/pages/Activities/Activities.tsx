@@ -35,6 +35,20 @@ import VisibilityIcon from '@mui/icons-material/Visibility';
 
 const PAGE_SIZE = 10;
 
+function getProductDisplayName(activity: ActivityDisplay): string {
+  if (activity.product_name) return activity.product_name;
+  if (
+    !activity.product_id &&
+    activity.quantity > 1 &&
+    (activity.inventory_action === 'MOVE' ||
+      activity.inventory_action === 'DONATED' ||
+      activity.inventory_action === 'DISCARD')
+  ) {
+    return 'Entire Pallet';
+  }
+  return 'Unknown item';
+}
+
 export default function Activities() {
   const [activities, setActivities] = useState<ActivityDisplay[]>([]);
   const [page, setPage] = useState(1);
@@ -88,6 +102,16 @@ export default function Activities() {
   }, [fetchActivities]);
 
   const handleUndoClick = (activity: ActivityDisplay) => {
+    if (activity.is_grouped_operation) {
+      setSnackbar({
+        open: true,
+        message:
+          'This is a combined bulk activity. Open the individual movement records to undo/edit batches.',
+        severity: 'error',
+      });
+      return;
+    }
+
     if (!activity.id) {
       setSnackbar({
         open: true,
@@ -98,7 +122,12 @@ export default function Activities() {
     }
 
     // Only MOVE, ADD, DONATED, and DISCARD can be undone
-    if (activity.inventory_action !== 'MOVE' && activity.inventory_action !== 'ADD' && activity.inventory_action !== 'DONATED' && activity.inventory_action !== 'DISCARD') {
+    if (
+      activity.inventory_action !== 'MOVE' &&
+      activity.inventory_action !== 'ADD' &&
+      activity.inventory_action !== 'DONATED' &&
+      activity.inventory_action !== 'DISCARD'
+    ) {
       setSnackbar({
         open: true,
         message: `Cannot undo ${activity.inventory_action} actions. Only MOVE, ADD, DONATED, and DISCARD can be undone.`,
@@ -352,17 +381,15 @@ export default function Activities() {
                         {activity.user_name ?? activity.user_email ?? 'Unknown User'}
                       </TableCell>
                       <TableCell sx={activitiesStyles.tableCell}>
-                        {activity.product_name ||
-                          (!activity.product_id &&
-                          activity.quantity > 1 &&
-                          (activity.inventory_action === 'MOVE' ||
-                            activity.inventory_action === 'DONATED' ||
-                            activity.inventory_action === 'DISCARD')
-                            ? 'Entire Pallet'
-                            : 'Unknown item')}
+                        {getProductDisplayName(activity)}
                       </TableCell>
                       <TableCell sx={activitiesStyles.tableCell}>
                         {formatAction(activity)}
+                        {activity.is_grouped_operation && activity.grouped_batch_count > 1 && (
+                          <div style={{ color: '#666', fontSize: '0.85em' }}>
+                            Combined {activity.grouped_batch_count} batches
+                          </div>
+                        )}
                       </TableCell>
                       <TableCell sx={activitiesStyles.tableCell} align="right">
                         {isPalletOperation(activity) && (
@@ -377,8 +404,8 @@ export default function Activities() {
                         <IconButton
                           sx={activitiesStyles.actionButton}
                           onClick={() => handleUndoClick(activity)}
-                          disabled={undoingId === activity.id}
-                          aria-label={`Undo ${activity.inventory_action} for ${activity.product_name}`}
+                          disabled={undoingId === activity.id || activity.is_grouped_operation}
+                          aria-label={`Undo ${activity.inventory_action} for ${getProductDisplayName(activity)}`}
                         >
                           {undoingId === activity.id ? (
                             <CircularProgress size={20} />
@@ -394,20 +421,21 @@ export default function Activities() {
                         {(activity.inventory_action === 'ADD' ||
                           activity.inventory_action === 'MOVE' ||
                           activity.inventory_action === 'DONATED' ||
-                          activity.inventory_action === 'DISCARD') && (
-                          <IconButton
-                            sx={activitiesStyles.actionButton}
-                            onClick={() => handleEditClick(activity)}
-                            aria-label={`Edit ${activity.inventory_action} for ${activity.product_name}`}
-                          >
-                            <Box
-                              component="img"
-                              src={modifyPen}
-                              alt="Edit"
-                              sx={activitiesStyles.actionIcon}
-                            />
-                          </IconButton>
-                        )}
+                          activity.inventory_action === 'DISCARD') &&
+                          !activity.is_grouped_operation && (
+                            <IconButton
+                              sx={activitiesStyles.actionButton}
+                              onClick={() => handleEditClick(activity)}
+                              aria-label={`Edit ${activity.inventory_action} for ${getProductDisplayName(activity)}`}
+                            >
+                              <Box
+                                component="img"
+                                src={modifyPen}
+                                alt="Edit"
+                                sx={activitiesStyles.actionIcon}
+                              />
+                            </IconButton>
+                          )}
                       </TableCell>
                     </TableRow>
                   ))
