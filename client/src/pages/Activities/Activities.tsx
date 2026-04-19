@@ -371,7 +371,16 @@ export default function Activities() {
                           sx={activitiesStyles.actionButton}
                           onClick={() => handleUndoClick(activity)}
                           disabled={undoingId === activity.id || activity.is_grouped_operation}
-                          aria-label={`Undo ${activity.inventory_action} for ${activity.product_name}`}
+                          aria-label={`Undo ${activity.inventory_action} for ${
+                            activity.product_name ||
+                            (!activity.product_id &&
+                            activity.quantity > 1 &&
+                            (activity.inventory_action === 'MOVE' ||
+                              activity.inventory_action === 'DONATED' ||
+                              activity.inventory_action === 'DISCARD')
+                              ? 'Entire Pallet'
+                              : 'Unknown item')
+                          }`}
                         >
                           {undoingId === activity.id ? (
                             <CircularProgress size={20} />
@@ -392,7 +401,16 @@ export default function Activities() {
                             <IconButton
                               sx={activitiesStyles.actionButton}
                               onClick={() => handleEditClick(activity)}
-                              aria-label={`Edit ${activity.inventory_action} for ${activity.product_name}`}
+                              aria-label={`Edit ${activity.inventory_action} for ${
+                                activity.product_name ||
+                                (!activity.product_id &&
+                                activity.quantity > 1 &&
+                                (activity.inventory_action === 'MOVE' ||
+                                  activity.inventory_action === 'DONATED' ||
+                                  activity.inventory_action === 'DISCARD')
+                                  ? 'Entire Pallet'
+                                  : 'Unknown item')
+                              }`}
                             >
                               <Box
                                 component="img"
