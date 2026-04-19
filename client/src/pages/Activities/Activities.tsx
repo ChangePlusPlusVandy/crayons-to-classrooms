@@ -32,6 +32,20 @@ import { EditRemoveDialog } from '../../components/EditRemoveDialog/EditRemoveDi
 
 const PAGE_SIZE = 10;
 
+function getProductDisplayName(activity: ActivityDisplay): string {
+  if (activity.product_name) return activity.product_name;
+  if (
+    !activity.product_id &&
+    activity.quantity > 1 &&
+    (activity.inventory_action === 'MOVE' ||
+      activity.inventory_action === 'DONATED' ||
+      activity.inventory_action === 'DISCARD')
+  ) {
+    return 'Entire Pallet';
+  }
+  return 'Unknown item';
+}
+
 export default function Activities() {
   const [activities, setActivities] = useState<ActivityDisplay[]>([]);
   const [page, setPage] = useState(1);
@@ -349,14 +363,7 @@ export default function Activities() {
                         {activity.user_name ?? activity.user_email ?? 'Unknown User'}
                       </TableCell>
                       <TableCell sx={activitiesStyles.tableCell}>
-                        {activity.product_name ||
-                          (!activity.product_id &&
-                          activity.quantity > 1 &&
-                          (activity.inventory_action === 'MOVE' ||
-                            activity.inventory_action === 'DONATED' ||
-                            activity.inventory_action === 'DISCARD')
-                            ? 'Entire Pallet'
-                            : 'Unknown item')}
+                        {getProductDisplayName(activity)}
                       </TableCell>
                       <TableCell sx={activitiesStyles.tableCell}>
                         {formatAction(activity)}
@@ -371,16 +378,7 @@ export default function Activities() {
                           sx={activitiesStyles.actionButton}
                           onClick={() => handleUndoClick(activity)}
                           disabled={undoingId === activity.id || activity.is_grouped_operation}
-                          aria-label={`Undo ${activity.inventory_action} for ${
-                            activity.product_name ||
-                            (!activity.product_id &&
-                            activity.quantity > 1 &&
-                            (activity.inventory_action === 'MOVE' ||
-                              activity.inventory_action === 'DONATED' ||
-                              activity.inventory_action === 'DISCARD')
-                              ? 'Entire Pallet'
-                              : 'Unknown item')
-                          }`}
+                          aria-label={`Undo ${activity.inventory_action} for ${getProductDisplayName(activity)}`}
                         >
                           {undoingId === activity.id ? (
                             <CircularProgress size={20} />
@@ -401,16 +399,7 @@ export default function Activities() {
                             <IconButton
                               sx={activitiesStyles.actionButton}
                               onClick={() => handleEditClick(activity)}
-                              aria-label={`Edit ${activity.inventory_action} for ${
-                                activity.product_name ||
-                                (!activity.product_id &&
-                                activity.quantity > 1 &&
-                                (activity.inventory_action === 'MOVE' ||
-                                  activity.inventory_action === 'DONATED' ||
-                                  activity.inventory_action === 'DISCARD')
-                                  ? 'Entire Pallet'
-                                  : 'Unknown item')
-                              }`}
+                              aria-label={`Edit ${activity.inventory_action} for ${getProductDisplayName(activity)}`}
                             >
                               <Box
                                 component="img"
