@@ -89,13 +89,13 @@ export async function getAllMovementsDetailed(req: Request, res: Response): Prom
         `WITH parsed AS (
            SELECT
              im.*,
-             substring(im.note FROM '\\[BULK_OP:([A-Za-z0-9-]+);BATCH:[0-9]+/[0-9]+\\]') AS bulk_operation_id,
+             substring(im.note FROM '\\[BULK_OP:([A-Za-z0-9-]+);BATCH:[0-9]+/[0-9]+\\]$') AS bulk_operation_id,
              NULLIF(
                trim(
                  regexp_replace(
                    COALESCE(im.note, ''),
-                   '\\s*\\[BULK_OP:[A-Za-z0-9-]+;BATCH:[0-9]+/[0-9]+\\]\\s*',
-                   ' ',
+                   '\\s*\\[BULK_OP:[A-Za-z0-9-]+;BATCH:[0-9]+/[0-9]+\\]$',
+                   '',
                    'g'
                  )
                ),
@@ -198,7 +198,7 @@ export async function getAllMovementsDetailed(req: Request, res: Response): Prom
         `WITH parsed AS (
            SELECT
              im.id,
-             substring(im.note FROM '\\[BULK_OP:([A-Za-z0-9-]+);BATCH:[0-9]+/[0-9]+\\]') AS bulk_operation_id
+             substring(im.note FROM '\\[BULK_OP:([A-Za-z0-9-]+);BATCH:[0-9]+/[0-9]+\\]$') AS bulk_operation_id
            FROM "inventory movement" im
          )
          SELECT COUNT(*)
