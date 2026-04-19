@@ -1017,6 +1017,12 @@ export const moveItemsWithMovement = async (req: Request, res: Response) => {
 
     const createdMovement = await createInventoryMovementCore(fullMovementData, client);
 
+    const movedItemIds = updateResult.rows.map((r: { id: string }) => r.id);
+    await client.query(
+      'UPDATE "inventory movement" SET item_ids = $1::uuid[] WHERE id = $2',
+      [movedItemIds, createdMovement.id]
+    );
+
     await client.query('COMMIT');
 
     res.status(201).json({ updatedCount: updateResult.rowCount, movement: createdMovement });
@@ -1148,6 +1154,12 @@ export const removeItemsWithMovement = async (req: Request, res: Response) => {
 
     // skipStockSync = true because the loop above already decremented stock per item name (correctly handles multi-type pallets)
     const createdMovement = await createInventoryMovementCore(fullMovementData, client, true);
+
+    const removedItemIds = updateResult.rows.map((r: { id: string }) => r.id);
+    await client.query(
+      'UPDATE "inventory movement" SET item_ids = $1::uuid[] WHERE id = $2',
+      [removedItemIds, createdMovement.id]
+    );
 
     await client.query('COMMIT');
 
@@ -1712,5 +1724,63 @@ export const undoInventoryMovement = async (req: Request, res: Response) => {
     res.status(500).json({ error: 'Internal server error' });
   } finally {
     client.release();
+  }
+};
+
+/**
+ * Returns a grouped item summary for a pallet movement by joining item_ids back to the items table.
+ * Groups by item name + category and sums quantity.
+ * Returns [] for movements that have no item_ids (pre-feature or non-pallet operations).
+ *
+ * GET /api/inventory-movement/:id/pallet-items
+ */
+export const getPalletMovementItems = async (req: Request, res: Response) => {
+  let id: string;
+  try {
+    ({ id } = movementIdParamSchema.parse(req.params));
+  } catch (error) {
+    if (error instanceof ZodError) {
+      return handleValidationError(error, res);
+    }
+    return res.status(400).json({ error: 'Invalid request params' });
+  }
+
+  try {
+    const movementCheck = await pool.query(
+      'SELECT id FROM "inventory movement" WHERE id = $1',
+      [id]
+    );
+    if (movementCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Inventory movement not found' });
+    }
+
+    const result = await pool.query(
+      `WITH target AS (
+         SELECT
+           substring(note FROM '\\[BULK_OP:([A-Za-z0-9-]+);BATCH:[0-9]+/[0-9]+\\]$') AS bulk_op_id
+         FROM "inventory movement"
+         WHERE id = $1
+       ),
+       related AS (
+         SELECT im.item_ids
+         FROM "inventory movement" im, target t
+         WHERE
+           (t.bulk_op_id IS NOT NULL
+            AND substring(im.note FROM '\\[BULK_OP:([A-Za-z0-9-]+);BATCH:[0-9]+/[0-9]+\\]$') = t.bulk_op_id)
+           OR (t.bulk_op_id IS NULL AND im.id = $1)
+       )
+       SELECT
+         i.name,
+         SUM(i.quantity)::int AS total_quantity
+       FROM related r
+       JOIN items i ON i.id = ANY(r.item_ids)
+       GROUP BY i.name
+       ORDER BY i.name ASC`,
+      [id]
+    );
+    res.json({ items: result.rows });
+  } catch (error) {
+    console.error('Error fetching pallet movement items:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
