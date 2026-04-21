@@ -1,6 +1,10 @@
 import { useState } from 'react';
-import { Container, Typography, Paper, Alert } from '@mui/material';
-import { getItemsByLocation, moveItemsWithMovement } from '../../api/moveItem';
+import { Container, Typography, Paper, Alert, Box, LinearProgress } from '@mui/material';
+import {
+  BulkOperationProgress,
+  getItemsByLocation,
+  moveItemsWithMovement,
+} from '../../api/moveItem';
 import MoveItemForm, { MoveItemFormData } from '../../components/MoveItemForm/MoveItemForm';
 import PalletMoveForm, { PalletMoveFormData } from '../../components/PalletMoveForm/PalletMoveForm';
 import FormModeToggle, { FormMode } from '../../components/FormModeToggle/FormModeToggle';
@@ -11,6 +15,7 @@ export default function MoveItem() {
   const [success, setSuccess] = useState('');
   const [formKey, setFormKey] = useState(0);
   const [mode, setMode] = useState<FormMode>('individual');
+  const [bulkProgress, setBulkProgress] = useState<BulkOperationProgress | null>(null);
 
   const handleSubmit = async (data: MoveItemFormData) => {
     const { sourceSlot, itemGroup, destinationLocationId, quantity, notes } = data;
@@ -46,6 +51,7 @@ export default function MoveItem() {
           performed_by: user!.id,
           note: notes || undefined,
         },
+        onProgress: (progress) => setBulkProgress(progress),
       });
 
       setSuccess(`${quantity} item${quantity > 1 ? 's' : ''} moved successfully!`);
@@ -57,6 +63,8 @@ export default function MoveItem() {
           ? `Failed to move item. ${err.message}`
           : 'Failed to move item. Please check the inventory and try again.';
       setError(errorMessage);
+    } finally {
+      setBulkProgress(null);
     }
   };
 
@@ -84,6 +92,7 @@ export default function MoveItem() {
           performed_by: user!.id,
           note: notes || undefined,
         },
+        onProgress: (progress) => setBulkProgress(progress),
       });
 
       setSuccess(
@@ -97,6 +106,8 @@ export default function MoveItem() {
           ? `Failed to move pallet. ${err.message}`
           : 'Failed to move pallet. Please check the inventory and try again.';
       setError(errorMessage);
+    } finally {
+      setBulkProgress(null);
     }
   };
 
@@ -131,6 +142,21 @@ export default function MoveItem() {
         {success && (
           <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess('')}>
             {success}
+          </Alert>
+        )}
+
+        {bulkProgress && (
+          <Alert severity="info" sx={{ mb: 2 }}>
+            <Box sx={{ mb: 1, fontWeight: 500 }}>
+              Moving items: {bulkProgress.processedItems}/{bulkProgress.totalItems}
+            </Box>
+            <LinearProgress
+              variant="determinate"
+              value={(bulkProgress.processedItems / bulkProgress.totalItems) * 100}
+            />
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+              Batch {bulkProgress.batch} of {bulkProgress.totalBatches}
+            </Typography>
           </Alert>
         )}
 
