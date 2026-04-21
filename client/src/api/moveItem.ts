@@ -6,6 +6,44 @@ import { InventoryMovement, InventoryMovementSchema } from '../types/InventoryMo
 import { authFetch } from './authFetch';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
+const BULK_OPERATION_BATCH_SIZE = Math.max(
+  1,
+  Number(process.env.REACT_APP_BULK_OPERATION_BATCH_SIZE || 2000)
+);
+
+export type BulkOperationProgress = {
+  action: 'MOVE' | 'REMOVE';
+  batch: number;
+  totalBatches: number;
+  processedItems: number;
+  totalItems: number;
+};
+
+const BULK_NOTE_MARKER_REGEX = /\s*\[BULK_OP:[^\]]+\]\s*$/;
+
+function sanitizeUserNote(note?: string): string | undefined {
+  if (!note) return undefined;
+  return note.replace(BULK_NOTE_MARKER_REGEX, '').trim() || undefined;
+}
+
+function withBulkNoteMarker(
+  note: string | undefined,
+  operationId: string,
+  batch: number,
+  totalBatches: number
+): string {
+  const marker = `[BULK_OP:${operationId};BATCH:${batch}/${totalBatches}]`;
+  const cleanNote = sanitizeUserNote(note);
+  return cleanNote ? `${cleanNote} ${marker}` : marker;
+}
+
+function chunkIds(ids: string[], chunkSize: number): string[][] {
+  const chunks: string[][] = [];
+  for (let i = 0; i < ids.length; i += chunkSize) {
+    chunks.push(ids.slice(i, i + chunkSize));
+  }
+  return chunks;
+}
 
 export async function getWarehouses(): Promise<Warehouse[]> {
   const response = await authFetch(`${API_BASE_URL}/warehouses`);
@@ -165,16 +203,58 @@ export async function moveItemsWithMovement(payload: {
     performed_by: string;
     note?: string;
   };
+  onProgress?: (progress: BulkOperationProgress) => void;
 }): Promise<{ updatedCount: number; movement: InventoryMovement }> {
-  const response = await authFetch(`${API_BASE_URL}/inventory-movement/with-move`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(payload),
-  });
-  if (!response.ok) throw new Error('Failed to move items');
-  return response.json();
+  const idBatches = chunkIds(payload.item_ids, BULK_OPERATION_BATCH_SIZE);
+  let totalUpdated = 0;
+  let lastMovement: InventoryMovement | null = null;
+  const operationId = crypto.randomUUID();
+
+  for (let i = 0; i < idBatches.length; i += 1) {
+    const batchIds = idBatches[i];
+    const batchPayload = {
+      item_ids: batchIds,
+      movement: {
+        ...payload.movement,
+        quantity: batchIds.length,
+        note: withBulkNoteMarker(payload.movement.note, operationId, i + 1, idBatches.length),
+      },
+    };
+
+    const response = await authFetch(`${API_BASE_URL}/inventory-movement/with-move`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(batchPayload),
+    });
+
+    if (!response.ok) {
+      throw new Error(
+        `Failed to move items in batch ${i + 1}/${idBatches.length} (processed ${totalUpdated}/${payload.item_ids.length}).`
+      );
+    }
+
+    const result = (await response.json()) as { updatedCount: number; movement: InventoryMovement };
+    totalUpdated += result.updatedCount;
+    lastMovement = result.movement;
+    payload.onProgress?.({
+      action: 'MOVE',
+      batch: i + 1,
+      totalBatches: idBatches.length,
+      processedItems: totalUpdated,
+      totalItems: payload.item_ids.length,
+    });
+  }
+
+  if (!lastMovement) {
+    throw new Error('Failed to move items: no movement was created.');
+  }
+
+  return {
+    updatedCount: totalUpdated,
+    movement: lastMovement,
+  };
 }
 
 export async function removeItemsWithMovement(payload: {
@@ -186,12 +266,54 @@ export async function removeItemsWithMovement(payload: {
     performed_by: string;
     note?: string;
   };
+  onProgress?: (progress: BulkOperationProgress) => void;
 }): Promise<{ updatedCount: number; movement: InventoryMovement }> {
-  const response = await authFetch(`${API_BASE_URL}/inventory-movement/with-removal`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
-  if (!response.ok) throw new Error('Failed to remove items');
-  return response.json();
+  const idBatches = chunkIds(payload.item_ids, BULK_OPERATION_BATCH_SIZE);
+  let totalUpdated = 0;
+  let lastMovement: InventoryMovement | null = null;
+  const operationId = crypto.randomUUID();
+
+  for (let i = 0; i < idBatches.length; i += 1) {
+    const batchIds = idBatches[i];
+    const batchPayload = {
+      item_ids: batchIds,
+      movement: {
+        ...payload.movement,
+        quantity: batchIds.length,
+        note: withBulkNoteMarker(payload.movement.note, operationId, i + 1, idBatches.length),
+      },
+    };
+
+    const response = await authFetch(`${API_BASE_URL}/inventory-movement/with-removal`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(batchPayload),
+    });
+
+    if (!response.ok) {
+      throw new Error(
+        `Failed to remove items in batch ${i + 1}/${idBatches.length} (processed ${totalUpdated}/${payload.item_ids.length}).`
+      );
+    }
+
+    const result = (await response.json()) as { updatedCount: number; movement: InventoryMovement };
+    totalUpdated += result.updatedCount;
+    lastMovement = result.movement;
+    payload.onProgress?.({
+      action: 'REMOVE',
+      batch: i + 1,
+      totalBatches: idBatches.length,
+      processedItems: totalUpdated,
+      totalItems: payload.item_ids.length,
+    });
+  }
+
+  if (!lastMovement) {
+    throw new Error('Failed to remove items: no movement was created.');
+  }
+
+  return {
+    updatedCount: totalUpdated,
+    movement: lastMovement,
+  };
 }

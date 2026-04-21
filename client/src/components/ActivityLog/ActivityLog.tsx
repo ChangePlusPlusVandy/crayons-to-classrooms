@@ -18,12 +18,15 @@ import {
 import { useNavigate } from 'react-router-dom';
 import UndoIcon from '@mui/icons-material/Undo';
 import EditIcon from '@mui/icons-material/Edit';
+import VisibilityIcon from '@mui/icons-material/Visibility';
 import { activityLogStyles } from './ActivityLog.styles';
 import { getActivities, ActivityDisplay } from '../../api/activities';
+import { isPalletOperation } from '../../api/palletUtils';
 import { undoInventoryMovement } from '../../api/moveItem';
 import { EditAddDialog } from '../EditAddDialog/EditAddDialog';
 import { EditMoveDialog } from '../EditMoveDialog/EditMoveDialog';
 import { EditRemoveDialog } from '../EditRemoveDialog/EditRemoveDialog';
+import { PalletDetailsDialog } from '../PalletDetailsDialog/PalletDetailsDialog';
 
 const ACTION_COLORS: Record<string, string> = {
   ADD: '#4caf50',
@@ -78,6 +81,21 @@ export default function ActivityLog() {
     open: false,
     activity: null,
   });
+  const [palletDetailsDialog, setPalletDetailsDialog] = useState<{
+    open: boolean;
+    movementId: string;
+    locationName: string | null;
+    action: string;
+  }>({ open: false, movementId: '', locationName: null, action: '' });
+
+  const handleViewPalletDetails = (activity: ActivityDisplay) => {
+    setPalletDetailsDialog({
+      open: true,
+      movementId: activity.id,
+      locationName: activity.from_location_name,
+      action: activity.inventory_action,
+    });
+  };
 
   const fetchActivities = async () => {
     try {
@@ -104,7 +122,12 @@ export default function ActivityLog() {
       return;
     }
 
-    if (activity.inventory_action !== 'MOVE' && activity.inventory_action !== 'ADD' && activity.inventory_action !== 'DONATED' && activity.inventory_action !== 'DISCARD') {
+    if (
+      activity.inventory_action !== 'MOVE' &&
+      activity.inventory_action !== 'ADD' &&
+      activity.inventory_action !== 'DONATED' &&
+      activity.inventory_action !== 'DISCARD'
+    ) {
       setSnackbar({
         open: true,
         message: `Cannot undo ${activity.inventory_action} actions. Only MOVE, ADD, DONATED, and DISCARD can be undone.`,
@@ -199,7 +222,11 @@ export default function ActivityLog() {
                     ? 'Entire Pallet'
                     : 'Unknown item');
                 const isUndoable =
-                  activity.inventory_action === 'MOVE' || activity.inventory_action === 'ADD' || activity.inventory_action === 'DONATED' || activity.inventory_action === 'DISCARD';
+                  (activity.inventory_action === 'MOVE' ||
+                    activity.inventory_action === 'ADD' ||
+                    activity.inventory_action === 'DONATED' ||
+                    activity.inventory_action === 'DISCARD') &&
+                  !activity.is_grouped_operation;
 
                 return (
                   <Box key={activity.id} sx={activityLogStyles.activityItem}>
@@ -226,6 +253,11 @@ export default function ActivityLog() {
                         <Typography variant="caption" color="text.secondary">
                           {activity.performed_at ? formatTimestamp(activity.performed_at) : ''}
                         </Typography>
+                        {activity.is_grouped_operation && activity.grouped_batch_count > 1 && (
+                          <Typography variant="caption" color="text.secondary">
+                            Combined {activity.grouped_batch_count} batches
+                          </Typography>
+                        )}
                       </Box>
                     </Box>
 
@@ -238,6 +270,15 @@ export default function ActivityLog() {
                         flexShrink: 0,
                       }}
                     >
+                      {isPalletOperation(activity) && (
+                        <IconButton
+                          size="small"
+                          aria-label="View pallet contents"
+                          onClick={() => handleViewPalletDetails(activity)}
+                        >
+                          <VisibilityIcon fontSize="small" />
+                        </IconButton>
+                      )}
                       <IconButton
                         size="small"
                         aria-label={`Undo ${activity.inventory_action.toLowerCase()} for ${productName}`}
@@ -253,15 +294,16 @@ export default function ActivityLog() {
                       {(activity.inventory_action === 'ADD' ||
                         activity.inventory_action === 'MOVE' ||
                         activity.inventory_action === 'DONATED' ||
-                        activity.inventory_action === 'DISCARD') && (
-                        <IconButton
-                          size="small"
-                          aria-label={`Edit ${activity.inventory_action.toLowerCase()} for ${productName}`}
-                          onClick={() => handleEditClick(activity)}
-                        >
-                          <EditIcon fontSize="small" />
-                        </IconButton>
-                      )}
+                        activity.inventory_action === 'DISCARD') &&
+                        !activity.is_grouped_operation && (
+                          <IconButton
+                            size="small"
+                            aria-label={`Edit ${activity.inventory_action.toLowerCase()} for ${productName}`}
+                            onClick={() => handleEditClick(activity)}
+                          >
+                            <EditIcon fontSize="small" />
+                          </IconButton>
+                        )}
                     </Box>
                   </Box>
                 );
@@ -350,6 +392,14 @@ export default function ActivityLog() {
           {snackbar.message}
         </Alert>
       </Snackbar>
+
+      <PalletDetailsDialog
+        open={palletDetailsDialog.open}
+        onClose={() => setPalletDetailsDialog((prev) => ({ ...prev, open: false }))}
+        movementId={palletDetailsDialog.movementId}
+        locationName={palletDetailsDialog.locationName}
+        action={palletDetailsDialog.action}
+      />
 
       <Dialog
         open={undoConfirmDialog.open}

@@ -16,8 +16,11 @@ import { requireAuth } from './middleware/auth.js';
 dotenv.config();
 
 const app = express();
+const requestBodyLimit = process.env.REQUEST_BODY_LIMIT || '10mb';
+
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: requestBodyLimit }));
+app.use(express.urlencoded({ limit: requestBodyLimit, extended: true }));
 
 // Health check route
 app.get('/', (_req, res) => {
