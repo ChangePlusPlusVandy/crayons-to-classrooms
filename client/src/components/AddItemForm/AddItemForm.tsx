@@ -443,6 +443,31 @@ export default function AddItemForm({
               placeholder="Enter new item name"
             />
 
+            {/* Value */}
+            <FormControl fullWidth sx={{ mt: 2 }}>
+              <AddItemFormLabel htmlFor="value-input" required>
+                Value
+              </AddItemFormLabel>
+              <TextField
+                id="value-input"
+                type="number"
+                fullWidth
+                value={newItemValue}
+                onChange={(e) => {
+                  const val = parseFloat(e.target.value);
+                  setNewItemValue(isNaN(val) ? '' : val);
+                }}
+                placeholder="Enter item value"
+                error={typeof newItemValue === 'number' && newItemValue < 0}
+                helperText={
+                  typeof newItemValue === 'number' && newItemValue < 0
+                    ? 'Value cannot be negative'
+                    : ''
+                }
+                slotProps={{ htmlInput: { min: 0, step: 0.01 } }}
+              />
+            </FormControl>
+
             {/* Category */}
             <FormControl fullWidth sx={{ mt: 2 }}>
               <AddItemFormLabel htmlFor="category-select">Category</AddItemFormLabel>
@@ -525,31 +550,6 @@ export default function AddItemForm({
                     : ''
                 }
                 slotProps={{ htmlInput: { min: 0, step: 1 } }}
-              />
-            </FormControl>
-
-            {/* Value */}
-            <FormControl fullWidth sx={{ mt: 2 }}>
-              <AddItemFormLabel htmlFor="value-input" required>
-                Value
-              </AddItemFormLabel>
-              <TextField
-                id="value-input"
-                type="number"
-                fullWidth
-                value={newItemValue}
-                onChange={(e) => {
-                  const val = parseFloat(e.target.value);
-                  setNewItemValue(isNaN(val) ? '' : val);
-                }}
-                placeholder="Enter item value"
-                error={typeof newItemValue === 'number' && newItemValue < 0}
-                helperText={
-                  typeof newItemValue === 'number' && newItemValue < 0
-                    ? 'Value cannot be negative'
-                    : ''
-                }
-                slotProps={{ htmlInput: { min: 0, step: 0.01 } }}
               />
             </FormControl>
 
