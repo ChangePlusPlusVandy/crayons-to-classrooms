@@ -12,11 +12,13 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  Chip,
+  Typography,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import { getProducts, getStorageLocations, createProduct } from '../../api/addItem';
 import { createStorageLocation } from '../../api/storageLocation';
-import { getItemInfoAll, ItemInfo } from '../../api/itemInfo';
+import { getItemInfoAll, getItemInfoDetails, ItemInfo } from '../../api/itemInfo';
 import { Warehouse } from '../../types/Warehouse';
 import { StorageLocation } from '../../types/StorageLocation';
 import { Product } from '../../types/Product';
@@ -110,6 +112,11 @@ export default function AddItemForm({
   const [newSlotCode, setNewSlotCode] = useState('');
   const [creatingSlot, setCreatingSlot] = useState(false);
 
+  // Smart slot suggestion states
+  const [existingSlots, setExistingSlots] = useState<string[]>([]);
+  const [showAllSlots, setShowAllSlots] = useState(false);
+  const [loadingExistingSlots, setLoadingExistingSlots] = useState(false);
+
   // UI states
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -142,6 +149,44 @@ export default function AddItemForm({
 
     fetchInitialData();
   }, [initialItemInfoId, initialItemInfo]);
+
+  // Fetch existing slots for the selected item in the selected warehouse
+  useEffect(() => {
+    async function fetchExistingSlots() {
+      // Reset when dependencies change
+      setExistingSlots([]);
+      setShowAllSlots(false);
+
+      // Only fetch if both item and warehouse are selected, and not in new item mode
+      if (!selectedItemInfo || !selectedWarehouse || isNewItemMode) {
+        return;
+      }
+
+      setLoadingExistingSlots(true);
+      try {
+        const details = await getItemInfoDetails(selectedItemInfo.id);
+        const warehouseData = details.warehouse_locations.find(
+          (wl) => wl.warehouse_id === selectedWarehouse.id
+        );
+
+        if (warehouseData) {
+          // Extract unique slot names where this item exists
+          const slots = warehouseData.locations
+            .map((loc) => loc.slot)
+            .filter((slot): slot is string => !!slot);
+          const uniqueSlots = Array.from(new Set(slots));
+          setExistingSlots(uniqueSlots);
+        }
+      } catch (err) {
+        // Silently fail - just show the regular slot picker
+        console.error('Failed to fetch existing slots:', err);
+      } finally {
+        setLoadingExistingSlots(false);
+      }
+    }
+
+    fetchExistingSlots();
+  }, [selectedItemInfo, selectedWarehouse, isNewItemMode]);
 
   const selectableItemInfoList = itemInfoList;
 
@@ -417,6 +462,8 @@ export default function AddItemForm({
         onChange={(newWarehouse) => {
           setSelectedWarehouse(newWarehouse);
           setSelectedSlot(null);
+          setExistingSlots([]);
+          setShowAllSlots(false);
           setError('');
         }}
         label="Warehouse"
@@ -642,6 +689,8 @@ export default function AddItemForm({
               value={selectedItemInfo}
               onChange={(_, newValue) => {
                 setSelectedItemInfo(newValue);
+                setSelectedSlot(null);
+                setShowAllSlots(false);
                 setError('');
               }}
               renderInput={(params) => (
@@ -675,35 +724,111 @@ export default function AddItemForm({
       </FormControl>
 
       {/* Slot Selection */}
-      <SlotSelector
-        value={selectedSlot}
-        onChange={(newSlot) => {
-          setSelectedSlot(newSlot);
-          setError('');
-        }}
-        warehouse={selectedWarehouse}
-        storageLocations={storageLocations}
-        required
-      >
-        <Button
-          startIcon={<AddIcon />}
-          onClick={() => {
-            setError('');
-            setNewSlotCode('');
-            setSlotDialogOpen(true);
-          }}
-          disabled={!selectedWarehouse}
-          sx={{
-            justifyContent: 'flex-start',
-            textTransform: 'none',
-            color: 'primary.main',
-            mt: 0,
-            '&:hover': { backgroundColor: 'transparent' },
-          }}
-        >
-          New Slot
-        </Button>
-      </SlotSelector>
+      {loadingExistingSlots ? (
+        <FormControl fullWidth>
+          <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 500 }}>
+            Slot <span style={{ color: 'error.main' }}>*</span>
+          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, py: 1 }}>
+            <CircularProgress size={16} />
+            <Typography variant="body2" color="text.secondary">
+              Checking existing locations...
+            </Typography>
+          </Box>
+        </FormControl>
+      ) : existingSlots.length > 0 && !showAllSlots ? (
+        <FormControl fullWidth>
+          <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 500 }}>
+            Slot <span style={{ color: 'error.main' }}>*</span>
+          </Typography>
+          <Box
+            sx={{
+              border: '1px solid',
+              borderColor: 'divider',
+              borderRadius: 1,
+              p: 2,
+            }}
+          >
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+              This item exists in:
+            </Typography>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
+              {existingSlots.map((slot) => (
+                <Chip
+                  key={slot}
+                  label={slot}
+                  onClick={() => {
+                    setSelectedSlot(slot);
+                    setError('');
+                  }}
+                  variant={selectedSlot === slot ? 'filled' : 'outlined'}
+                  color={selectedSlot === slot ? 'primary' : 'default'}
+                  sx={{ cursor: 'pointer' }}
+                />
+              ))}
+            </Box>
+            <Button
+              variant="text"
+              onClick={() => setShowAllSlots(true)}
+              sx={{
+                textTransform: 'none',
+                p: 0,
+                minWidth: 'auto',
+                '&:hover': { backgroundColor: 'transparent' },
+              }}
+            >
+              Select Other Location →
+            </Button>
+          </Box>
+        </FormControl>
+      ) : (
+        <>
+          <SlotSelector
+            value={selectedSlot}
+            onChange={(newSlot) => {
+              setSelectedSlot(newSlot);
+              setError('');
+            }}
+            warehouse={selectedWarehouse}
+            storageLocations={storageLocations}
+            required
+          >
+            <Button
+              startIcon={<AddIcon />}
+              onClick={() => {
+                setError('');
+                setNewSlotCode('');
+                setSlotDialogOpen(true);
+              }}
+              disabled={!selectedWarehouse}
+              sx={{
+                justifyContent: 'flex-start',
+                textTransform: 'none',
+                color: 'primary.main',
+                mt: 0,
+                '&:hover': { backgroundColor: 'transparent' },
+              }}
+            >
+              New Slot
+            </Button>
+          </SlotSelector>
+          {existingSlots.length > 0 && showAllSlots && (
+            <Button
+              variant="text"
+              onClick={() => setShowAllSlots(false)}
+              sx={{
+                justifyContent: 'flex-start',
+                textTransform: 'none',
+                p: 0,
+                mt: -2,
+                '&:hover': { backgroundColor: 'transparent' },
+              }}
+            >
+              ← Back to suggestions
+            </Button>
+          )}
+        </>
+      )}
 
       {/* Quantity to Add */}
       <FormControl fullWidth>
