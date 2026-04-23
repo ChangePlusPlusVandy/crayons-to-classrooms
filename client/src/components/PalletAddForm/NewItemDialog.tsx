@@ -172,6 +172,10 @@ export default function NewItemDialog({
       setError('Item name is required.');
       return;
     }
+    if (value === '' || typeof value !== 'number' || value < 0) {
+      setError('Value is required and must be 0 or greater.');
+      return;
+    }
 
     const isPendingSubcategory = subcategoryProduct?.id.startsWith('pending-sub-');
 
@@ -316,7 +320,7 @@ export default function NewItemDialog({
 
             {/* Value */}
             <FormControl fullWidth>
-              <AddItemFormLabel>Value</AddItemFormLabel>
+              <AddItemFormLabel>Value *</AddItemFormLabel>
               <TextField
                 type="number"
                 fullWidth
@@ -325,7 +329,7 @@ export default function NewItemDialog({
                   const val = parseFloat(e.target.value);
                   setValue(isNaN(val) ? '' : val);
                 }}
-                placeholder="Enter item value (optional)"
+                placeholder="Enter item value"
                 size="small"
                 error={value !== '' && typeof value === 'number' && value < 0}
                 helperText={
@@ -389,7 +393,11 @@ export default function NewItemDialog({
         </DialogContent>
         <DialogActions>
           <Button onClick={onClose}>Cancel</Button>
-          <Button onClick={handleConfirm} variant="contained" disabled={!name.trim()}>
+          <Button
+            onClick={handleConfirm}
+            variant="contained"
+            disabled={!name.trim() || value === '' || (typeof value === 'number' && value < 0)}
+          >
             {isEditMode ? 'Update' : 'Confirm'}
           </Button>
         </DialogActions>
