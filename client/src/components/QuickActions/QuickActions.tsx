@@ -19,7 +19,7 @@ export default function QuickActions() {
     },
     {
       icon: <RemoveIcon />,
-      text: 'Remove Item',
+      text: 'Donate Item',
       borderColor: '#dc3545',
       bgColor: '#f8d7da',
       iconColor: '#a71d2a',

@@ -78,7 +78,7 @@ interface RemoveItemFormProps {
 
 const removalActionOptions = [
   { value: 'DONATED' as const, label: 'Donate' },
-  { value: 'DISCARD' as const, label: 'Delete (Defective)' },
+  { value: 'DISCARD' as const, label: 'Discard' },
 ];
 
 export default function RemoveItemForm({
