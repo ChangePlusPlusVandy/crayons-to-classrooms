@@ -13,9 +13,17 @@ export const inventoryStyles = {
     color: 'text.secondary',
     fontSize: { xs: '0.85rem', sm: '1rem' },
   },
-  filterBar: {
+  tabsBar: {
     bgcolor: 'white',
     borderRadius: '12px 12px 0 0',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+    px: { xs: 2, sm: 3.5 },
+    borderBottom: '1px solid #eeeeee',
+    mb: 0,
+  },
+  filterBar: {
+    bgcolor: 'white',
+    borderRadius: 0,
     boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
     p: { xs: 2, sm: 3.5 },
     pb: { xs: 2, sm: 3 },

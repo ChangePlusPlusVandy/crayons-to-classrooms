@@ -70,3 +70,60 @@ export async function deleteStorageLocation(id: string): Promise<void> {
   });
   if (!response.ok) throw new Error('Failed to delete storage location');
 }
+
+export interface LocationCodeBrowseParams {
+  page?: number;
+  limit?: number;
+  search?: string;
+  warehouse?: string;
+  include_empty?: boolean;
+}
+
+export interface LocationCodeBrowseItem {
+  id: string;
+  location_code: string;
+  warehouse_id: string;
+  warehouse_name: string;
+  distinct_items: number;
+  total_units: number;
+  is_empty: boolean;
+}
+
+export interface LocationCodeBrowseResponse {
+  data: LocationCodeBrowseItem[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export interface LocationCodeContents {
+  location_code: string;
+  items: { name: string; total_quantity: number }[];
+}
+
+// GET /api/storage-locations/browse
+export async function browseLocationCodes(
+  params: LocationCodeBrowseParams = {}
+): Promise<LocationCodeBrowseResponse> {
+  const searchParams = new URLSearchParams();
+  if (params.page) searchParams.set('page', String(params.page));
+  if (params.limit) searchParams.set('limit', String(params.limit));
+  if (params.search) searchParams.set('search', params.search);
+  if (params.warehouse) searchParams.set('warehouse', params.warehouse);
+  if (params.include_empty !== undefined) {
+    searchParams.set('include_empty', params.include_empty ? 'true' : 'false');
+  }
+
+  const response = await authFetch(
+    `${API_BASE_URL}/storage-locations/browse?${searchParams.toString()}`
+  );
+  if (!response.ok) throw new Error('Failed to fetch location codes');
+  return response.json();
+}
+
+// GET /api/storage-locations/:id/contents
+export async function getLocationCodeContents(id: string): Promise<LocationCodeContents> {
+  const response = await authFetch(`${API_BASE_URL}/storage-locations/${id}/contents`);
+  if (!response.ok) throw new Error('Failed to fetch location contents');
+  return response.json();
+}

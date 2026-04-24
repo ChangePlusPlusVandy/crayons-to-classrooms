@@ -8,6 +8,7 @@ import {
   CreateStorageLocationInput,
   UpdateStorageLocationInput,
   slotParamSchema,
+  locationCodeBrowseQuerySchema,
 } from '../utils/storageLocationModel.js';
 import { ZodError } from 'zod';
 
@@ -223,6 +224,130 @@ export async function deleteStorageLocation(req: Request, res: Response) {
       return handleValidationError(error, res);
     }
     console.error(error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+}
+
+// GET paginated, filterable list of location codes with per-location stock aggregation
+export async function browseLocationCodes(req: Request, res: Response) {
+  try {
+    const { page, limit, search, warehouse, include_empty } = locationCodeBrowseQuerySchema.parse(
+      req.query
+    );
+    const offset = (page - 1) * limit;
+
+    const conditions: string[] = ['sl.active = TRUE'];
+    const params: any[] = [];
+    let idx = 1;
+
+    if (warehouse) {
+      conditions.push(`sl.warehouse_id = $${idx++}`);
+      params.push(warehouse);
+    }
+    if (search) {
+      conditions.push(`sl.location_code ILIKE $${idx++}`);
+      params.push(`%${search}%`);
+    }
+
+    const whereClause = `WHERE ${conditions.join(' AND ')}`;
+    const havingClause = include_empty
+      ? ''
+      : `HAVING COUNT(i.id) FILTER (WHERE i.status = 'active') > 0`;
+
+    const dataQuery = `
+      SELECT
+        sl.id,
+        sl.location_code,
+        w.id   AS warehouse_id,
+        w.name AS warehouse_name,
+        COUNT(DISTINCT i.name) FILTER (WHERE i.status = 'active') AS distinct_items,
+        COALESCE(SUM(i.quantity) FILTER (WHERE i.status = 'active'), 0) AS total_units
+      FROM storage_locations sl
+      LEFT JOIN warehouse w ON sl.warehouse_id = w.id
+      LEFT JOIN items i     ON sl.id = i.current_location_id::uuid
+      ${whereClause}
+      GROUP BY sl.id, sl.location_code, w.id, w.name
+      ${havingClause}
+      ORDER BY sl.location_code ASC
+      LIMIT $${idx++} OFFSET $${idx++};
+    `;
+
+    const countQuery = `
+      SELECT COUNT(*)::int AS count FROM (
+        SELECT sl.id
+        FROM storage_locations sl
+        LEFT JOIN items i ON sl.id = i.current_location_id::uuid
+        ${whereClause}
+        GROUP BY sl.id
+        ${havingClause}
+      ) AS sub;
+    `;
+
+    const [dataResult, countResult] = await Promise.all([
+      pool.query(dataQuery, [...params, limit, offset]),
+      pool.query(countQuery, params),
+    ]);
+
+    const data = dataResult.rows.map((row: any) => {
+      const distinct_items = parseInt(row.distinct_items, 10) || 0;
+      const total_units = parseInt(row.total_units, 10) || 0;
+      return {
+        id: row.id,
+        location_code: row.location_code,
+        warehouse_id: row.warehouse_id,
+        warehouse_name: row.warehouse_name,
+        distinct_items,
+        total_units,
+        is_empty: distinct_items === 0,
+      };
+    });
+
+    const total = parseInt(countResult.rows[0]?.count ?? '0', 10);
+
+    res.json({ data, total, page, limit });
+  } catch (error) {
+    if (error instanceof ZodError) {
+      return handleValidationError(error, res);
+    }
+    console.error('Error browsing location codes:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+}
+
+// GET items currently at a given location
+export async function getLocationCodeContents(req: Request, res: Response) {
+  try {
+    const { id } = storageLocationIdParamSchema.parse(req.params);
+
+    const locationResult = await pool.query(
+      'SELECT location_code FROM storage_locations WHERE id = $1',
+      [id]
+    );
+    if (locationResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Not found' });
+    }
+
+    const itemsResult = await pool.query(
+      `SELECT name, SUM(quantity)::int AS total_quantity
+       FROM items
+       WHERE current_location_id::uuid = $1 AND status = 'active'
+       GROUP BY name
+       ORDER BY name ASC`,
+      [id]
+    );
+
+    res.json({
+      location_code: locationResult.rows[0].location_code,
+      items: itemsResult.rows.map((row: any) => ({
+        name: row.name,
+        total_quantity: parseInt(row.total_quantity, 10) || 0,
+      })),
+    });
+  } catch (error) {
+    if (error instanceof ZodError) {
+      return handleValidationError(error, res);
+    }
+    console.error('Error fetching location contents:', error);
     res.status(500).json({ error: 'Internal Server Error' });
   }
 }
