@@ -40,7 +40,12 @@ interface ItemsTabProps {
   onWarehouseChange: (value: string) => void;
 }
 
-export function ItemsTab({ active, warehouseFilter, warehouses, onWarehouseChange }: ItemsTabProps) {
+export function ItemsTab({
+  active,
+  warehouseFilter,
+  warehouses,
+  onWarehouseChange,
+}: ItemsTabProps) {
   const navigate = useNavigate();
 
   const [items, setItems] = useState<ItemInfoBrowseItem[]>([]);

@@ -15,10 +15,7 @@ import {
   Box,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
-import {
-  getLocationCodeContents,
-  LocationCodeContents,
-} from '../../api/storageLocation';
+import { getLocationCodeContents, LocationCodeContents } from '../../api/storageLocation';
 
 interface LocationCodeDetailsDialogProps {
   open: boolean;

@@ -24,10 +24,7 @@ import { getItemInfoAll, ItemInfo } from '../../api/itemInfo';
 import { Warehouse } from '../../types/Warehouse';
 import { StorageLocation } from '../../types/StorageLocation';
 import { Product } from '../../types/Product';
-import {
-  AddItemFormLabel,
-  ProductNameText,
-} from '../AddItemForm/AddItemForm.styles';
+import { AddItemFormLabel, ProductNameText } from '../AddItemForm/AddItemForm.styles';
 import { WarehouseSelector } from '../WarehouseSelector/WarehouseSelector';
 import { SlotSelector } from '../SlotSelector/SlotSelector';
 import NewItemDialog from './NewItemDialog';

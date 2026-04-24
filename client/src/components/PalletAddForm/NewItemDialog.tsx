@@ -366,7 +366,11 @@ export default function NewItemDialog({
                 value={fixture}
                 onChange={(_, newValue) => setFixture(newValue)}
                 renderInput={(params) => (
-                  <TextField {...params} placeholder="Select or add a fixture (optional)" size="small" />
+                  <TextField
+                    {...params}
+                    placeholder="Select or add a fixture (optional)"
+                    size="small"
+                  />
                 )}
                 size="small"
               />
@@ -384,7 +388,6 @@ export default function NewItemDialog({
                 New Fixture
               </Button>
             </FormControl>
-
           </Stack>
         </DialogContent>
         <DialogActions>

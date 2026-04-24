@@ -236,7 +236,9 @@ export default function PalletMoveForm({
       />
 
       <FormControl fullWidth disabled={!selectedWarehouse}>
-        <MoveItemFormLabel htmlFor="pallet-source-slot-select" required>Source Slot</MoveItemFormLabel>
+        <MoveItemFormLabel htmlFor="pallet-source-slot-select" required>
+          Source Slot
+        </MoveItemFormLabel>
         <Autocomplete
           id="pallet-source-slot-select"
           options={warehouseLocations}

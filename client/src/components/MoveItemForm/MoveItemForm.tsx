@@ -16,7 +16,12 @@ import {
 } from '@mui/material';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import AddIcon from '@mui/icons-material/Add';
-import { getStorageLocations, getItemsByLocation, getItemsByWarehouse, groupItemsByLocation } from '../../api/moveItem';
+import {
+  getStorageLocations,
+  getItemsByLocation,
+  getItemsByWarehouse,
+  groupItemsByLocation,
+} from '../../api/moveItem';
 import { createStorageLocation } from '../../api/storageLocation';
 import { Warehouse } from '../../types/Warehouse';
 import { StorageLocation } from '../../types/StorageLocation';
@@ -474,7 +479,9 @@ export default function MoveItemForm({
       </FormControl>
 
       <FormControl fullWidth disabled={!selectedSourceSlot}>
-        <MoveItemFormLabel htmlFor="item-in-slot-select" required>Item in Source Slot</MoveItemFormLabel>
+        <MoveItemFormLabel htmlFor="item-in-slot-select" required>
+          Item in Source Slot
+        </MoveItemFormLabel>
         <Autocomplete
           id="item-in-slot-select"
           options={itemGroupsInSourceSlot}
@@ -514,7 +521,9 @@ export default function MoveItemForm({
         disabled={!selectedItemGroup}
         error={selectedItemGroup ? !isQuantityValid() : false}
       >
-        <MoveItemFormLabel htmlFor="quantity-input" required>Quantity to Move</MoveItemFormLabel>
+        <MoveItemFormLabel htmlFor="quantity-input" required>
+          Quantity to Move
+        </MoveItemFormLabel>
         <TextField
           id="quantity-input"
           type="number"
