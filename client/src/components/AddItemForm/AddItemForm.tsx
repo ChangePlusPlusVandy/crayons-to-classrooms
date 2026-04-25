@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import {
   TextField,
   Button,
@@ -117,6 +117,7 @@ export default function AddItemForm({
   const [isLastKnownLocation, setIsLastKnownLocation] = useState(false);
   const [showAllSlots, setShowAllSlots] = useState(false);
   const [loadingExistingSlots, setLoadingExistingSlots] = useState(false);
+  const fetchRequestId = useRef(0);
 
   // UI states
   const [loading, setLoading] = useState(true);
@@ -153,6 +154,8 @@ export default function AddItemForm({
 
   // Fetch existing slots for the selected item in the selected warehouse
   useEffect(() => {
+    const currentRequestId = ++fetchRequestId.current;
+
     async function fetchExistingSlots() {
       // Reset when dependencies change
       setExistingSlots([]);
@@ -169,6 +172,10 @@ export default function AddItemForm({
         setLoadingExistingSlots(true);
         try {
           const details = await getItemInfoDetails(selectedItemInfo.id);
+
+          // Guard against race condition - only update if this is still the latest request
+          if (currentRequestId !== fetchRequestId.current) return;
+
           const warehouseData = details.warehouse_locations.find(
             (wl) => wl.warehouse_id === selectedWarehouse.id
           );
@@ -181,9 +188,12 @@ export default function AddItemForm({
             setExistingSlots(uniqueSlots);
           }
         } catch (err) {
+          if (currentRequestId !== fetchRequestId.current) return;
           console.error('Failed to fetch existing slots:', err);
         } finally {
-          setLoadingExistingSlots(false);
+          if (currentRequestId === fetchRequestId.current) {
+            setLoadingExistingSlots(false);
+          }
         }
       } else {
         // For out-of-stock items, check if last_known_location_code exists in this warehouse
@@ -479,6 +489,9 @@ export default function AddItemForm({
         onChange={(newWarehouse) => {
           setSelectedWarehouse(newWarehouse);
           setSelectedSlot(null);
+          setExistingSlots([]);
+          setShowAllSlots(false);
+          setIsLastKnownLocation(false);
           setError('');
         }}
         label="Warehouse"
@@ -704,6 +717,10 @@ export default function AddItemForm({
               value={selectedItemInfo}
               onChange={(_, newValue) => {
                 setSelectedItemInfo(newValue);
+                setSelectedSlot(null);
+                setExistingSlots([]);
+                setShowAllSlots(false);
+                setIsLastKnownLocation(false);
                 setError('');
               }}
               renderInput={(params) => (
