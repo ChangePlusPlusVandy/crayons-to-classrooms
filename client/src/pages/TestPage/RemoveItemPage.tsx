@@ -51,7 +51,7 @@ export default function RemoveItemPage() {
 
   const removalActionOptions = [
     { value: 'DONATED' as const, label: 'Donate' },
-    { value: 'DISCARD' as const, label: 'Delete (Defective)' },
+    { value: 'DISCARD' as const, label: 'Discard' },
   ];
   const [removalAction, setRemovalAction] = useState<'DONATED' | 'DISCARD'>('DONATED');
 
