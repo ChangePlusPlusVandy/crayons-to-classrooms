@@ -486,7 +486,11 @@ export default function MoveItemForm({
                 <Box>
                   <Typography fontWeight={500}>{option.name}</Typography>
                   <Typography variant="body2" color="text.secondary">
-                    Quantity: {option.quantity}
+                    Quantity: {option.quantity} | Value:{' '}
+                    {new Intl.NumberFormat('en-US', {
+                      style: 'currency',
+                      currency: 'USD',
+                    }).format(option.value ?? 0)}
                   </Typography>
                 </Box>
               </li>

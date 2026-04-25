@@ -26,6 +26,8 @@ export type ItemGroup = {
   name: string;
   product_id: string;
   quantity: number; // This is the number of item rows where all the other fields match (same name and location)
+  /** Unit value from item rows in this group (same for a given product at a location) */
+  value: number;
 };
 
 export interface UpdateItemRequest {

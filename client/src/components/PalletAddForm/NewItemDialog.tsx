@@ -172,6 +172,10 @@ export default function NewItemDialog({
       setError('Item name is required.');
       return;
     }
+    if (value === '' || typeof value !== 'number' || value < 0) {
+      setError('Value is required and must be 0 or greater.');
+      return;
+    }
 
     const isPendingSubcategory = subcategoryProduct?.id.startsWith('pending-sub-');
 
@@ -223,6 +227,29 @@ export default function NewItemDialog({
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Enter new item name"
                 size="small"
+              />
+            </FormControl>
+
+            {/* Value */}
+            <FormControl fullWidth>
+              <AddItemFormLabel>Value *</AddItemFormLabel>
+              <TextField
+                type="number"
+                fullWidth
+                value={value}
+                onChange={(e) => {
+                  const val = parseFloat(e.target.value);
+                  setValue(isNaN(val) ? '' : val);
+                }}
+                placeholder="Enter item value"
+                size="small"
+                error={value !== '' && typeof value === 'number' && value < 0}
+                helperText={
+                  value !== '' && typeof value === 'number' && value < 0
+                    ? 'Value cannot be negative'
+                    : ''
+                }
+                slotProps={{ htmlInput: { min: 0, step: 0.01 } }}
               />
             </FormControl>
 
@@ -314,29 +341,6 @@ export default function NewItemDialog({
               />
             </FormControl>
 
-            {/* Value */}
-            <FormControl fullWidth>
-              <AddItemFormLabel>Value</AddItemFormLabel>
-              <TextField
-                type="number"
-                fullWidth
-                value={value}
-                onChange={(e) => {
-                  const val = parseFloat(e.target.value);
-                  setValue(isNaN(val) ? '' : val);
-                }}
-                placeholder="Enter item value (optional)"
-                size="small"
-                error={value !== '' && typeof value === 'number' && value < 0}
-                helperText={
-                  value !== '' && typeof value === 'number' && value < 0
-                    ? 'Value cannot be negative'
-                    : ''
-                }
-                slotProps={{ htmlInput: { min: 0, step: 0.01 } }}
-              />
-            </FormControl>
-
             {/* Pack Size */}
             <FormControl fullWidth>
               <AddItemFormLabel>Pack Size</AddItemFormLabel>
@@ -389,7 +393,11 @@ export default function NewItemDialog({
         </DialogContent>
         <DialogActions>
           <Button onClick={onClose}>Cancel</Button>
-          <Button onClick={handleConfirm} variant="contained" disabled={!name.trim()}>
+          <Button
+            onClick={handleConfirm}
+            variant="contained"
+            disabled={!name.trim() || value === '' || (typeof value === 'number' && value < 0)}
+          >
             {isEditMode ? 'Update' : 'Confirm'}
           </Button>
         </DialogActions>

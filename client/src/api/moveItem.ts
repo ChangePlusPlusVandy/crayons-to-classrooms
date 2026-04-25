@@ -167,6 +167,7 @@ export function groupItemsByLocation(items: Item[]): ItemGroup[] {
         name: item.name ?? 'Unknown',
         product_id: item.product_id,
         quantity: 1,
+        value: item.value ?? 0,
       });
     }
   });
