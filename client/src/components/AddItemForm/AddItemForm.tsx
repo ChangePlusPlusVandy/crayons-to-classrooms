@@ -114,6 +114,7 @@ export default function AddItemForm({
 
   // Smart slot suggestion states
   const [existingSlots, setExistingSlots] = useState<string[]>([]);
+  const [isLastKnownLocation, setIsLastKnownLocation] = useState(false);
   const [showAllSlots, setShowAllSlots] = useState(false);
   const [loadingExistingSlots, setLoadingExistingSlots] = useState(false);
 
@@ -156,37 +157,53 @@ export default function AddItemForm({
       // Reset when dependencies change
       setExistingSlots([]);
       setShowAllSlots(false);
+      setIsLastKnownLocation(false);
 
       // Only fetch if both item and warehouse are selected, and not in new item mode
       if (!selectedItemInfo || !selectedWarehouse || isNewItemMode) {
         return;
       }
 
-      setLoadingExistingSlots(true);
-      try {
-        const details = await getItemInfoDetails(selectedItemInfo.id);
-        const warehouseData = details.warehouse_locations.find(
-          (wl) => wl.warehouse_id === selectedWarehouse.id
-        );
+      // For items with stock, fetch existing locations from API
+      if (selectedItemInfo.stock > 0) {
+        setLoadingExistingSlots(true);
+        try {
+          const details = await getItemInfoDetails(selectedItemInfo.id);
+          const warehouseData = details.warehouse_locations.find(
+            (wl) => wl.warehouse_id === selectedWarehouse.id
+          );
 
-        if (warehouseData) {
-          // Extract unique slot names where this item exists
-          const slots = warehouseData.locations
-            .map((loc) => loc.slot)
-            .filter((slot): slot is string => !!slot);
-          const uniqueSlots = Array.from(new Set(slots));
-          setExistingSlots(uniqueSlots);
+          if (warehouseData) {
+            const slots = warehouseData.locations
+              .map((loc) => loc.slot)
+              .filter((slot): slot is string => !!slot);
+            const uniqueSlots = Array.from(new Set(slots));
+            setExistingSlots(uniqueSlots);
+          }
+        } catch (err) {
+          console.error('Failed to fetch existing slots:', err);
+        } finally {
+          setLoadingExistingSlots(false);
         }
-      } catch (err) {
-        // Silently fail - just show the regular slot picker
-        console.error('Failed to fetch existing slots:', err);
-      } finally {
-        setLoadingExistingSlots(false);
+      } else {
+        // For out-of-stock items, check if last_known_location_code exists in this warehouse
+        const lastKnownCode = selectedItemInfo.last_known_location_code;
+        if (lastKnownCode) {
+          const matchingLocation = storageLocations.find(
+            (loc) =>
+              loc.warehouse_id === selectedWarehouse.id &&
+              (loc.slot === lastKnownCode || loc.location_code === lastKnownCode)
+          );
+          if (matchingLocation?.slot) {
+            setExistingSlots([matchingLocation.slot]);
+            setIsLastKnownLocation(true);
+          }
+        }
       }
     }
 
     fetchExistingSlots();
-  }, [selectedItemInfo, selectedWarehouse, isNewItemMode]);
+  }, [selectedItemInfo, selectedWarehouse, isNewItemMode, storageLocations]);
 
   const selectableItemInfoList = itemInfoList;
 
@@ -462,8 +479,6 @@ export default function AddItemForm({
         onChange={(newWarehouse) => {
           setSelectedWarehouse(newWarehouse);
           setSelectedSlot(null);
-          setExistingSlots([]);
-          setShowAllSlots(false);
           setError('');
         }}
         label="Warehouse"
@@ -689,8 +704,6 @@ export default function AddItemForm({
               value={selectedItemInfo}
               onChange={(_, newValue) => {
                 setSelectedItemInfo(newValue);
-                setSelectedSlot(null);
-                setShowAllSlots(false);
                 setError('');
               }}
               renderInput={(params) => (
@@ -750,7 +763,7 @@ export default function AddItemForm({
             }}
           >
             <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-              This item exists in:
+              {isLastKnownLocation ? 'Item was last stocked in:' : 'This item exists in:'}
             </Typography>
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
               {existingSlots.map((slot) => (
