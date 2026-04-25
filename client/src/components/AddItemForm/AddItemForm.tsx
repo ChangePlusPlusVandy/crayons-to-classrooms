@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import {
   TextField,
   Button,
@@ -12,11 +12,13 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  Chip,
+  Typography,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import { getProducts, getStorageLocations, createProduct } from '../../api/addItem';
 import { createStorageLocation } from '../../api/storageLocation';
-import { getItemInfoAll, ItemInfo } from '../../api/itemInfo';
+import { getItemInfoAll, getItemInfoDetails, ItemInfo } from '../../api/itemInfo';
 import { Warehouse } from '../../types/Warehouse';
 import { StorageLocation } from '../../types/StorageLocation';
 import { Product } from '../../types/Product';
@@ -110,6 +112,13 @@ export default function AddItemForm({
   const [newSlotCode, setNewSlotCode] = useState('');
   const [creatingSlot, setCreatingSlot] = useState(false);
 
+  // Smart slot suggestion states
+  const [existingSlots, setExistingSlots] = useState<string[]>([]);
+  const [isLastKnownLocation, setIsLastKnownLocation] = useState(false);
+  const [showAllSlots, setShowAllSlots] = useState(false);
+  const [loadingExistingSlots, setLoadingExistingSlots] = useState(false);
+  const fetchRequestId = useRef(0);
+
   // UI states
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -142,6 +151,69 @@ export default function AddItemForm({
 
     fetchInitialData();
   }, [initialItemInfoId, initialItemInfo]);
+
+  // Fetch existing slots for the selected item in the selected warehouse
+  useEffect(() => {
+    const currentRequestId = ++fetchRequestId.current;
+
+    async function fetchExistingSlots() {
+      // Reset when dependencies change
+      setExistingSlots([]);
+      setShowAllSlots(false);
+      setIsLastKnownLocation(false);
+
+      // Only fetch if both item and warehouse are selected, and not in new item mode
+      if (!selectedItemInfo || !selectedWarehouse || isNewItemMode) {
+        return;
+      }
+
+      // For items with stock, fetch existing locations from API
+      if (selectedItemInfo.stock > 0) {
+        setLoadingExistingSlots(true);
+        try {
+          const details = await getItemInfoDetails(selectedItemInfo.id);
+
+          // Guard against race condition - only update if this is still the latest request
+          if (currentRequestId !== fetchRequestId.current) return;
+
+          const warehouseData = details.warehouse_locations.find(
+            (wl) => wl.warehouse_id === selectedWarehouse.id
+          );
+
+          if (warehouseData) {
+            const slots = warehouseData.locations
+              .map((loc) => loc.slot)
+              .filter((slot): slot is string => !!slot);
+            const uniqueSlots = Array.from(new Set(slots));
+            setExistingSlots(uniqueSlots);
+          }
+        } catch (err) {
+          if (currentRequestId !== fetchRequestId.current) return;
+          console.error('Failed to fetch existing slots:', err);
+        } finally {
+          if (currentRequestId === fetchRequestId.current) {
+            setLoadingExistingSlots(false);
+          }
+        }
+      } else {
+        // For out-of-stock items, check if last_known_location_code exists in this warehouse
+        const lastKnownCode = selectedItemInfo.last_known_location_code;
+        if (lastKnownCode) {
+          const matchingLocation = storageLocations.find(
+            (loc) =>
+              loc.warehouse_id === selectedWarehouse.id &&
+              (loc.slot === lastKnownCode || loc.location_code === lastKnownCode)
+          );
+          if (matchingLocation?.slot) {
+            setExistingSlots([matchingLocation.slot]);
+            setIsLastKnownLocation(true);
+          }
+        }
+      }
+    }
+
+    fetchExistingSlots();
+  }, [selectedItemInfo, selectedWarehouse, isNewItemMode, storageLocations]);
 
   const selectableItemInfoList = itemInfoList;
 
@@ -422,6 +494,9 @@ export default function AddItemForm({
         onChange={(newWarehouse) => {
           setSelectedWarehouse(newWarehouse);
           setSelectedSlot(null);
+          setExistingSlots([]);
+          setShowAllSlots(false);
+          setIsLastKnownLocation(false);
           setError('');
         }}
         label="Warehouse"
@@ -649,6 +724,10 @@ export default function AddItemForm({
               value={selectedItemInfo}
               onChange={(_, newValue) => {
                 setSelectedItemInfo(newValue);
+                setSelectedSlot(null);
+                setExistingSlots([]);
+                setShowAllSlots(false);
+                setIsLastKnownLocation(false);
                 setError('');
               }}
               renderInput={(params) => (
@@ -682,35 +761,107 @@ export default function AddItemForm({
       </FormControl>
 
       {/* Slot Selection */}
-      <SlotSelector
-        value={selectedSlot}
-        onChange={(newSlot) => {
-          setSelectedSlot(newSlot);
-          setError('');
-        }}
-        warehouse={selectedWarehouse}
-        storageLocations={storageLocations}
-        required
-      >
-        <Button
-          startIcon={<AddIcon />}
-          onClick={() => {
-            setError('');
-            setNewSlotCode('');
-            setSlotDialogOpen(true);
-          }}
-          disabled={!selectedWarehouse}
-          sx={{
-            justifyContent: 'flex-start',
-            textTransform: 'none',
-            color: 'primary.main',
-            mt: 0,
-            '&:hover': { backgroundColor: 'transparent' },
-          }}
-        >
-          New Slot
-        </Button>
-      </SlotSelector>
+      {loadingExistingSlots ? (
+        <FormControl fullWidth>
+          <AddItemFormLabel required>Slot</AddItemFormLabel>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, py: 1 }}>
+            <CircularProgress size={16} />
+            <Typography variant="body2" color="text.secondary">
+              Checking existing locations...
+            </Typography>
+          </Box>
+        </FormControl>
+      ) : existingSlots.length > 0 && !showAllSlots ? (
+        <FormControl fullWidth>
+          <AddItemFormLabel required>Slot</AddItemFormLabel>
+          <Box
+            sx={{
+              border: '1px solid',
+              borderColor: 'divider',
+              borderRadius: 1,
+              p: 2,
+            }}
+          >
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+              {isLastKnownLocation ? 'Item was last stocked in:' : 'This item exists in:'}
+            </Typography>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
+              {existingSlots.map((slot) => (
+                <Chip
+                  key={slot}
+                  label={slot}
+                  onClick={() => {
+                    setSelectedSlot(slot);
+                    setError('');
+                  }}
+                  variant={selectedSlot === slot ? 'filled' : 'outlined'}
+                  color={selectedSlot === slot ? 'primary' : 'default'}
+                  sx={{ cursor: 'pointer' }}
+                />
+              ))}
+            </Box>
+            <Button
+              variant="text"
+              onClick={() => setShowAllSlots(true)}
+              sx={{
+                textTransform: 'none',
+                p: 0,
+                minWidth: 'auto',
+                '&:hover': { backgroundColor: 'transparent' },
+              }}
+            >
+              Select Other Location →
+            </Button>
+          </Box>
+        </FormControl>
+      ) : (
+        <>
+          <SlotSelector
+            value={selectedSlot}
+            onChange={(newSlot) => {
+              setSelectedSlot(newSlot);
+              setError('');
+            }}
+            warehouse={selectedWarehouse}
+            storageLocations={storageLocations}
+            required
+          >
+            <Button
+              startIcon={<AddIcon />}
+              onClick={() => {
+                setError('');
+                setNewSlotCode('');
+                setSlotDialogOpen(true);
+              }}
+              disabled={!selectedWarehouse}
+              sx={{
+                justifyContent: 'flex-start',
+                textTransform: 'none',
+                color: 'primary.main',
+                mt: 0,
+                '&:hover': { backgroundColor: 'transparent' },
+              }}
+            >
+              New Slot
+            </Button>
+          </SlotSelector>
+          {existingSlots.length > 0 && showAllSlots && (
+            <Button
+              variant="text"
+              onClick={() => setShowAllSlots(false)}
+              sx={{
+                justifyContent: 'flex-start',
+                textTransform: 'none',
+                p: 0,
+                mt: -2,
+                '&:hover': { backgroundColor: 'transparent' },
+              }}
+            >
+              ← Back to suggestions
+            </Button>
+          )}
+        </>
+      )}
 
       {/* Quantity to Add */}
       <FormControl fullWidth>

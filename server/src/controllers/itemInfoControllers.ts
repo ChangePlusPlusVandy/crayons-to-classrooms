@@ -269,12 +269,14 @@ export const getItemInfoDetails = async (req: Request, res: Response) => {
          w.id AS warehouse_id,
          w.name AS warehouse_name,
          sl.location_code,
+         sl.slot,
+         sl.aisle,
          COUNT(i.id) AS stock
        FROM items i
        JOIN warehouse w ON i.warehouse::uuid = w.id
        LEFT JOIN storage_locations sl ON i.current_location_id::uuid = sl.id
        WHERE i.name = $1 AND i.status = 'active'
-       GROUP BY w.id, w.name, sl.location_code`,
+       GROUP BY w.id, w.name, sl.location_code, sl.slot, sl.aisle`,
       [itemInfo.name]
     );
 
