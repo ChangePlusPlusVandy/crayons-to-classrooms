@@ -756,9 +756,7 @@ export default function AddItemForm({
       {/* Slot Selection */}
       {loadingExistingSlots ? (
         <FormControl fullWidth>
-          <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 500 }}>
-            Slot <span style={{ color: 'error.main' }}>*</span>
-          </Typography>
+          <AddItemFormLabel required>Slot</AddItemFormLabel>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, py: 1 }}>
             <CircularProgress size={16} />
             <Typography variant="body2" color="text.secondary">
@@ -768,9 +766,7 @@ export default function AddItemForm({
         </FormControl>
       ) : existingSlots.length > 0 && !showAllSlots ? (
         <FormControl fullWidth>
-          <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 500 }}>
-            Slot <span style={{ color: 'error.main' }}>*</span>
-          </Typography>
+          <AddItemFormLabel required>Slot</AddItemFormLabel>
           <Box
             sx={{
               border: '1px solid',
