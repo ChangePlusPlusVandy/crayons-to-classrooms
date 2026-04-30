@@ -48,8 +48,7 @@ export const locationCodeBrowseQuerySchema = z.object({
   warehouse: z.string().uuid().optional(),
   include_empty: z
     .enum(['true', 'false'])
-    .optional()
-    .transform((v) => v === 'true'),
+    .default('false'),
 });
 
 export type CreateStorageLocationInput = z.infer<typeof createStorageLocationSchema>;

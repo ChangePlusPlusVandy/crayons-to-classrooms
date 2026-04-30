@@ -314,8 +314,8 @@ export async function browseLocationCodes(req: Request, res: Response) {
   }
 }
 
-// GET items currently at a given location
-export async function getLocationCodeContents(req: Request, res: Response) {
+// GET items currently at a given location by storage location ID
+export async function getLocationContentsById(req: Request, res: Response) {
   try {
     const { id } = storageLocationIdParamSchema.parse(req.params);
 
