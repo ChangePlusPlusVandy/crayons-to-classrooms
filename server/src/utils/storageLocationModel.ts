@@ -46,9 +46,7 @@ export const locationCodeBrowseQuerySchema = z.object({
   limit: z.coerce.number().int().positive().max(100).default(10),
   search: z.string().optional(),
   warehouse: z.string().uuid().optional(),
-  include_empty: z
-    .enum(['true', 'false'])
-    .default('false'),
+  include_empty: z.enum(['true', 'false']).default('false'),
 });
 
 export type CreateStorageLocationInput = z.infer<typeof createStorageLocationSchema>;
