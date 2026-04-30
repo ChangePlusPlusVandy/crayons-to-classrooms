@@ -1247,9 +1247,9 @@ export const editInventoryMovementMove = async (req: Request, res: Response) => 
 
     await client.query('BEGIN');
 
-    // Validation
+    // Fetch full original movement (need item_ids and from_location_id)
     const original = await client.query(
-      'SELECT inventory_action FROM "inventory movement" WHERE id = $1',
+      'SELECT * FROM "inventory movement" WHERE id = $1',
       [id]
     );
     if (original.rows.length === 0) {
@@ -1259,23 +1259,46 @@ export const editInventoryMovementMove = async (req: Request, res: Response) => 
       throw new InvalidError('Can only edit MOVE type movements with this endpoint');
     }
 
+    const originalMovement = original.rows[0];
+    const savedItemIds: string[] | null = originalMovement.item_ids;
+    const originalFromLocationId = originalMovement.from_location_id;
+
     // Undo the original MOVE (reverses item locations, deletes movement record)
     await undoInventoryMovementCore({ id }, client);
 
-    // Find items at the new source location matching product_id (LIFO order)
-    const itemsAtSource = await client.query(
-      'SELECT id FROM items WHERE product_id = $1 AND current_location_id = $2 ORDER BY created_at DESC LIMIT $3',
-      [moveData.product_id, moveData.from_location_id, moveData.quantity]
-    );
+    let itemIds: string[];
 
-    if (itemsAtSource.rows.length < moveData.quantity) {
-      throw new UndoConflictError(
-        `Not enough items at source location: found ${itemsAtSource.rows.length}, need ${moveData.quantity}`
+    if (savedItemIds && savedItemIds.length > 0) {
+      // Pallet move: use exact item IDs (now back at original source after undo)
+      const itemsAtSource = await client.query(
+        'SELECT id FROM items WHERE id = ANY($1::uuid[]) AND current_location_id = $2',
+        [savedItemIds, originalFromLocationId]
       );
+
+      if (itemsAtSource.rows.length < savedItemIds.length) {
+        throw new UndoConflictError(
+          `Not enough items at source location after undo: found ${itemsAtSource.rows.length}, need ${savedItemIds.length}`
+        );
+      }
+
+      itemIds = savedItemIds;
+    } else {
+      // Single-item move: fall back to product_id lookup (LIFO order)
+      const itemsAtSource = await client.query(
+        'SELECT id FROM items WHERE product_id = $1 AND current_location_id = $2 ORDER BY created_at DESC LIMIT $3',
+        [moveData.product_id, moveData.from_location_id, moveData.quantity]
+      );
+
+      if (itemsAtSource.rows.length < moveData.quantity) {
+        throw new UndoConflictError(
+          `Not enough items at source location: found ${itemsAtSource.rows.length}, need ${moveData.quantity}`
+        );
+      }
+
+      itemIds = itemsAtSource.rows.map((row: { id: string }) => row.id);
     }
 
-    // Move each item to the new destination
-    const itemIds: string[] = itemsAtSource.rows.map((row: { id: string }) => row.id);
+    // Move items to the new destination
     await client.query(
       `UPDATE items
        SET current_location_id = $1::uuid,
@@ -1290,14 +1313,22 @@ export const editInventoryMovementMove = async (req: Request, res: Response) => 
     const fullMovementData: CreateInventoryInput = {
       inventory_action: 'MOVE',
       item_id: representativeItemId,
-      product_id: moveData.product_id,
-      from_location_id: moveData.from_location_id,
+      product_id: savedItemIds ? originalMovement.product_id : moveData.product_id,
+      from_location_id: savedItemIds ? originalFromLocationId : moveData.from_location_id,
       to_location_id: moveData.to_location_id,
-      quantity: moveData.quantity,
+      quantity: itemIds.length,
       performed_by: moveData.performed_by,
       note: moveData.note,
     };
     const createdMovement = await createInventoryMovementCore(fullMovementData, client);
+
+    // Preserve item_ids on the new movement for pallet operations
+    if (savedItemIds && savedItemIds.length > 0) {
+      await client.query(
+        'UPDATE "inventory movement" SET item_ids = $1::uuid[] WHERE id = $2',
+        [savedItemIds, createdMovement.id]
+      );
+    }
 
     await client.query('COMMIT');
 
@@ -1345,7 +1376,131 @@ export const editInventoryMovementRemove = async (req: Request, res: Response) =
 
     const originalMovement = original.rows[0];
 
-    // Compute delta: positive = removing more, negative = removing less
+    // Pallet removal path: when item_ids is populated
+    if (originalMovement.item_ids && originalMovement.item_ids.length > 0) {
+      const locationChanged = originalMovement.from_location_id !== removeData.from_location_id;
+
+      if (locationChanged) {
+        // Location changed: undo original removal, then remove all items from the new location
+        await undoInventoryMovementCore({ id }, client);
+
+        // Find all active items at the new source location
+        const itemsAtNewLocation = await client.query(
+          `SELECT id, name FROM items
+           WHERE current_location_id = $1 AND status = 'active'`,
+          [removeData.from_location_id]
+        );
+
+        if (itemsAtNewLocation.rows.length === 0) {
+          throw new InvalidError('No active items found at the selected location');
+        }
+
+        const newItemIds = itemsAtNewLocation.rows.map((r: { id: string }) => r.id);
+        const newRemovalStatus = removeData.inventory_action === 'DONATED' ? 'donated' : 'defective';
+
+        // Deactivate items at new location
+        await client.query(
+          `UPDATE items
+           SET status = $1, current_location_id = NULL, warehouse = NULL, updated_at = NOW()
+           WHERE id = ANY($2::uuid[])`,
+          [newRemovalStatus, newItemIds]
+        );
+
+        // Sync item_info stock: decrement per item name
+        const countsByName: Record<string, number> = {};
+        for (const row of itemsAtNewLocation.rows) {
+          const name = (row as { name: string }).name;
+          countsByName[name] = (countsByName[name] || 0) + 1;
+        }
+
+        // Look up location code for item_info tracking
+        const fromLocResult = await client.query(
+          'SELECT location_code FROM storage_locations WHERE id = $1',
+          [removeData.from_location_id]
+        );
+        const fromLocationCode = fromLocResult.rows[0]?.location_code ?? null;
+
+        for (const [itemName, count] of Object.entries(countsByName)) {
+          const syncResult = await syncItemInfoStock(
+            itemName,
+            undefined, undefined, undefined, undefined, undefined,
+            false, null, null,
+            -count, false, client
+          );
+          if (syncResult && syncResult.stock === 0 && fromLocationCode) {
+            await syncItemInfoStock(
+              itemName,
+              undefined, undefined, undefined, undefined, undefined,
+              undefined, null, fromLocationCode,
+              0, false, client
+            );
+          }
+        }
+
+        // Create new movement record
+        const representativeItemId = newItemIds[0];
+        const uniqueProductIds = new Set(
+          itemsAtNewLocation.rows.map((r: { product_id?: string }) => r.product_id)
+        );
+        const fullMovementData: CreateInventoryInput = {
+          inventory_action: removeData.inventory_action,
+          item_id: representativeItemId,
+          product_id: uniqueProductIds.size === 1 ? [...uniqueProductIds][0] ?? null : null,
+          from_location_id: removeData.from_location_id,
+          to_location_id: null,
+          quantity: newItemIds.length,
+          performed_by: removeData.performed_by,
+          note: removeData.note,
+        };
+        const createdMovement = await createInventoryMovementCore(fullMovementData, client, true);
+
+        // Store item_ids on the new movement for future undo/edit
+        await client.query(
+          'UPDATE "inventory movement" SET item_ids = $1::uuid[] WHERE id = $2',
+          [newItemIds, createdMovement.id]
+        );
+
+        await client.query('COMMIT');
+        return res.status(201).json({ movement: createdMovement });
+      }
+
+      // Location unchanged: in-place update of action type + note
+      const actionChanged = originalMovement.inventory_action !== removeData.inventory_action;
+
+      if (actionChanged) {
+        // Update item statuses: 'donated' <-> 'defective'
+        const oldStatus =
+          originalMovement.inventory_action === 'DONATED' ? 'donated' : 'defective';
+        const newStatus =
+          removeData.inventory_action === 'DONATED' ? 'donated' : 'defective';
+
+        await client.query(
+          `UPDATE items SET status = $1, updated_at = NOW()
+           WHERE id = ANY($2::uuid[]) AND status = $3`,
+          [newStatus, originalMovement.item_ids, oldStatus]
+        );
+      }
+
+      // Update the movement record (action type + note)
+      await client.query(
+        `UPDATE "inventory movement"
+         SET inventory_action = $1,
+             performed_by     = $2,
+             note             = $3
+         WHERE id = $4`,
+        [removeData.inventory_action, removeData.performed_by, removeData.note ?? null, id]
+      );
+
+      const updatedMovement = await client.query(
+        'SELECT * FROM "inventory movement" WHERE id = $1',
+        [id]
+      );
+
+      await client.query('COMMIT');
+      return res.status(200).json({ movement: updatedMovement.rows[0] });
+    }
+
+    // Single-item removal path: compute delta and adjust item counts
     const oldQty: number = originalMovement.quantity;
     const newQty: number = removeData.quantity;
     const delta = newQty - oldQty;
@@ -1514,14 +1669,27 @@ export const undoInventoryMovementCore = async (
       );
     }
 
-    // Get items at destination with their names for item_info sync
-    const itemsAtDestination = await db.query(
-      'SELECT id, name FROM items WHERE product_id = $1 AND current_location_id = $2 LIMIT $3',
-      [inventoryMovement.product_id, inventoryMovement.to_location_id, inventoryMovement.quantity]
-    );
+    let itemsAtDestination;
+    if (inventoryMovement.item_ids && inventoryMovement.item_ids.length > 0) {
+      // Pallet move: use exact item IDs (handles mixed-product pallets)
+      itemsAtDestination = await db.query(
+        'SELECT id, name FROM items WHERE id = ANY($1::uuid[]) AND current_location_id = $2',
+        [inventoryMovement.item_ids, inventoryMovement.to_location_id]
+      );
 
-    if (itemsAtDestination.rows.length < inventoryMovement.quantity) {
-      throw new UndoConflictError('Cannot undo because item has since been moved');
+      if (itemsAtDestination.rows.length < inventoryMovement.item_ids.length) {
+        throw new UndoConflictError('Cannot undo because some items have since been moved');
+      }
+    } else {
+      // Single-item move: fall back to product_id lookup
+      itemsAtDestination = await db.query(
+        'SELECT id, name FROM items WHERE product_id = $1 AND current_location_id = $2 LIMIT $3',
+        [inventoryMovement.product_id, inventoryMovement.to_location_id, inventoryMovement.quantity]
+      );
+
+      if (itemsAtDestination.rows.length < inventoryMovement.quantity) {
+        throw new UndoConflictError('Cannot undo because item has since been moved');
+      }
     }
 
     // Get from_location details for item_info update
@@ -1640,22 +1808,9 @@ export const undoInventoryMovementCore = async (
       throw new UndoConflictError('Cannot undo: movement has no from_location_id');
     }
 
-    // Get the original item details to recreate
-    const originalItemResult = await db.query(
-      `SELECT name, product_id, quantity, category, item_limit, value, limbo, notes, item_info, warehouse
-       FROM items WHERE id = $1`,
-      [inventoryMovement.item_id]
-    );
-
-    if (originalItemResult.rows.length === 0) {
-      throw new UndoConflictError('Cannot undo: original item not found');
-    }
-
-    const originalItem = originalItemResult.rows[0];
-
     // Get from_location details (warehouse_id)
     const fromLocationResult = await db.query(
-      'SELECT warehouse_id FROM storage_locations WHERE id = $1',
+      'SELECT warehouse_id, location_code, fixture FROM storage_locations WHERE id = $1',
       [inventoryMovement.from_location_id]
     );
 
@@ -1663,28 +1818,100 @@ export const undoInventoryMovementCore = async (
       throw new UndoConflictError('Cannot undo: original location no longer exists');
     }
 
-    const warehouseId = fromLocationResult.rows[0].warehouse_id;
+    const fromLoc = fromLocationResult.rows[0];
+    const warehouseId = fromLoc.warehouse_id;
 
-    // Use createItemCore to add items back (this also handles stock increment)
-    await createItemCore(
-      {
-        name: originalItem.name,
-        product_id: originalItem.product_id,
-        current_location_id: inventoryMovement.from_location_id,
-        quantity: originalItem.quantity,
-        status: 'active',
-        warehouse: warehouseId ?? originalItem.warehouse,
-        category: originalItem.category,
-        item_limit: originalItem.item_limit,
-        value: originalItem.value ?? 0,
-        limbo: originalItem.limbo ?? false,
-        notes: originalItem.notes,
-        item_info: originalItem.item_info,
-        created_by: inventoryMovement.performed_by,
-      },
-      inventoryMovement.quantity,
-      db
-    );
+    if (inventoryMovement.item_ids && inventoryMovement.item_ids.length > 0) {
+      // Pallet removal: reactivate the exact items using item_ids (handles mixed-product pallets)
+      const removalStatus =
+        inventoryMovement.inventory_action === 'DONATED' ? 'donated' : 'defective';
+
+      // Verify all items exist and are in the expected removal status
+      const itemsCheck = await db.query(
+        'SELECT id, name, status FROM items WHERE id = ANY($1::uuid[])',
+        [inventoryMovement.item_ids]
+      );
+
+      if (itemsCheck.rows.length !== inventoryMovement.item_ids.length) {
+        throw new UndoConflictError('Cannot undo: some items no longer exist');
+      }
+
+      const wrongStatus = itemsCheck.rows.filter(
+        (row: { status: string }) => row.status !== removalStatus
+      );
+      if (wrongStatus.length > 0) {
+        throw new UndoConflictError(
+          'Cannot undo: some items are no longer in the expected removal status'
+        );
+      }
+
+      // Reactivate items
+      const reactivateResult = await db.query(
+        `UPDATE items
+         SET status = 'active',
+             current_location_id = $1,
+             warehouse = $2,
+             updated_at = NOW()
+         WHERE id = ANY($3::uuid[])
+         RETURNING name`,
+        [inventoryMovement.from_location_id, warehouseId, inventoryMovement.item_ids]
+      );
+
+      if (reactivateResult.rowCount !== inventoryMovement.item_ids.length) {
+        throw new UndoConflictError('Cannot undo: failed to reactivate all items');
+      }
+
+      // Increment item_info stock grouped by name
+      const countsByName: Record<string, number> = {};
+      for (const row of reactivateResult.rows) {
+        const name = (row as { name: string }).name;
+        countsByName[name] = (countsByName[name] || 0) + 1;
+      }
+
+      for (const [itemName, count] of Object.entries(countsByName)) {
+        await syncItemInfoStock(
+          itemName,
+          undefined, undefined, undefined, undefined, undefined, undefined,
+          fromLoc.fixture ?? null,
+          fromLoc.location_code ?? null,
+          count, // stockDelta - increment by reactivated count
+          false, db
+        );
+      }
+    } else {
+      // Single-item removal: recreate items from representative item data (original behavior)
+      const originalItemResult = await db.query(
+        `SELECT name, product_id, quantity, category, item_limit, value, limbo, notes, item_info, warehouse
+         FROM items WHERE id = $1`,
+        [inventoryMovement.item_id]
+      );
+
+      if (originalItemResult.rows.length === 0) {
+        throw new UndoConflictError('Cannot undo: original item not found');
+      }
+
+      const originalItem = originalItemResult.rows[0];
+
+      await createItemCore(
+        {
+          name: originalItem.name,
+          product_id: originalItem.product_id,
+          current_location_id: inventoryMovement.from_location_id,
+          quantity: originalItem.quantity,
+          status: 'active',
+          warehouse: warehouseId ?? originalItem.warehouse,
+          category: originalItem.category,
+          item_limit: originalItem.item_limit,
+          value: originalItem.value ?? 0,
+          limbo: originalItem.limbo ?? false,
+          notes: originalItem.notes,
+          item_info: originalItem.item_info,
+          created_by: inventoryMovement.performed_by,
+        },
+        inventoryMovement.quantity,
+        db
+      );
+    }
 
     // Delete movement record
     await db.query('DELETE FROM "inventory movement" WHERE id = $1', [id]);

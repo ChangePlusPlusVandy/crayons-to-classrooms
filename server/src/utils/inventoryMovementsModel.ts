@@ -112,7 +112,7 @@ export const createItemWithMovementSchema = z.object({
 export const editMoveSchema = z.object({
   from_location_id: uuidSchema,
   to_location_id: uuidSchema,
-  product_id: uuidSchema,
+  product_id: uuidSchema.nullable().optional(),
   quantity: z.number().int().positive('Quantity must be a positive integer'),
   performed_by: uuidSchema,
   note: z.string().optional(),

@@ -11,6 +11,7 @@ export const InventoryMovementSchema = z.object({
   performed_by: z.string().nullable(),
   note: z.string().nullable().optional(),
   performed_at: z.string(),
+  item_ids: z.array(z.string()).nullable().optional(),
 });
 
 export type InventoryMovement = z.infer<typeof InventoryMovementSchema>;

@@ -28,8 +28,8 @@ import { activitiesStyles } from './Activities.styles';
 import undoArrow from '../../assets/undo_arrow.svg';
 import modifyPen from '../../assets/modify_pen.svg';
 import { EditAddDialog } from '../../components/EditAddDialog/EditAddDialog';
-import { EditMoveDialog } from '../../components/EditMoveDialog/EditMoveDialog';
-import { EditRemoveDialog } from '../../components/EditRemoveDialog/EditRemoveDialog';
+import { EditPalletMoveDialog } from '../../components/EditPalletMoveDialog/EditPalletMoveDialog';
+import { EditPalletRemoveDialog } from '../../components/EditPalletRemoveDialog/EditPalletRemoveDialog';
 import { PalletDetailsDialog } from '../../components/PalletDetailsDialog/PalletDetailsDialog';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 
@@ -459,18 +459,18 @@ export default function Activities() {
         />
       )}
 
-      {editingMovement?.inventory_action === 'MOVE' && editingMovement.product_id && (
-        <EditMoveDialog
+      {editingMovement?.inventory_action === 'MOVE' && (
+        <EditPalletMoveDialog
           open={!!editingMovement}
           onClose={handleEditClose}
-          movement={{ ...editingMovement, product_id: editingMovement.product_id }}
+          movement={editingMovement}
           onSuccess={handleEditSuccess}
         />
       )}
 
       {(editingMovement?.inventory_action === 'DONATED' ||
         editingMovement?.inventory_action === 'DISCARD') && (
-        <EditRemoveDialog
+        <EditPalletRemoveDialog
           open={!!editingMovement}
           onClose={handleEditClose}
           movement={editingMovement}

@@ -31,7 +31,10 @@ function withBulkNoteMarker(
   operationId: string,
   batch: number,
   totalBatches: number
-): string {
+): string | undefined {
+  // Only tag when there are multiple batches — single-batch operations
+  // should not be flagged as grouped so they remain undoable/editable.
+  if (totalBatches <= 1) return sanitizeUserNote(note);
   const marker = `[BULK_OP:${operationId};BATCH:${batch}/${totalBatches}]`;
   const cleanNote = sanitizeUserNote(note);
   return cleanNote ? `${cleanNote} ${marker}` : marker;

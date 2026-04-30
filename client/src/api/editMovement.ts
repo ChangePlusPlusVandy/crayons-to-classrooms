@@ -98,7 +98,7 @@ export async function editMoveMovementTransaction(
   payload: {
     from_location_id: string;
     to_location_id: string;
-    product_id: string;
+    product_id?: string | null;
     quantity: number;
     performed_by: string;
     note?: string;

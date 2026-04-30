@@ -120,6 +120,8 @@ export function EditRemoveDialog({ open, onClose, movement, onSuccess }: EditRem
             onSubmit={handleSubmit}
             onCancel={onClose}
             submitLabel="Save Changes"
+            disableQuantity
+            disableItem
           />
         )}
       </DialogContent>
