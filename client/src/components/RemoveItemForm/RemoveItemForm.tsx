@@ -66,7 +66,7 @@ export interface RemoveItemFormData {
 interface RemoveItemFormProps {
   initialWarehouse: Warehouse | null;
   initialSourceLocation: StorageLocation | null;
-  initialProductId: string;
+  initialItemName: string;
   initialRemovalAction: 'DONATED' | 'DISCARD';
   initialQuantity: number;
   initialNotes: string;
@@ -84,7 +84,7 @@ const removalActionOptions = [
 export default function RemoveItemForm({
   initialWarehouse,
   initialSourceLocation,
-  initialProductId,
+  initialItemName,
   initialRemovalAction,
   initialQuantity,
   initialNotes,
@@ -149,11 +149,9 @@ export default function RemoveItemForm({
         const allLocations = await getCachedStorageLocations();
         const locationMap = new Map(allLocations.map((loc) => [loc.id, loc.location_code]));
 
-        // Group items by item_info_id + location — one dropdown entry per unique combination.
-        // Using item_info_id (not name) prevents merging distinct products that share a display name.
         const groupMap = new Map<string, ItemGroupWithLocation>();
         for (const item of itemsInSelectedWarehouse) {
-          const key = `${item.item_info}|${item.current_location_id}`;
+          const key = `${item.name}|${item.current_location_id}`;
           const locationCode = locationMap.get(item.current_location_id) ?? 'Unknown';
           if (groupMap.has(key)) {
             groupMap.get(key)!.items.push(item);
@@ -172,11 +170,11 @@ export default function RemoveItemForm({
         const options = Array.from(groupMap.values());
         setGroupOptions(options);
 
-        // Pre-select the group matching initialProductId + initialSourceLocation,
+        // Pre-select the group matching initialItemName + initialSourceLocation,
         // falling back to the initialGroup prop (used by edit dialogs when items are inactive)
         if (initialSourceLocation) {
           const match = options.find(
-            (g) => g.locationId === initialSourceLocation.id && g.productId === initialProductId
+            (g) => g.locationId === initialSourceLocation.id && g.name === initialItemName
           );
           setSelectedGroup(match ?? initialGroup ?? null);
         }
@@ -190,7 +188,7 @@ export default function RemoveItemForm({
     itemsInSelectedWarehouse,
     selectedWarehouse,
     initialSourceLocation,
-    initialProductId,
+    initialItemName,
     initialGroup,
   ]);
 
@@ -279,12 +277,10 @@ export default function RemoveItemForm({
             setSelectedGroup(newValue);
             setQuantityToRemove(null);
           }}
-          isOptionEqualToValue={(a, b) =>
-            a.itemInfoId === b.itemInfoId && a.locationId === b.locationId
-          }
+          isOptionEqualToValue={(a, b) => a.name === b.name && a.locationId === b.locationId}
           getOptionLabel={(option) => option.name}
           renderOption={(props, option) => (
-            <li {...props} key={`${option.itemInfoId}|${option.locationId}`}>
+            <li {...props} key={`${option.name}|${option.locationId}`}>
               <Box>
                 <Typography fontWeight={500}>{option.name}</Typography>
                 <Typography variant="body2" color="text.secondary">

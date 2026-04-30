@@ -35,6 +35,7 @@ export function EditRemoveDialog({ open, onClose, movement, onSuccess }: EditRem
   const [fetchError, setFetchError] = useState('');
   const [warehouse, setWarehouse] = useState<Warehouse | null>(null);
   const [sourceLocation, setSourceLocation] = useState<StorageLocation | null>(null);
+  const [itemName, setItemName] = useState('');
   const [initialGroup, setInitialGroup] = useState<ItemGroupWithLocation | undefined>(undefined);
 
   useEffect(() => {
@@ -58,6 +59,7 @@ export function EditRemoveDialog({ open, onClose, movement, onSuccess }: EditRem
 
         setSourceLocation(location);
         setWarehouse(wh);
+        setItemName(item.name);
 
         // Build a virtual group from movement data so the item name pre-populates even when
         // the removed items are inactive (and thus absent from the active items list).
@@ -112,7 +114,7 @@ export function EditRemoveDialog({ open, onClose, movement, onSuccess }: EditRem
           <RemoveItemForm
             initialWarehouse={warehouse}
             initialSourceLocation={sourceLocation}
-            initialProductId={movement.product_id ?? ''}
+            initialItemName={itemName}
             initialRemovalAction={(movement.inventory_action as 'DONATED' | 'DISCARD') ?? 'DONATED'}
             initialQuantity={movement.quantity}
             initialNotes={movement.note || ''}

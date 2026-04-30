@@ -49,7 +49,7 @@ interface MoveItemFormProps {
   initialWarehouse?: Warehouse | null;
   initialDestinationWarehouse?: Warehouse | null;
   initialSourceSlot?: StorageLocation | null;
-  initialProductId?: string | null;
+  initialItemName?: string | null;
   initialDestinationSlot?: string | null;
   initialQuantity?: number;
   initialNotes?: string;
@@ -63,7 +63,7 @@ export default function MoveItemForm({
   initialWarehouse = null,
   initialDestinationWarehouse = null,
   initialSourceSlot = null,
-  initialProductId = null,
+  initialItemName = null,
   initialDestinationSlot = null,
   initialQuantity,
   initialNotes = '',
@@ -94,8 +94,7 @@ export default function MoveItemForm({
   const [newSlotCode, setNewSlotCode] = useState('');
   const [creatingSlot, setCreatingSlot] = useState(false);
 
-  // Track whether we still need to auto-select the item group from initialProductId
-  const [pendingAutoSelect, setPendingAutoSelect] = useState(!!initialProductId);
+  const [pendingAutoSelect, setPendingAutoSelect] = useState(!!initialItemName);
 
   // Fetch storage locations on mount
   useEffect(() => {
@@ -151,9 +150,8 @@ export default function MoveItemForm({
         }
         setItemGroupsInSourceSlot(groups);
 
-        // Auto-select item group if initialProductName is provided
-        if (pendingAutoSelect && initialProductId) {
-          const matchingGroup = groups.find((g) => g.product_id === initialProductId);
+        if (pendingAutoSelect && initialItemName) {
+          const matchingGroup = groups.find((g) => g.name === initialItemName);
           if (matchingGroup) {
             setSelectedItemGroup(matchingGroup);
             if (initialQuantity === undefined) {
@@ -170,7 +168,7 @@ export default function MoveItemForm({
     }
 
     fetchItemsInSlot();
-  }, [selectedSourceSlot, adjustItemGroups, initialProductId, initialQuantity, pendingAutoSelect]);
+  }, [selectedSourceSlot, adjustItemGroups, initialItemName, initialQuantity, pendingAutoSelect]);
 
   // Create location-to-items map for efficient lookup
   const locationItemsMap = useMemo(() => {
