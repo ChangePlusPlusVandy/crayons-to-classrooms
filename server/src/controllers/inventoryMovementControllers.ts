@@ -126,6 +126,7 @@ export async function getAllMovementsDetailed(req: Request, res: Response): Prom
              b.operation_bucket,
              b.id,
              b.item_id,
+             b.item_ids,
              b.product_id,
              b.from_location_id,
              b.to_location_id,
@@ -140,6 +141,7 @@ export async function getAllMovementsDetailed(req: Request, res: Response): Prom
            SELECT
              l.id,
              l.item_id,
+             l.item_ids,
              CASE
                WHEN a.is_grouped_operation
                  AND (a.distinct_product_count <> 1 OR a.has_null_product_id)
@@ -161,6 +163,7 @@ export async function getAllMovementsDetailed(req: Request, res: Response): Prom
          SELECT
            fr.id,
            fr.item_id,
+           fr.item_ids,
            fr.product_id,
            fr.from_location_id,
            fr.to_location_id,

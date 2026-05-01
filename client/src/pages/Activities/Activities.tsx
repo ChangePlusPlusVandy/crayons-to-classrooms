@@ -461,23 +461,26 @@ export default function Activities() {
         />
       )}
 
-      {editingMovement?.inventory_action === 'MOVE' && editingMovement.product_id && (
-        <EditMoveDialog
-          open={!!editingMovement}
-          onClose={handleEditClose}
-          movement={{ ...editingMovement, product_id: editingMovement.product_id }}
-          onSuccess={handleEditSuccess}
-        />
-      )}
+      {editingMovement?.inventory_action === 'MOVE' &&
+        !isPalletOperation(editingMovement) &&
+        editingMovement.product_id && (
+          <EditMoveDialog
+            open={!!editingMovement}
+            onClose={handleEditClose}
+            movement={{ ...editingMovement, product_id: editingMovement.product_id }}
+            onSuccess={handleEditSuccess}
+          />
+        )}
 
-      {editingMovement?.inventory_action === 'MOVE' && !editingMovement.product_id && (
-        <EditPalletMoveDialog
-          open={!!editingMovement}
-          onClose={handleEditClose}
-          movement={editingMovement}
-          onSuccess={handleEditSuccess}
-        />
-      )}
+      {editingMovement?.inventory_action === 'MOVE' &&
+        isPalletOperation(editingMovement) && (
+          <EditPalletMoveDialog
+            open={!!editingMovement}
+            onClose={handleEditClose}
+            movement={editingMovement}
+            onSuccess={handleEditSuccess}
+          />
+        )}
 
       {(editingMovement?.inventory_action === 'DONATED' ||
         editingMovement?.inventory_action === 'DISCARD') &&

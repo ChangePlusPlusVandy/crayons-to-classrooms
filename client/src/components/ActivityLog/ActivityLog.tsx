@@ -349,6 +349,7 @@ export default function ActivityLog() {
 
       {editingMovement &&
         editingMovement.inventory_action === 'MOVE' &&
+        !isPalletOperation(editingMovement) &&
         editingMovement.product_id && (
           <EditMoveDialog
             open={!!editingMovement}
@@ -360,7 +361,7 @@ export default function ActivityLog() {
 
       {editingMovement &&
         editingMovement.inventory_action === 'MOVE' &&
-        !editingMovement.product_id && (
+        isPalletOperation(editingMovement) && (
           <EditPalletMoveDialog
             open={!!editingMovement}
             onClose={handleEditClose}
