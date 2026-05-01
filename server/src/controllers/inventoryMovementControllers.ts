@@ -1272,19 +1272,36 @@ export const editInventoryMovementMove = async (req: Request, res: Response) => 
     let itemIds: string[];
 
     if (savedItemIds && savedItemIds.length > 0) {
-      // Pallet move: use exact item IDs (now back at original source after undo)
-      const itemsAtSource = await client.query(
-        'SELECT id FROM items WHERE id = ANY($1::uuid[]) AND current_location_id = $2',
-        [savedItemIds, originalFromLocationId]
-      );
+      const sourceChanged = moveData.from_location_id !== originalFromLocationId;
 
-      if (itemsAtSource.rows.length < savedItemIds.length) {
-        throw new UndoConflictError(
-          `Not enough items at source location after undo: found ${itemsAtSource.rows.length}, need ${savedItemIds.length}`
+      if (sourceChanged) {
+        // Source location changed: pick up all active items at the new source
+        const itemsAtNewSource = await client.query(
+          `SELECT id FROM items
+           WHERE current_location_id = $1 AND status = 'active'`,
+          [moveData.from_location_id]
         );
-      }
 
-      itemIds = savedItemIds;
+        if (itemsAtNewSource.rows.length === 0) {
+          throw new InvalidError('No active items found at the selected source location');
+        }
+
+        itemIds = itemsAtNewSource.rows.map((row: { id: string }) => row.id);
+      } else {
+        // Same source: use exact item IDs (now back at original source after undo)
+        const itemsAtSource = await client.query(
+          'SELECT id FROM items WHERE id = ANY($1::uuid[]) AND current_location_id = $2',
+          [savedItemIds, originalFromLocationId]
+        );
+
+        if (itemsAtSource.rows.length < savedItemIds.length) {
+          throw new UndoConflictError(
+            `Not enough items at source location after undo: found ${itemsAtSource.rows.length}, need ${savedItemIds.length}`
+          );
+        }
+
+        itemIds = savedItemIds;
+      }
     } else {
       // Single-item move: fall back to product_id lookup (LIFO order)
       const productId = moveData.product_id ?? originalMovement.product_id;
@@ -1318,11 +1335,12 @@ export const editInventoryMovementMove = async (req: Request, res: Response) => 
 
     // Create new MOVE movement record
     const representativeItemId = itemIds[0];
+    const isPallet = savedItemIds && savedItemIds.length > 0;
     const fullMovementData: CreateInventoryInput = {
       inventory_action: 'MOVE',
       item_id: representativeItemId,
-      product_id: savedItemIds ? originalMovement.product_id : moveData.product_id,
-      from_location_id: savedItemIds ? originalFromLocationId : moveData.from_location_id,
+      product_id: isPallet ? originalMovement.product_id : moveData.product_id,
+      from_location_id: isPallet ? moveData.from_location_id : moveData.from_location_id,
       to_location_id: moveData.to_location_id,
       quantity: itemIds.length,
       performed_by: moveData.performed_by,
@@ -1331,10 +1349,10 @@ export const editInventoryMovementMove = async (req: Request, res: Response) => 
     const createdMovement = await createInventoryMovementCore(fullMovementData, client);
 
     // Preserve item_ids on the new movement for pallet operations
-    if (savedItemIds && savedItemIds.length > 0) {
+    if (isPallet) {
       await client.query(
         'UPDATE "inventory movement" SET item_ids = $1::uuid[] WHERE id = $2',
-        [savedItemIds, createdMovement.id]
+        [itemIds, createdMovement.id]
       );
     }
 

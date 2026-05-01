@@ -142,7 +142,7 @@ export function EditPalletMoveDialog({
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
       <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        Edit Move
+        Edit Pallet Move
         <IconButton aria-label="close" onClick={onClose} size="small">
           <CloseIcon />
         </IconButton>
