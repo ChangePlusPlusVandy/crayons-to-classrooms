@@ -254,7 +254,6 @@ export async function browseLocationCodes(req: Request, res: Response) {
       ? ''
       : `HAVING COUNT(i.id) FILTER (WHERE i.status = 'active') > 0`;
 
-    console.log('\n\ninclude_empty:', include_empty)
 
     const dataQuery = `
       SELECT
