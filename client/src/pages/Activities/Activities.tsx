@@ -28,6 +28,7 @@ import { activitiesStyles } from './Activities.styles';
 import undoArrow from '../../assets/undo_arrow.svg';
 import modifyPen from '../../assets/modify_pen.svg';
 import { EditAddDialog } from '../../components/EditAddDialog/EditAddDialog';
+import { EditMoveDialog } from '../../components/EditMoveDialog/EditMoveDialog';
 import { EditPalletMoveDialog } from '../../components/EditPalletMoveDialog/EditPalletMoveDialog';
 import { EditPalletRemoveDialog } from '../../components/EditPalletRemoveDialog/EditPalletRemoveDialog';
 import { PalletDetailsDialog } from '../../components/PalletDetailsDialog/PalletDetailsDialog';
@@ -459,7 +460,16 @@ export default function Activities() {
         />
       )}
 
-      {editingMovement?.inventory_action === 'MOVE' && (
+      {editingMovement?.inventory_action === 'MOVE' && editingMovement.product_id && (
+        <EditMoveDialog
+          open={!!editingMovement}
+          onClose={handleEditClose}
+          movement={{ ...editingMovement, product_id: editingMovement.product_id }}
+          onSuccess={handleEditSuccess}
+        />
+      )}
+
+      {editingMovement?.inventory_action === 'MOVE' && !editingMovement.product_id && (
         <EditPalletMoveDialog
           open={!!editingMovement}
           onClose={handleEditClose}

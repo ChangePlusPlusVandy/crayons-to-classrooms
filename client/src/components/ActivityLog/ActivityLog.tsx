@@ -24,6 +24,7 @@ import { getActivities, ActivityDisplay } from '../../api/activities';
 import { isPalletOperation } from '../../api/palletUtils';
 import { undoInventoryMovement } from '../../api/moveItem';
 import { EditAddDialog } from '../EditAddDialog/EditAddDialog';
+import { EditMoveDialog } from '../EditMoveDialog/EditMoveDialog';
 import { EditPalletMoveDialog } from '../EditPalletMoveDialog/EditPalletMoveDialog';
 import { EditPalletRemoveDialog } from '../EditPalletRemoveDialog/EditPalletRemoveDialog';
 import { PalletDetailsDialog } from '../PalletDetailsDialog/PalletDetailsDialog';
@@ -345,14 +346,27 @@ export default function ActivityLog() {
           />
         )}
 
-      {editingMovement && editingMovement.inventory_action === 'MOVE' && (
-        <EditPalletMoveDialog
-          open={!!editingMovement}
-          onClose={handleEditClose}
-          movement={editingMovement}
-          onSuccess={handleEditSuccess}
-        />
-      )}
+      {editingMovement &&
+        editingMovement.inventory_action === 'MOVE' &&
+        editingMovement.product_id && (
+          <EditMoveDialog
+            open={!!editingMovement}
+            onClose={handleEditClose}
+            movement={{ ...editingMovement, product_id: editingMovement.product_id }}
+            onSuccess={handleEditSuccess}
+          />
+        )}
+
+      {editingMovement &&
+        editingMovement.inventory_action === 'MOVE' &&
+        !editingMovement.product_id && (
+          <EditPalletMoveDialog
+            open={!!editingMovement}
+            onClose={handleEditClose}
+            movement={editingMovement}
+            onSuccess={handleEditSuccess}
+          />
+        )}
 
       {editingMovement &&
         (editingMovement.inventory_action === 'DONATED' ||
