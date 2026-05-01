@@ -30,6 +30,7 @@ import modifyPen from '../../assets/modify_pen.svg';
 import { EditAddDialog } from '../../components/EditAddDialog/EditAddDialog';
 import { EditMoveDialog } from '../../components/EditMoveDialog/EditMoveDialog';
 import { EditPalletMoveDialog } from '../../components/EditPalletMoveDialog/EditPalletMoveDialog';
+import { EditRemoveDialog } from '../../components/EditRemoveDialog/EditRemoveDialog';
 import { EditPalletRemoveDialog } from '../../components/EditPalletRemoveDialog/EditPalletRemoveDialog';
 import { PalletDetailsDialog } from '../../components/PalletDetailsDialog/PalletDetailsDialog';
 import VisibilityIcon from '@mui/icons-material/Visibility';
@@ -479,14 +480,26 @@ export default function Activities() {
       )}
 
       {(editingMovement?.inventory_action === 'DONATED' ||
-        editingMovement?.inventory_action === 'DISCARD') && (
-        <EditPalletRemoveDialog
-          open={!!editingMovement}
-          onClose={handleEditClose}
-          movement={editingMovement}
-          onSuccess={handleEditSuccess}
-        />
-      )}
+        editingMovement?.inventory_action === 'DISCARD') &&
+        isPalletOperation(editingMovement) && (
+          <EditPalletRemoveDialog
+            open={!!editingMovement}
+            onClose={handleEditClose}
+            movement={editingMovement}
+            onSuccess={handleEditSuccess}
+          />
+        )}
+
+      {(editingMovement?.inventory_action === 'DONATED' ||
+        editingMovement?.inventory_action === 'DISCARD') &&
+        !isPalletOperation(editingMovement) && (
+          <EditRemoveDialog
+            open={!!editingMovement}
+            onClose={handleEditClose}
+            movement={editingMovement}
+            onSuccess={handleEditSuccess}
+          />
+        )}
 
       <Snackbar
         open={showSuccessAlert}

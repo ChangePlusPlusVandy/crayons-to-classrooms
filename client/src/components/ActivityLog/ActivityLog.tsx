@@ -26,6 +26,7 @@ import { undoInventoryMovement } from '../../api/moveItem';
 import { EditAddDialog } from '../EditAddDialog/EditAddDialog';
 import { EditMoveDialog } from '../EditMoveDialog/EditMoveDialog';
 import { EditPalletMoveDialog } from '../EditPalletMoveDialog/EditPalletMoveDialog';
+import { EditRemoveDialog } from '../EditRemoveDialog/EditRemoveDialog';
 import { EditPalletRemoveDialog } from '../EditPalletRemoveDialog/EditPalletRemoveDialog';
 import { PalletDetailsDialog } from '../PalletDetailsDialog/PalletDetailsDialog';
 
@@ -370,8 +371,21 @@ export default function ActivityLog() {
 
       {editingMovement &&
         (editingMovement.inventory_action === 'DONATED' ||
-          editingMovement.inventory_action === 'DISCARD') && (
+          editingMovement.inventory_action === 'DISCARD') &&
+        isPalletOperation(editingMovement) && (
           <EditPalletRemoveDialog
+            open={!!editingMovement}
+            onClose={handleEditClose}
+            movement={editingMovement}
+            onSuccess={handleEditSuccess}
+          />
+        )}
+
+      {editingMovement &&
+        (editingMovement.inventory_action === 'DONATED' ||
+          editingMovement.inventory_action === 'DISCARD') &&
+        !isPalletOperation(editingMovement) && (
+          <EditRemoveDialog
             open={!!editingMovement}
             onClose={handleEditClose}
             movement={editingMovement}
