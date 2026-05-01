@@ -1339,7 +1339,7 @@ export const editInventoryMovementMove = async (req: Request, res: Response) => 
     const fullMovementData: CreateInventoryInput = {
       inventory_action: 'MOVE',
       item_id: representativeItemId,
-      product_id: isPallet ? originalMovement.product_id : moveData.product_id,
+      product_id: isPallet ? originalMovement.product_id : (moveData.product_id ?? originalMovement.product_id),
       from_location_id: isPallet ? moveData.from_location_id : moveData.from_location_id,
       to_location_id: moveData.to_location_id,
       quantity: itemIds.length,
