@@ -1391,7 +1391,7 @@ export const editInventoryMovementRemove = async (req: Request, res: Response) =
 
         // Find all active items at the new source location
         const itemsAtNewLocation = await client.query(
-          `SELECT id, name FROM items
+          `SELECT id, name, product_id FROM items
            WHERE current_location_id = $1 AND status = 'active'`,
           [removeData.from_location_id]
         );
