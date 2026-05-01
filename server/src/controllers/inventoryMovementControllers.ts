@@ -1284,9 +1284,14 @@ export const editInventoryMovementMove = async (req: Request, res: Response) => 
       itemIds = savedItemIds;
     } else {
       // Single-item move: fall back to product_id lookup (LIFO order)
+      const productId = moveData.product_id ?? originalMovement.product_id;
+      if (!productId) {
+        throw new InvalidError('product_id is required for non-pallet move edits');
+      }
+
       const itemsAtSource = await client.query(
         'SELECT id FROM items WHERE product_id = $1 AND current_location_id = $2 ORDER BY created_at DESC LIMIT $3',
-        [moveData.product_id, moveData.from_location_id, moveData.quantity]
+        [productId, moveData.from_location_id, moveData.quantity]
       );
 
       if (itemsAtSource.rows.length < moveData.quantity) {
