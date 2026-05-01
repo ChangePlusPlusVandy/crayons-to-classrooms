@@ -1500,11 +1500,17 @@ export const editInventoryMovementRemove = async (req: Request, res: Response) =
         const newStatus =
           removeData.inventory_action === 'DONATED' ? 'donated' : 'defective';
 
-        await client.query(
+        const statusUpdate = await client.query(
           `UPDATE items SET status = $1, updated_at = NOW()
            WHERE id = ANY($2::uuid[]) AND status = $3`,
           [newStatus, originalMovement.item_ids, oldStatus]
         );
+
+        if (statusUpdate.rowCount !== originalMovement.item_ids.length) {
+          throw new UndoConflictError(
+            `Expected to update ${originalMovement.item_ids.length} items but only ${statusUpdate.rowCount} had status '${oldStatus}'`
+          );
+        }
       }
 
       // Update the movement record (action type + note)
