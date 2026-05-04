@@ -19,9 +19,12 @@ import {
   updateInventoryMovement,
   deleteInventoryMovement,
   undoInventoryMovement,
+  undoGroupedInventoryMovement,
   editInventoryMovementAdd,
   editInventoryMovementMove,
   editInventoryMovementRemove,
+  editGroupedMoveMovement,
+  editGroupedRemoveMovement,
   getPalletMovementItems,
 } from '../controllers/inventoryMovementControllers.js';
 
@@ -42,6 +45,7 @@ router.post('/with-items', bulkCreateItemsWithMovement); // POST /api/inventory-
 router.post('/with-move', moveItemsWithMovement); // POST /api/inventory-movement/with-move
 router.post('/with-removal', removeItemsWithMovement); // POST /api/inventory-movement/with-removal
 router.post('/:id/undo', undoInventoryMovement); // POST /api/inventory-movement/:id/undo (must be before /:id routes)
+router.post('/:id/undo-group', undoGroupedInventoryMovement); // POST /api/inventory-movement/:id/undo-group
 router.get('/:id/pallet-items', getPalletMovementItems); // GET /api/inventory-movement/:id/pallet-items
 router.get('/:id', getMovementById); // GET /api/inventory-movement/:id
 router.patch('/:id', updateInventoryMovement); // PATCH /api/inventory-movement/:id
@@ -49,5 +53,7 @@ router.delete('/:id', deleteInventoryMovement); // DELETE /api/inventory-movemen
 router.post('/:id/edit-add', editInventoryMovementAdd); // POST /api/inventory-movement/:id/edit-add
 router.post('/:id/edit-move', editInventoryMovementMove); // POST /api/inventory-movement/:id/edit-move
 router.post('/:id/edit-remove', editInventoryMovementRemove); // POST /api/inventory-movement/:id/edit-remove
+router.post('/:id/edit-group-move', editGroupedMoveMovement); // POST /api/inventory-movement/:id/edit-group-move
+router.post('/:id/edit-group-remove', editGroupedRemoveMovement); // POST /api/inventory-movement/:id/edit-group-remove
 
 export default router;

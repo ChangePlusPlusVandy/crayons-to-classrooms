@@ -52,6 +52,7 @@ interface MoveItemFormProps {
   onCancel: () => void;
   submitLabel?: string;
   adjustItemGroups?: (groups: ItemGroup[], sourceSlotId: string) => ItemGroup[];
+  disableSource?: boolean;
 }
 
 export default function MoveItemForm({
@@ -66,6 +67,7 @@ export default function MoveItemForm({
   onCancel,
   submitLabel = 'Confirm Move',
   adjustItemGroups,
+  disableSource = false,
 }: MoveItemFormProps) {
   const [storageLocations, setStorageLocations] = useState<StorageLocation[]>([]);
   const [allItems, setAllItems] = useState<Item[]>([]);
@@ -409,69 +411,82 @@ export default function MoveItemForm({
         </Alert>
       )}
 
-      <WarehouseSelector
-        value={selectedWarehouse}
-        onChange={(newWarehouse) => {
-          setSelectedWarehouse(newWarehouse);
-          setSelectedSourceSlot(null);
-          setItemGroupsInSourceSlot([]);
-          setSelectedItemGroup(null);
-          setSelectedDestinationWarehouse(newWarehouse);
-          setSelectedDestinationSlot(null);
-          setQuantityToMove(0);
-          setError('');
-        }}
-        label="Warehouse"
-        placeholder="Select warehouse"
-        fullWidth
-        required
-      />
+      {disableSource ? (
+        <Box>
+          <Typography variant="caption" color="text.secondary">
+            Source
+          </Typography>
+          <Typography variant="body1">
+            {selectedWarehouse?.name ?? '—'} — {selectedSourceSlot?.location_code ?? '—'}
+          </Typography>
+        </Box>
+      ) : (
+        <>
+          <WarehouseSelector
+            value={selectedWarehouse}
+            onChange={(newWarehouse) => {
+              setSelectedWarehouse(newWarehouse);
+              setSelectedSourceSlot(null);
+              setItemGroupsInSourceSlot([]);
+              setSelectedItemGroup(null);
+              setSelectedDestinationWarehouse(newWarehouse);
+              setSelectedDestinationSlot(null);
+              setQuantityToMove(0);
+              setError('');
+            }}
+            label="Warehouse"
+            placeholder="Select warehouse"
+            fullWidth
+            required
+          />
 
-      <FormControl fullWidth disabled={!selectedWarehouse}>
-        <MoveItemFormLabel htmlFor="source-slot-select" required>
-          Source Slot (Search by location code or item name)
-        </MoveItemFormLabel>
-        <Autocomplete
-          id="source-slot-select"
-          options={warehouseLocations}
-          getOptionLabel={(option) => option.location_code ?? 'No location code'}
-          getOptionKey={(option) => option.id}
-          filterOptions={filterSourceSlotOptions}
-          renderOption={(props, option, state) => {
-            const { key, ...otherProps } = props;
-            const locationCode = option.location_code ?? 'No location code';
-            const searchTerm = state.inputValue;
-            const itemNames = getItemNamesForLocation(option.id, searchTerm);
+          <FormControl fullWidth disabled={!selectedWarehouse}>
+            <MoveItemFormLabel htmlFor="source-slot-select" required>
+              Source Slot (Search by location code or item name)
+            </MoveItemFormLabel>
+            <Autocomplete
+              id="source-slot-select"
+              options={warehouseLocations}
+              getOptionLabel={(option) => option.location_code ?? 'No location code'}
+              getOptionKey={(option) => option.id}
+              filterOptions={filterSourceSlotOptions}
+              renderOption={(props, option, state) => {
+                const { key, ...otherProps } = props;
+                const locationCode = option.location_code ?? 'No location code';
+                const searchTerm = state.inputValue;
+                const itemNames = getItemNamesForLocation(option.id, searchTerm);
 
-            return (
-              <li key={key} {...otherProps}>
-                <SourceSlotOptionContainer>
-                  <LocationCodeText>{highlightText(locationCode, searchTerm)}</LocationCodeText>
-                  <ItemListText>{highlightText(itemNames, searchTerm)}</ItemListText>
-                </SourceSlotOptionContainer>
-              </li>
-            );
-          }}
-          value={selectedSourceSlot}
-          onChange={(_, newValue) => {
-            setSelectedSourceSlot(newValue);
-            setItemGroupsInSourceSlot([]);
-            setSelectedItemGroup(null);
-            setQuantityToMove(0);
-            setError('');
-          }}
-          renderInput={(params) => (
-            <TextField
-              {...params}
-              placeholder={
-                !selectedWarehouse ? 'Select warehouse first' : 'Search by slot code or item name'
-              }
+                return (
+                  <li key={key} {...otherProps}>
+                    <SourceSlotOptionContainer>
+                      <LocationCodeText>{highlightText(locationCode, searchTerm)}</LocationCodeText>
+                      <ItemListText>{highlightText(itemNames, searchTerm)}</ItemListText>
+                    </SourceSlotOptionContainer>
+                  </li>
+                );
+              }}
+              value={selectedSourceSlot}
+              onChange={(_, newValue) => {
+                setSelectedSourceSlot(newValue);
+                setItemGroupsInSourceSlot([]);
+                setSelectedItemGroup(null);
+                setQuantityToMove(0);
+                setError('');
+              }}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  placeholder={
+                    !selectedWarehouse ? 'Select warehouse first' : 'Search by slot code or item name'
+                  }
+                />
+              )}
+              noOptionsText="No matching slots found"
+              disabled={!selectedWarehouse}
             />
-          )}
-          noOptionsText="No matching slots found"
-          disabled={!selectedWarehouse}
-        />
-      </FormControl>
+          </FormControl>
+        </>
+      )}
 
       <FormControl fullWidth disabled={!selectedSourceSlot}>
         <MoveItemFormLabel htmlFor="item-in-slot-select" required>Item in Source Slot</MoveItemFormLabel>

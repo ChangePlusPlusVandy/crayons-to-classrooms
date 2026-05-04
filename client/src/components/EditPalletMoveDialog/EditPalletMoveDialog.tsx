@@ -16,7 +16,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import { useAuth } from '../../context/AuthContext';
 import { WarehouseSelector } from '../WarehouseSelector/WarehouseSelector';
 import { SlotSelector } from '../SlotSelector/SlotSelector';
-import { editMoveMovementTransaction } from '../../api/editMovement';
+import { editMoveMovementTransaction, editGroupedMoveMovementTransaction } from '../../api/editMovement';
 import { InventoryMovement } from '../../types/InventoryMovement';
 import { Warehouse } from '../../types/Warehouse';
 import { StorageLocation } from '../../types/StorageLocation';
@@ -28,6 +28,7 @@ interface EditPalletMoveDialogProps {
   onClose: () => void;
   movement: InventoryMovement;
   onSuccess?: () => void;
+  isGroupedOperation?: boolean;
 }
 
 export function EditPalletMoveDialog({
@@ -35,6 +36,7 @@ export function EditPalletMoveDialog({
   onClose,
   movement,
   onSuccess,
+  isGroupedOperation,
 }: EditPalletMoveDialogProps) {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
@@ -92,23 +94,16 @@ export function EditPalletMoveDialog({
   }, [open, movement.from_location_id, movement.to_location_id, movement.note]);
 
   const handleSubmit = async () => {
-    if (!srcWarehouse || !srcSlot || !destWarehouse || !destSlot) return;
+    if (!destWarehouse || !destSlot) return;
     if (!user) {
       setSubmitError('Not authenticated');
       return;
     }
 
-    const matchingSrc = storageLocations.find(
-      (loc) => loc.warehouse_id === srcWarehouse.id && loc.slot === srcSlot
-    );
     const matchingDest = storageLocations.find(
       (loc) => loc.warehouse_id === destWarehouse.id && loc.slot === destSlot
     );
 
-    if (!matchingSrc) {
-      setSubmitError('Could not find the selected source slot');
-      return;
-    }
     if (!matchingDest) {
       setSubmitError('Could not find the selected destination slot');
       return;
@@ -118,13 +113,19 @@ export function EditPalletMoveDialog({
     setSubmitError('');
 
     try {
-      await editMoveMovementTransaction(movement.id, {
-        from_location_id: matchingSrc.id,
+      const payload = {
+        from_location_id: movement.from_location_id!,
         to_location_id: matchingDest.id,
         quantity: movement.quantity,
         performed_by: user.id,
         note: note || undefined,
-      });
+      };
+
+      if (isGroupedOperation) {
+        await editGroupedMoveMovementTransaction(movement.id, payload);
+      } else {
+        await editMoveMovementTransaction(movement.id, payload);
+      }
 
       onSuccess?.();
       onClose();
@@ -137,7 +138,7 @@ export function EditPalletMoveDialog({
     }
   };
 
-  const canSubmit = !!srcWarehouse && !!srcSlot && !!destWarehouse && !!destSlot && !submitting;
+  const canSubmit = !!destWarehouse && !!destSlot && !submitting;
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
@@ -166,24 +167,14 @@ export function EditPalletMoveDialog({
               Quantity: {movement.quantity} items
             </Typography>
 
-            <WarehouseSelector
-              value={srcWarehouse}
-              onChange={(wh) => {
-                setSrcWarehouse(wh);
-                setSrcSlot(null);
-              }}
-              label="Source Warehouse"
-              required
-            />
-
-            <SlotSelector
-              value={srcSlot}
-              onChange={setSrcSlot}
-              warehouse={srcWarehouse}
-              storageLocations={storageLocations}
-              label="Source Slot"
-              required
-            />
+            <Box>
+              <Typography variant="caption" color="text.secondary">
+                Source
+              </Typography>
+              <Typography variant="body1">
+                {srcWarehouse?.name ?? '—'} — {srcSlot ?? '—'}
+              </Typography>
+            </Box>
 
             <WarehouseSelector
               value={destWarehouse}

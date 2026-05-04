@@ -196,6 +196,25 @@ export async function undoInventoryMovement(movementId: string): Promise<void> {
   }
 }
 
+export async function undoGroupedInventoryMovement(movementId: string): Promise<{ batchesUndone: number }> {
+  const response = await authFetch(`${API_BASE_URL}/inventory-movement/${movementId}/undo-group`, {
+    method: 'POST',
+  });
+  if (!response.ok) {
+    let errorMessage = 'Failed to undo grouped movement';
+    try {
+      const data = await response.json();
+      if (data && data.error) {
+        errorMessage = data.error;
+      }
+    } catch {
+      // If JSON parsing fails, use default message
+    }
+    throw new Error(errorMessage);
+  }
+  return response.json();
+}
+
 export async function moveItemsWithMovement(payload: {
   item_ids: string[];
   movement: {

@@ -1987,6 +1987,351 @@ export const undoInventoryMovement = async (req: Request, res: Response) => {
 };
 
 /**
+ * Extracts the BULK_OP UUID from a movement's note and returns all sibling movement IDs
+ * sharing the same BULK_OP UUID, ordered by performed_at ASC.
+ * Returns an empty array if the movement has no BULK_OP marker.
+ */
+async function findSiblingMovementIds(movementId: string, db: DbClient): Promise<string[]> {
+  const result = await db.query(
+    `WITH target AS (
+       SELECT substring(note FROM '\\[BULK_OP:([A-Za-z0-9-]+);BATCH:[0-9]+/[0-9]+\\]$') AS bulk_op_id
+       FROM "inventory movement"
+       WHERE id = $1
+     )
+     SELECT im.id
+     FROM "inventory movement" im, target t
+     WHERE t.bulk_op_id IS NOT NULL
+       AND substring(im.note FROM '\\[BULK_OP:([A-Za-z0-9-]+);BATCH:[0-9]+/[0-9]+\\]$') = t.bulk_op_id
+     ORDER BY im.performed_at ASC, im.id ASC`,
+    [movementId]
+  );
+  return result.rows.map((r: { id: string }) => r.id);
+}
+
+export const undoGroupedInventoryMovement = async (req: Request, res: Response) => {
+  const client = await pool.connect();
+  try {
+    const { id } = movementIdParamSchema.parse(req.params);
+
+    await client.query('BEGIN');
+
+    const siblingIds = await findSiblingMovementIds(id, client);
+
+    if (siblingIds.length === 0) {
+      // Not a grouped operation — fall back to single undo
+      await undoInventoryMovementCore({ id }, client);
+      await client.query('COMMIT');
+      return res.json({ message: 'Inventory movement undone successfully', batchesUndone: 1 });
+    }
+
+    // Undo in reverse order (last batch first)
+    const reversed = [...siblingIds].reverse();
+    for (let i = 0; i < reversed.length; i++) {
+      try {
+        await undoInventoryMovementCore({ id: reversed[i] }, client);
+      } catch (err) {
+        const batchNum = siblingIds.length - i;
+        const msg = err instanceof Error ? err.message : String(err);
+        throw new UndoConflictError(`Batch ${batchNum}/${siblingIds.length}: ${msg}`);
+      }
+    }
+
+    await client.query('COMMIT');
+    res.json({ message: 'Grouped inventory movement undone successfully', batchesUndone: siblingIds.length });
+  } catch (error) {
+    try {
+      await client.query('ROLLBACK');
+    } catch (rollbackError) {
+      console.error('Error rolling back transaction in undoGroupedInventoryMovement:', rollbackError);
+    }
+    if (error instanceof ZodError) {
+      return handleValidationError(error, res);
+    }
+    if (error instanceof NotFoundError) {
+      return res.status(404).json({ error: error.message });
+    }
+    if (error instanceof UndoConflictError) {
+      return res.status(400).json({ error: error.message });
+    }
+    console.error('Error undoing grouped inventory movement:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  } finally {
+    client.release();
+  }
+};
+
+export const editGroupedMoveMovement = async (req: Request, res: Response) => {
+  const client = await pool.connect();
+  try {
+    const { id } = movementIdParamSchema.parse(req.params);
+    const moveData = editMoveSchema.parse(req.body);
+
+    await client.query('BEGIN');
+
+    const siblingIds = await findSiblingMovementIds(id, client);
+
+    if (siblingIds.length === 0) {
+      // Not a grouped op — fall back to single edit-move
+      await client.query('ROLLBACK');
+      return editInventoryMovementMove(req, res);
+    }
+
+    // Collect all item_ids from all sibling movements
+    const allItemIds: string[] = [];
+    let originalFromLocationId: string | null = null;
+    let representativeProductId: string | null = null;
+
+    for (const sibId of siblingIds) {
+      const mov = await client.query(
+        'SELECT * FROM "inventory movement" WHERE id = $1',
+        [sibId]
+      );
+      if (mov.rows.length === 0) continue;
+      const m = mov.rows[0];
+      if (m.item_ids && m.item_ids.length > 0) {
+        allItemIds.push(...m.item_ids);
+      }
+      if (!originalFromLocationId) originalFromLocationId = m.from_location_id;
+      if (!representativeProductId) representativeProductId = m.product_id;
+    }
+
+    if (allItemIds.length === 0) {
+      throw new InvalidError('No item_ids found in grouped movements');
+    }
+
+    // Undo all siblings in reverse order
+    const reversed = [...siblingIds].reverse();
+    for (let i = 0; i < reversed.length; i++) {
+      try {
+        await undoInventoryMovementCore({ id: reversed[i] }, client);
+      } catch (err) {
+        const batchNum = siblingIds.length - i;
+        const msg = err instanceof Error ? err.message : String(err);
+        throw new UndoConflictError(`Batch ${batchNum}/${siblingIds.length}: ${msg}`);
+      }
+    }
+
+    // Move all items to the new destination
+    const updateResult = await client.query(
+      `UPDATE items
+       SET current_location_id = $1::uuid,
+           warehouse = (SELECT warehouse_id FROM storage_locations WHERE id = $1::uuid),
+           updated_at = NOW()
+       WHERE id = ANY($2::uuid[])
+       RETURNING *`,
+      [moveData.to_location_id, allItemIds]
+    );
+
+    if (updateResult.rowCount !== allItemIds.length) {
+      throw new UndoConflictError(
+        `Expected to move ${allItemIds.length} items but only found ${updateResult.rowCount}`
+      );
+    }
+
+    // Create one new movement record (no BULK_OP marker)
+    const representativeItemId = allItemIds[0];
+    const uniqueProductIds = new Set(updateResult.rows.map((r: { product_id: string }) => r.product_id));
+
+    const fullMovementData: CreateInventoryInput = {
+      inventory_action: 'MOVE',
+      item_id: representativeItemId,
+      product_id: uniqueProductIds.size === 1 ? [...uniqueProductIds][0] ?? null : null,
+      from_location_id: moveData.from_location_id,
+      to_location_id: moveData.to_location_id,
+      quantity: allItemIds.length,
+      performed_by: moveData.performed_by,
+      note: moveData.note,
+    };
+    const createdMovement = await createInventoryMovementCore(fullMovementData, client);
+
+    // Store all item_ids on the new movement
+    await client.query(
+      'UPDATE "inventory movement" SET item_ids = $1::uuid[] WHERE id = $2',
+      [allItemIds, createdMovement.id]
+    );
+
+    await client.query('COMMIT');
+    res.status(201).json({ movement: createdMovement });
+  } catch (error) {
+    try {
+      await client.query('ROLLBACK');
+    } catch (rollbackError) {
+      console.error('Error rolling back transaction in editGroupedMoveMovement:', rollbackError);
+    }
+    if (error instanceof ZodError) {
+      return handleValidationError(error, res);
+    }
+    if (error instanceof ForeignKeyError) {
+      return res.status(400).json({ error: error.message });
+    }
+    if (error instanceof NotFoundError) {
+      return res.status(404).json({ error: error.message });
+    }
+    if (error instanceof UndoConflictError) {
+      return res.status(400).json({ error: error.message });
+    }
+    if (error instanceof InvalidError) {
+      return res.status(400).json({ error: error.message });
+    }
+    console.error('Error editing grouped MOVE inventory movement:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  } finally {
+    client.release();
+  }
+};
+
+export const editGroupedRemoveMovement = async (req: Request, res: Response) => {
+  const client = await pool.connect();
+  try {
+    const { id } = movementIdParamSchema.parse(req.params);
+    const removeData = editRemoveSchema.parse(req.body);
+
+    await client.query('BEGIN');
+
+    const siblingIds = await findSiblingMovementIds(id, client);
+
+    if (siblingIds.length === 0) {
+      // Not a grouped op — fall back to single edit-remove
+      await client.query('ROLLBACK');
+      return editInventoryMovementRemove(req, res);
+    }
+
+    // Collect all item_ids from all sibling movements
+    const allItemIds: string[] = [];
+
+    for (const sibId of siblingIds) {
+      const mov = await client.query(
+        'SELECT item_ids FROM "inventory movement" WHERE id = $1',
+        [sibId]
+      );
+      if (mov.rows.length === 0) continue;
+      const m = mov.rows[0];
+      if (m.item_ids && m.item_ids.length > 0) {
+        allItemIds.push(...m.item_ids);
+      }
+    }
+
+    if (allItemIds.length === 0) {
+      throw new InvalidError('No item_ids found in grouped movements');
+    }
+
+    // Undo all siblings in reverse order (reactivates items)
+    const reversed = [...siblingIds].reverse();
+    for (let i = 0; i < reversed.length; i++) {
+      try {
+        await undoInventoryMovementCore({ id: reversed[i] }, client);
+      } catch (err) {
+        const batchNum = siblingIds.length - i;
+        const msg = err instanceof Error ? err.message : String(err);
+        throw new UndoConflictError(`Batch ${batchNum}/${siblingIds.length}: ${msg}`);
+      }
+    }
+
+    // Re-remove all items with updated params
+    const newRemovalStatus = removeData.inventory_action === 'DONATED' ? 'donated' : 'defective';
+
+    const updateResult = await client.query(
+      `UPDATE items
+       SET status = $1,
+           current_location_id = NULL,
+           warehouse = NULL,
+           updated_at = NOW()
+       WHERE id = ANY($2::uuid[])
+         AND status = 'active'
+       RETURNING *`,
+      [newRemovalStatus, allItemIds]
+    );
+
+    if (updateResult.rowCount !== allItemIds.length) {
+      throw new UndoConflictError(
+        `Expected to remove ${allItemIds.length} items but only found ${updateResult.rowCount} active`
+      );
+    }
+
+    // Look up from-location code for item_info tracking
+    const fromLocResult = await client.query(
+      'SELECT location_code FROM storage_locations WHERE id = $1',
+      [removeData.from_location_id]
+    );
+    const fromLocationCode = fromLocResult.rows[0]?.location_code ?? null;
+
+    // Sync item_info stock: group by name and decrement
+    const countsByName: Record<string, number> = {};
+    for (const row of updateResult.rows) {
+      const name = (row as { name: string }).name;
+      countsByName[name] = (countsByName[name] || 0) + 1;
+    }
+
+    for (const [itemName, count] of Object.entries(countsByName)) {
+      const syncResult = await syncItemInfoStock(
+        itemName,
+        undefined, undefined, undefined, undefined, undefined,
+        false, null, null,
+        -count, false, client
+      );
+      if (syncResult && syncResult.stock === 0 && fromLocationCode) {
+        await syncItemInfoStock(
+          itemName,
+          undefined, undefined, undefined, undefined, undefined,
+          undefined, null, fromLocationCode,
+          0, false, client
+        );
+      }
+    }
+
+    // Create one new movement record (no BULK_OP marker)
+    const representativeItemId = allItemIds[0];
+    const uniqueProductIds = new Set(updateResult.rows.map((r: { product_id?: string }) => r.product_id));
+
+    const fullMovementData: CreateInventoryInput = {
+      inventory_action: removeData.inventory_action,
+      item_id: representativeItemId,
+      product_id: uniqueProductIds.size === 1 ? [...uniqueProductIds][0] ?? null : null,
+      from_location_id: removeData.from_location_id,
+      to_location_id: null,
+      quantity: allItemIds.length,
+      performed_by: removeData.performed_by,
+      note: removeData.note,
+    };
+    const createdMovement = await createInventoryMovementCore(fullMovementData, client, true);
+
+    // Store all item_ids on the new movement
+    await client.query(
+      'UPDATE "inventory movement" SET item_ids = $1::uuid[] WHERE id = $2',
+      [allItemIds, createdMovement.id]
+    );
+
+    await client.query('COMMIT');
+    res.status(201).json({ movement: createdMovement });
+  } catch (error) {
+    try {
+      await client.query('ROLLBACK');
+    } catch (rollbackError) {
+      console.error('Error rolling back transaction in editGroupedRemoveMovement:', rollbackError);
+    }
+    if (error instanceof ZodError) {
+      return handleValidationError(error, res);
+    }
+    if (error instanceof ForeignKeyError) {
+      return res.status(400).json({ error: error.message });
+    }
+    if (error instanceof NotFoundError) {
+      return res.status(404).json({ error: error.message });
+    }
+    if (error instanceof UndoConflictError) {
+      return res.status(400).json({ error: error.message });
+    }
+    if (error instanceof InvalidError) {
+      return res.status(400).json({ error: error.message });
+    }
+    console.error('Error editing grouped REMOVE inventory movement:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  } finally {
+    client.release();
+  }
+};
+
+/**
  * Returns a grouped item summary for a pallet movement by joining item_ids back to the items table.
  * Groups by item name + category and sums quantity.
  * Returns [] for movements that have no item_ids (pre-feature or non-pallet operations).

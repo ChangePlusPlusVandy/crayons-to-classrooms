@@ -16,7 +16,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import { useAuth } from '../../context/AuthContext';
 import { WarehouseSelector } from '../WarehouseSelector/WarehouseSelector';
 import { SlotSelector } from '../SlotSelector/SlotSelector';
-import { editRemoveMovementTransaction } from '../../api/editMovement';
+import { editRemoveMovementTransaction, editGroupedRemoveMovementTransaction } from '../../api/editMovement';
 import { InventoryMovement } from '../../types/InventoryMovement';
 import { Warehouse } from '../../types/Warehouse';
 import { StorageLocation } from '../../types/StorageLocation';
@@ -28,6 +28,7 @@ interface EditPalletRemoveDialogProps {
   onClose: () => void;
   movement: InventoryMovement;
   onSuccess?: () => void;
+  isGroupedOperation?: boolean;
 }
 
 export function EditPalletRemoveDialog({
@@ -35,6 +36,7 @@ export function EditPalletRemoveDialog({
   onClose,
   movement,
   onSuccess,
+  isGroupedOperation,
 }: EditPalletRemoveDialogProps) {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
@@ -100,13 +102,19 @@ export function EditPalletRemoveDialog({
     setSubmitError('');
 
     try {
-      await editRemoveMovementTransaction(movement.id, {
+      const payload = {
         inventory_action: movement.inventory_action as 'DONATED' | 'DISCARD',
         from_location_id: matchingLocation.id,
         quantity: movement.quantity,
         performed_by: user.id,
         note: note || undefined,
-      });
+      };
+
+      if (isGroupedOperation) {
+        await editGroupedRemoveMovementTransaction(movement.id, payload);
+      } else {
+        await editRemoveMovementTransaction(movement.id, payload);
+      }
 
       onSuccess?.();
       onClose();

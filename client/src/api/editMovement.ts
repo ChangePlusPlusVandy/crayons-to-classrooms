@@ -116,3 +116,49 @@ export async function editMoveMovementTransaction(
   const data = await response.json();
   return { movement: InventoryMovementSchema.parse(data.movement) };
 }
+
+export async function editGroupedMoveMovementTransaction(
+  movementId: string,
+  payload: {
+    from_location_id: string;
+    to_location_id: string;
+    quantity: number;
+    performed_by: string;
+    note?: string;
+  }
+): Promise<{ movement: InventoryMovement }> {
+  const response = await authFetch(`${API_BASE_URL}/inventory-movement/${movementId}/edit-group-move`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error ?? 'Failed to edit grouped movement');
+  }
+  const data = await response.json();
+  return { movement: InventoryMovementSchema.parse(data.movement) };
+}
+
+export async function editGroupedRemoveMovementTransaction(
+  movementId: string,
+  payload: {
+    inventory_action: 'DONATED' | 'DISCARD';
+    from_location_id: string;
+    quantity: number;
+    performed_by: string;
+    note?: string;
+  }
+): Promise<{ movement: InventoryMovement }> {
+  const response = await authFetch(`${API_BASE_URL}/inventory-movement/${movementId}/edit-group-remove`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error ?? 'Failed to edit grouped removal');
+  }
+  const data = await response.json();
+  return { movement: InventoryMovementSchema.parse(data.movement) };
+}
