@@ -2238,13 +2238,14 @@ export const editGroupedRemoveMovement = async (req: Request, res: Response) => 
            updated_at = NOW()
        WHERE id = ANY($2::uuid[])
          AND status = 'active'
+         AND current_location_id = $3
        RETURNING *`,
-      [newRemovalStatus, allItemIds]
+      [newRemovalStatus, allItemIds, removeData.from_location_id]
     );
 
     if (updateResult.rowCount !== allItemIds.length) {
       throw new UndoConflictError(
-        `Expected to remove ${allItemIds.length} items but only found ${updateResult.rowCount} active`
+        `Expected to remove ${allItemIds.length} items from location ${removeData.from_location_id} but only found ${updateResult.rowCount} active items at that location`
       );
     }
 
