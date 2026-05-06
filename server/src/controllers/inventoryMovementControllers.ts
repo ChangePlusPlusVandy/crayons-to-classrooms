@@ -2118,13 +2118,14 @@ export const editGroupedMoveMovement = async (req: Request, res: Response) => {
            warehouse = (SELECT warehouse_id FROM storage_locations WHERE id = $1::uuid),
            updated_at = NOW()
        WHERE id = ANY($2::uuid[])
+         AND current_location_id = $3
        RETURNING *`,
-      [moveData.to_location_id, allItemIds]
+      [moveData.to_location_id, allItemIds, moveData.from_location_id]
     );
 
     if (updateResult.rowCount !== allItemIds.length) {
       throw new UndoConflictError(
-        `Expected to move ${allItemIds.length} items but only found ${updateResult.rowCount}`
+        `Expected to move ${allItemIds.length} items from location ${moveData.from_location_id} but only found ${updateResult.rowCount} items at that location`
       );
     }
 
