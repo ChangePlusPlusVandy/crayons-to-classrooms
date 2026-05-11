@@ -15,9 +15,7 @@ const PalletItemsResponseSchema = z.object({
 export type PalletItemSummary = z.infer<typeof PalletItemSummarySchema>;
 
 export async function getPalletItems(movementId: string): Promise<PalletItemSummary[]> {
-  const response = await authFetch(
-    `${API_BASE_URL}/inventory-movement/${movementId}/pallet-items`
-  );
+  const response = await authFetch(`${API_BASE_URL}/inventory-movement/${movementId}/pallet-items`);
   if (!response.ok) throw new Error('Failed to fetch pallet items');
   const { items } = PalletItemsResponseSchema.parse(await response.json());
   return items;

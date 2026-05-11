@@ -40,5 +40,18 @@ export const slotParamSchema = z.object({
   slot: z.string().min(1, 'Slot cannot be empty'),
 });
 
+// Schema for validating browse query params for location-code listing
+export const locationCodeBrowseQuerySchema = z.object({
+  page: z.coerce.number().int().positive().default(1),
+  limit: z.coerce.number().int().positive().max(100).default(10),
+  search: z.string().optional(),
+  warehouse: z.string().uuid().optional(),
+  include_empty: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((v) => v === 'true'),
+});
+
 export type CreateStorageLocationInput = z.infer<typeof createStorageLocationSchema>;
 export type UpdateStorageLocationInput = z.infer<typeof updateStorageLocationSchema>;
+export type LocationCodeBrowseQuery = z.infer<typeof locationCodeBrowseQuerySchema>;

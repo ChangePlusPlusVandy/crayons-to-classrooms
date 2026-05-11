@@ -86,11 +86,11 @@ export function EditMoveDialog({ open, onClose, movement, onSuccess }: EditMoveD
 
     if (sourceSlotId === movement.from_location_id) {
       // Undo returns items TO the original source → increase quantity
-      const match = adjusted.find((g) => g.product_id === movement.product_id);
+      const match = adjusted.find((g) => g.name === productName);
       if (match) {
         match.quantity += movement.quantity;
       } else {
-        // Group doesn't exist yet (all items of this product were moved away)
+        // Group doesn't exist yet (all items of this name were moved away)
         adjusted.push({
           current_location_id: sourceSlotId,
           warehouse: warehouse!.id,
@@ -102,7 +102,7 @@ export function EditMoveDialog({ open, onClose, movement, onSuccess }: EditMoveD
       }
     } else if (sourceSlotId === movement.to_location_id) {
       // Undo removes items FROM the original destination → decrease quantity
-      const match = adjusted.find((g) => g.product_id === movement.product_id);
+      const match = adjusted.find((g) => g.name === productName);
       if (match) {
         match.quantity = Math.max(0, match.quantity - movement.quantity);
         if (match.quantity === 0) {
@@ -166,7 +166,7 @@ export function EditMoveDialog({ open, onClose, movement, onSuccess }: EditMoveD
               initialWarehouse={warehouse}
               initialDestinationWarehouse={destinationWarehouse}
               initialSourceSlot={sourceSlot}
-              initialProductId={movement.product_id}
+              initialItemName={productName}
               initialDestinationSlot={destinationSlot}
               initialQuantity={movement.quantity}
               initialNotes={movement.note || ''}

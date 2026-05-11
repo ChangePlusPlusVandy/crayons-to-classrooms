@@ -1018,10 +1018,10 @@ export const moveItemsWithMovement = async (req: Request, res: Response) => {
     const createdMovement = await createInventoryMovementCore(fullMovementData, client);
 
     const movedItemIds = updateResult.rows.map((r: { id: string }) => r.id);
-    await client.query(
-      'UPDATE "inventory movement" SET item_ids = $1::uuid[] WHERE id = $2',
-      [movedItemIds, createdMovement.id]
-    );
+    await client.query('UPDATE "inventory movement" SET item_ids = $1::uuid[] WHERE id = $2', [
+      movedItemIds,
+      createdMovement.id,
+    ]);
 
     await client.query('COMMIT');
 
@@ -1156,10 +1156,10 @@ export const removeItemsWithMovement = async (req: Request, res: Response) => {
     const createdMovement = await createInventoryMovementCore(fullMovementData, client, true);
 
     const removedItemIds = updateResult.rows.map((r: { id: string }) => r.id);
-    await client.query(
-      'UPDATE "inventory movement" SET item_ids = $1::uuid[] WHERE id = $2',
-      [removedItemIds, createdMovement.id]
-    );
+    await client.query('UPDATE "inventory movement" SET item_ids = $1::uuid[] WHERE id = $2', [
+      removedItemIds,
+      createdMovement.id,
+    ]);
 
     await client.query('COMMIT');
 
@@ -1746,10 +1746,9 @@ export const getPalletMovementItems = async (req: Request, res: Response) => {
   }
 
   try {
-    const movementCheck = await pool.query(
-      'SELECT id FROM "inventory movement" WHERE id = $1',
-      [id]
-    );
+    const movementCheck = await pool.query('SELECT id FROM "inventory movement" WHERE id = $1', [
+      id,
+    ]);
     if (movementCheck.rows.length === 0) {
       return res.status(404).json({ error: 'Inventory movement not found' });
     }
