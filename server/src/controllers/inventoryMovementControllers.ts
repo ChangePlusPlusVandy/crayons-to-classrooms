@@ -20,6 +20,7 @@ import {
   bulkCreateItemsWithMovementSchema,
   moveItemsWithMovementSchema,
   removeItemsWithMovementSchema,
+  detectReversalSchema,
 } from '../utils/inventoryMovementsModel.js';
 import { ZodError } from 'zod';
 import { DbClient } from '../utils/dbTypes.js';
@@ -958,6 +959,87 @@ export const bulkCreateItemsWithMovement = async (req: Request, res: Response) =
 };
 
 /**
+ * Pre-check endpoint: detects whether a proposed move exactly reverses a prior MOVE.
+ * Returns { match: true, movementId, isGrouped } if a reversal is found, or { match: false }.
+ * Read-only — no mutations.
+ */
+export const detectReversal = async (req: Request, res: Response) => {
+  try {
+    const { from_location_id, to_location_id, item_ids } = detectReversalSchema.parse(req.body);
+
+    // Single-record check: look for a non-BULK_OP MOVE with swapped from/to
+    // whose item_ids match exactly (containment + same length = equality).
+    const singleMatch = await pool.query(
+      `SELECT id
+       FROM "inventory movement"
+       WHERE inventory_action = 'MOVE'
+         AND from_location_id = $1
+         AND to_location_id = $2
+         AND item_ids @> $3::uuid[]
+         AND array_length(item_ids, 1) = $4
+         AND (note IS NULL OR note NOT LIKE '%[BULK_OP:%')
+       ORDER BY performed_at DESC
+       LIMIT 1`,
+      [to_location_id, from_location_id, item_ids, item_ids.length]
+    );
+
+    if (singleMatch.rows.length > 0) {
+      return res.json({ match: true, movementId: singleMatch.rows[0].id, isGrouped: false });
+    }
+
+    // Grouped check: find BULK_OP groups with swapped from/to,
+    // aggregate item_ids across siblings, compare sorted arrays.
+    const groupedMatch = await pool.query(
+      `WITH candidates AS (
+         SELECT
+           substring(note FROM '\\[BULK_OP:([A-Za-z0-9-]+);BATCH:[0-9]+/[0-9]+\\]$') AS bulk_op_id,
+           item_ids
+         FROM "inventory movement"
+         WHERE inventory_action = 'MOVE'
+           AND from_location_id = $1
+           AND to_location_id = $2
+           AND note LIKE '%[BULK_OP:%'
+       ),
+       grouped AS (
+         SELECT
+           bulk_op_id,
+           array_agg(unnested ORDER BY unnested) AS all_item_ids
+         FROM candidates, unnest(item_ids) AS unnested
+         WHERE bulk_op_id IS NOT NULL
+         GROUP BY bulk_op_id
+       )
+       SELECT bulk_op_id
+       FROM grouped
+       WHERE all_item_ids = (SELECT array_agg(u ORDER BY u) FROM unnest($3::uuid[]) AS u)
+       LIMIT 1`,
+      [to_location_id, from_location_id, item_ids]
+    );
+
+    if (groupedMatch.rows.length > 0) {
+      // Find any sibling movement id from this bulk_op group to use as the reference
+      const siblingRef = await pool.query(
+        `SELECT id FROM "inventory movement"
+         WHERE note LIKE '%[BULK_OP:' || $1 || ';%'
+         ORDER BY performed_at ASC
+         LIMIT 1`,
+        [groupedMatch.rows[0].bulk_op_id]
+      );
+      if (siblingRef.rows.length > 0) {
+        return res.json({ match: true, movementId: siblingRef.rows[0].id, isGrouped: true });
+      }
+    }
+
+    return res.json({ match: false });
+  } catch (error) {
+    // Graceful degradation: any error means "no match"
+    if (error instanceof ZodError) {
+      return handleValidationError(error, res);
+    }
+    return res.json({ match: false });
+  }
+};
+
+/**
  * Moves existing items to a new location and creates an inventory movement record atomically.
  * All item location updates and the movement record are wrapped in a single transaction.
  *
@@ -1268,6 +1350,13 @@ export const editInventoryMovementMove = async (req: Request, res: Response) => 
 
     // Undo the original MOVE (reverses item locations, deletes movement record)
     await undoInventoryMovementCore({ id }, client);
+
+    // If the edit destination equals the original source, the undo already put items
+    // back where they belong — just commit and return.
+    if (moveData.to_location_id === originalFromLocationId) {
+      await client.query('COMMIT');
+      return res.status(200).json({ undone: true });
+    }
 
     let itemIds: string[];
 
@@ -2109,6 +2198,13 @@ export const editGroupedMoveMovement = async (req: Request, res: Response) => {
         const msg = err instanceof Error ? err.message : String(err);
         throw new UndoConflictError(`Batch ${batchNum}/${siblingIds.length}: ${msg}`);
       }
+    }
+
+    // If the edit destination equals the original source, the undo already put items
+    // back where they belong — just commit and return.
+    if (moveData.to_location_id === originalFromLocationId) {
+      await client.query('COMMIT');
+      return res.status(200).json({ undone: true });
     }
 
     // Move all items to the new destination

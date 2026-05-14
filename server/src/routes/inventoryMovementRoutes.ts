@@ -26,6 +26,7 @@ import {
   editGroupedMoveMovement,
   editGroupedRemoveMovement,
   getPalletMovementItems,
+  detectReversal,
 } from '../controllers/inventoryMovementControllers.js';
 
 const router = express.Router();
@@ -44,6 +45,7 @@ router.post('/with-item', createItemWithMovement); // POST /api/inventory-moveme
 router.post('/with-items', bulkCreateItemsWithMovement); // POST /api/inventory-movement/with-items
 router.post('/with-move', moveItemsWithMovement); // POST /api/inventory-movement/with-move
 router.post('/with-removal', removeItemsWithMovement); // POST /api/inventory-movement/with-removal
+router.post('/detect-reversal', detectReversal); // POST /api/inventory-movement/detect-reversal
 router.post('/:id/undo', undoInventoryMovement); // POST /api/inventory-movement/:id/undo (must be before /:id routes)
 router.post('/:id/undo-group', undoGroupedInventoryMovement); // POST /api/inventory-movement/:id/undo-group
 router.get('/:id/pallet-items', getPalletMovementItems); // GET /api/inventory-movement/:id/pallet-items

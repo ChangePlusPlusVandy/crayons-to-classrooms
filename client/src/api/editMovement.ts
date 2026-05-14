@@ -103,7 +103,7 @@ export async function editMoveMovementTransaction(
     performed_by: string;
     note?: string;
   }
-): Promise<{ movement: InventoryMovement }> {
+): Promise<{ undone: true } | { movement: InventoryMovement }> {
   const response = await authFetch(`${API_BASE_URL}/inventory-movement/${movementId}/edit-move`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -114,6 +114,7 @@ export async function editMoveMovementTransaction(
     throw new Error(errorData.error ?? 'Failed to edit movement');
   }
   const data = await response.json();
+  if (data.undone) return { undone: true };
   return { movement: InventoryMovementSchema.parse(data.movement) };
 }
 
@@ -126,7 +127,7 @@ export async function editGroupedMoveMovementTransaction(
     performed_by: string;
     note?: string;
   }
-): Promise<{ movement: InventoryMovement }> {
+): Promise<{ undone: true } | { movement: InventoryMovement }> {
   const response = await authFetch(`${API_BASE_URL}/inventory-movement/${movementId}/edit-group-move`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -137,6 +138,7 @@ export async function editGroupedMoveMovementTransaction(
     throw new Error(errorData.error ?? 'Failed to edit grouped movement');
   }
   const data = await response.json();
+  if (data.undone) return { undone: true };
   return { movement: InventoryMovementSchema.parse(data.movement) };
 }
 
