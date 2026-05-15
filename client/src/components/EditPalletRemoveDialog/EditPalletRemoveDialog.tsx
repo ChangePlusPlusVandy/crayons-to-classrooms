@@ -14,14 +14,9 @@ import {
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import { useAuth } from '../../context/AuthContext';
-import { WarehouseSelector } from '../WarehouseSelector/WarehouseSelector';
-import { SlotSelector } from '../SlotSelector/SlotSelector';
 import { editRemoveMovementTransaction, editGroupedRemoveMovementTransaction } from '../../api/editMovement';
 import { InventoryMovement } from '../../types/InventoryMovement';
-import { Warehouse } from '../../types/Warehouse';
-import { StorageLocation } from '../../types/StorageLocation';
-import { getStorageLocations } from '../../api/moveItem';
-import { getStorageLocationById, getWarehouseById } from '../../api/addItem';
+import { getStorageLocationById } from '../../api/addItem';
 
 interface EditPalletRemoveDialogProps {
   open: boolean;
@@ -44,9 +39,7 @@ export function EditPalletRemoveDialog({
   const [submitError, setSubmitError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  const [storageLocations, setStorageLocations] = useState<StorageLocation[]>([]);
-  const [sourceWarehouse, setSourceWarehouse] = useState<Warehouse | null>(null);
-  const [sourceSlot, setSourceSlot] = useState<string | null>(null);
+  const [sourceSlotName, setSourceSlotName] = useState('');
   const [note, setNote] = useState(movement.note || '');
 
   useEffect(() => {
@@ -63,16 +56,8 @@ export function EditPalletRemoveDialog({
           return;
         }
 
-        const [allLocations, srcLocation] = await Promise.all([
-          getStorageLocations(),
-          getStorageLocationById(movement.from_location_id),
-        ]);
-
-        setStorageLocations(allLocations);
-
-        const wh = await getWarehouseById(srcLocation.warehouse_id);
-        setSourceWarehouse(wh);
-        setSourceSlot(srcLocation.slot);
+        const srcLocation = await getStorageLocationById(movement.from_location_id);
+        setSourceSlotName(srcLocation.slot);
       } catch {
         setFetchError('Failed to load movement details');
       } finally {
@@ -84,17 +69,9 @@ export function EditPalletRemoveDialog({
   }, [open, movement.from_location_id, movement.note]);
 
   const handleSubmit = async () => {
-    if (!sourceWarehouse || !sourceSlot) return;
+    if (!movement.from_location_id) return;
     if (!user) {
       setSubmitError('Not authenticated');
-      return;
-    }
-
-    const matchingLocation = storageLocations.find(
-      (loc) => loc.warehouse_id === sourceWarehouse.id && loc.slot === sourceSlot
-    );
-    if (!matchingLocation) {
-      setSubmitError('Could not find the selected source slot');
       return;
     }
 
@@ -104,7 +81,7 @@ export function EditPalletRemoveDialog({
     try {
       const payload = {
         inventory_action: movement.inventory_action as 'DONATED' | 'DISCARD',
-        from_location_id: matchingLocation.id,
+        from_location_id: movement.from_location_id,
         quantity: movement.quantity,
         performed_by: user.id,
         note: note || undefined,
@@ -126,8 +103,6 @@ export function EditPalletRemoveDialog({
       setSubmitting(false);
     }
   };
-
-  const canSubmit = !!sourceWarehouse && !!sourceSlot && !submitting;
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
@@ -163,24 +138,12 @@ export function EditPalletRemoveDialog({
               Quantity: {movement.quantity} items
             </Typography>
 
-            <WarehouseSelector
-              value={sourceWarehouse}
-              onChange={(wh) => {
-                setSourceWarehouse(wh);
-                setSourceSlot(null);
-              }}
-              label="Warehouse"
-              required
-            />
-
-            <SlotSelector
-              value={sourceSlot}
-              onChange={setSourceSlot}
-              warehouse={sourceWarehouse}
-              storageLocations={storageLocations}
-              label="Slot"
-              required
-            />
+            <Box>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                Removed from
+              </Typography>
+              <Typography variant="body1">{sourceSlotName}</Typography>
+            </Box>
 
             <TextField
               label="Notes"
@@ -196,7 +159,7 @@ export function EditPalletRemoveDialog({
       {!loading && !fetchError && (
         <DialogActions>
           <Button onClick={onClose}>Cancel</Button>
-          <Button variant="contained" onClick={handleSubmit} disabled={!canSubmit}>
+          <Button variant="contained" onClick={handleSubmit} disabled={submitting}>
             {submitting ? <CircularProgress size={20} /> : 'Save Changes'}
           </Button>
         </DialogActions>
