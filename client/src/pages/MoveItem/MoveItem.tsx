@@ -30,7 +30,7 @@ export default function MoveItem() {
         (item) =>
           item.warehouse === itemGroup.warehouse &&
           item.current_location_id === itemGroup.current_location_id &&
-          item.product_id === itemGroup.product_id
+          item.name === itemGroup.name
       );
 
       const itemsToMove = itemsInGroup

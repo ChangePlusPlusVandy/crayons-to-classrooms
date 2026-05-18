@@ -236,7 +236,9 @@ export default function PalletMoveForm({
       />
 
       <FormControl fullWidth disabled={!selectedWarehouse}>
-        <MoveItemFormLabel htmlFor="pallet-source-slot-select" required>Source Slot</MoveItemFormLabel>
+        <MoveItemFormLabel htmlFor="pallet-source-slot-select" required>
+          Source Slot
+        </MoveItemFormLabel>
         <Autocomplete
           id="pallet-source-slot-select"
           options={warehouseLocations}
@@ -285,7 +287,7 @@ export default function PalletMoveForm({
             <Stack spacing={0.5}>
               {itemGroups.map((group) => (
                 <Box
-                  key={`${group.product_id}-${group.current_location_id}`}
+                  key={`${group.name}-${group.current_location_id}`}
                   sx={{ display: 'flex', justifyContent: 'space-between' }}
                 >
                   <Typography variant="body2">{group.name}</Typography>

@@ -22,11 +22,7 @@ import { getItemInfoAll, getItemInfoDetails, ItemInfo } from '../../api/itemInfo
 import { Warehouse } from '../../types/Warehouse';
 import { StorageLocation } from '../../types/StorageLocation';
 import { Product } from '../../types/Product';
-import {
-  AddItemFormLabel,
-  ProductNameText,
-  HighlightedText,
-} from './AddItemForm.styles';
+import { AddItemFormLabel, ProductNameText, HighlightedText } from './AddItemForm.styles';
 import { WarehouseSelector } from '../WarehouseSelector/WarehouseSelector';
 import { SlotSelector } from '../SlotSelector/SlotSelector';
 
@@ -507,7 +503,9 @@ export default function AddItemForm({
 
       {/* Item name (item_info) */}
       <FormControl fullWidth>
-        <AddItemFormLabel htmlFor="item-name-select" required>Item Name</AddItemFormLabel>
+        <AddItemFormLabel htmlFor="item-name-select" required>
+          Item Name
+        </AddItemFormLabel>
         {isNewItemMode ? (
           <>
             <TextField
@@ -717,7 +715,9 @@ export default function AddItemForm({
 
                 return (
                   <li key={key} {...otherProps}>
-                    <ProductNameText>{highlightText(option.name || 'Unknown', searchTerm)}</ProductNameText>
+                    <ProductNameText>
+                      {highlightText(option.name || 'Unknown', searchTerm)}
+                    </ProductNameText>
                   </li>
                 );
               }}
@@ -865,7 +865,9 @@ export default function AddItemForm({
 
       {/* Quantity to Add */}
       <FormControl fullWidth>
-        <AddItemFormLabel htmlFor="quantity-input" required>Quantity to Add</AddItemFormLabel>
+        <AddItemFormLabel htmlFor="quantity-input" required>
+          Quantity to Add
+        </AddItemFormLabel>
         <TextField
           id="quantity-input"
           type="number"

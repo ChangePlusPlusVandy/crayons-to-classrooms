@@ -78,7 +78,9 @@ export const getItemsInfoPaginated = async (req: Request, res: Response) => {
 
     if (category) {
       if (category === 'No Category') {
-        conditions.push(`(ii.category IS NULL OR ii.category = 'UNKNOWN' OR ii.category = 'No Category')`);
+        conditions.push(
+          `(ii.category IS NULL OR ii.category = 'UNKNOWN' OR ii.category = 'No Category')`
+        );
       } else {
         conditions.push(`ii.category = $${paramIdx++}`);
         params.push(category);

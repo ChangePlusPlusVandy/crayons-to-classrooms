@@ -64,8 +64,7 @@ export default function Limbo() {
   const [deleteSubmitting, setDeleteSubmitting] = useState(false);
   const [tableActionError, setTableActionError] = useState('');
 
-  const tableRowActionsLocked =
-    deleteSubmitting || itemToDelete !== null || restockSubmitting;
+  const tableRowActionsLocked = deleteSubmitting || itemToDelete !== null || restockSubmitting;
 
   const warehouseNameOptions = useMemo(
     () => [...warehouses].map((w) => w.name).sort((a, b) => a.localeCompare(b)),
