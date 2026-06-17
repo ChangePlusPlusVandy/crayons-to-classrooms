@@ -229,9 +229,9 @@ export default function ActivityLog() {
                     : 'Unknown item');
                 const isUndoable =
                   activity.inventory_action === 'MOVE' ||
-                    activity.inventory_action === 'ADD' ||
-                    activity.inventory_action === 'DONATED' ||
-                    activity.inventory_action === 'DISCARD';
+                  activity.inventory_action === 'ADD' ||
+                  activity.inventory_action === 'DONATED' ||
+                  activity.inventory_action === 'DISCARD';
 
                 return (
                   <Box key={activity.id} sx={activityLogStyles.activityItem}>
@@ -300,14 +300,14 @@ export default function ActivityLog() {
                         activity.inventory_action === 'MOVE' ||
                         activity.inventory_action === 'DONATED' ||
                         activity.inventory_action === 'DISCARD') && (
-                          <IconButton
-                            size="small"
-                            aria-label={`Edit ${activity.inventory_action.toLowerCase()} for ${productName}`}
-                            onClick={() => handleEditClick(activity)}
-                          >
-                            <EditIcon fontSize="small" />
-                          </IconButton>
-                        )}
+                        <IconButton
+                          size="small"
+                          aria-label={`Edit ${activity.inventory_action.toLowerCase()} for ${productName}`}
+                          onClick={() => handleEditClick(activity)}
+                        >
+                          <EditIcon fontSize="small" />
+                        </IconButton>
+                      )}
                     </Box>
                   </Box>
                 );
@@ -338,16 +338,14 @@ export default function ActivityLog() {
         </CardContent>
       </Card>
 
-      {editingMovement &&
-        editingMovement.inventory_action === 'ADD' &&
-        editingMovement.product_id && (
-          <EditAddDialog
-            open={!!editingMovement}
-            onClose={handleEditClose}
-            movement={{ ...editingMovement, product_id: editingMovement.product_id }}
-            onSuccess={handleEditSuccess}
-          />
-        )}
+      {editingMovement && editingMovement.inventory_action === 'ADD' && (
+        <EditAddDialog
+          open={!!editingMovement}
+          onClose={handleEditClose}
+          movement={editingMovement}
+          onSuccess={handleEditSuccess}
+        />
+      )}
 
       {editingMovement &&
         editingMovement.inventory_action === 'MOVE' &&

@@ -37,6 +37,7 @@ export interface AddItemFormData {
     name: string;
     category: string;
     subcategoryProductId?: string;
+    newSubcategoryName?: string;
     limit?: number;
     value?: number;
     packSize?: number;
@@ -133,9 +134,7 @@ export default function AddItemForm({
         setItemInfoList(itemInfoData);
         setStorageLocations(locationsData);
         if (initialItemInfoId && !initialItemInfo) {
-          const match = itemInfoData.find(
-            (info) => info.id === initialItemInfoId && !!info.product_id
-          );
+          const match = itemInfoData.find((info) => info.id === initialItemInfoId);
           if (match) setSelectedItemInfo(match);
         }
       } catch (err) {
@@ -316,7 +315,10 @@ export default function AddItemForm({
       setError('Please enter an item name.');
       return;
     }
-    if (isNewItemMode && (newItemValue === '' || typeof newItemValue !== 'number' || newItemValue < 0)) {
+    if (
+      isNewItemMode &&
+      (newItemValue === '' || typeof newItemValue !== 'number' || newItemValue < 0)
+    ) {
       setError('Please enter a value (0 or greater) for the new item.');
       return;
     }
