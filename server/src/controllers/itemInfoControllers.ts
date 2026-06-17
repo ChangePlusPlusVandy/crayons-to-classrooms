@@ -452,7 +452,7 @@ export const createItemInfo = async (req: Request, res: Response) => {
         product_id,
         category,
         quantity,
-        value != null ? Math.round(value) : null,
+        value,
         item_limit,
         limbo,
         stock,
@@ -507,7 +507,7 @@ export const updateItemInfo = async (req: Request, res: Response) => {
 
     for (const [key, val] of Object.entries(validatedData)) {
       setClauses.push(`${key} = $${idx++}`);
-      values.push(key === 'value' && val != null ? Math.round(val as number) : val);
+      values.push(val);
     }
 
     // item_info uses time_last_updated (not updated_at); other controllers update the same column.
