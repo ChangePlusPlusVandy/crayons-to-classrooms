@@ -230,8 +230,7 @@ export default function Activities() {
     const from = activity.from_location_name;
     const to = activity.to_location_name;
     /** Matches dashboard ActivityLog: e.g. ADD (x6) */
-    const quantitySuffix =
-      typeof activity.quantity === 'number' ? ` (x${activity.quantity})` : '';
+    const quantitySuffix = typeof activity.quantity === 'number' ? ` (x${activity.quantity})` : '';
 
     switch (action) {
       case 'ADD':
@@ -421,19 +420,19 @@ export default function Activities() {
                           activity.inventory_action === 'MOVE' ||
                           activity.inventory_action === 'DONATED' ||
                           activity.inventory_action === 'DISCARD') && (
-                            <IconButton
-                              sx={activitiesStyles.actionButton}
-                              onClick={() => handleEditClick(activity)}
-                              aria-label={`Edit ${activity.inventory_action} for ${getProductDisplayName(activity)}`}
-                            >
-                              <Box
-                                component="img"
-                                src={modifyPen}
-                                alt="Edit"
-                                sx={activitiesStyles.actionIcon}
-                              />
-                            </IconButton>
-                          )}
+                          <IconButton
+                            sx={activitiesStyles.actionButton}
+                            onClick={() => handleEditClick(activity)}
+                            aria-label={`Edit ${activity.inventory_action} for ${getProductDisplayName(activity)}`}
+                          >
+                            <Box
+                              component="img"
+                              src={modifyPen}
+                              alt="Edit"
+                              sx={activitiesStyles.actionIcon}
+                            />
+                          </IconButton>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))
@@ -445,11 +444,11 @@ export default function Activities() {
           {renderPagination()}
         </>
       )}
-      {editingMovement?.inventory_action === 'ADD' && editingMovement.product_id && (
+      {editingMovement?.inventory_action === 'ADD' && (
         <EditAddDialog
           open={!!editingMovement}
           onClose={handleEditClose}
-          movement={{ ...editingMovement, product_id: editingMovement.product_id }}
+          movement={editingMovement}
           onSuccess={handleEditSuccess}
         />
       )}
@@ -465,16 +464,15 @@ export default function Activities() {
           />
         )}
 
-      {editingMovement?.inventory_action === 'MOVE' &&
-        isPalletOperation(editingMovement) && (
-          <EditPalletMoveDialog
-            open={!!editingMovement}
-            onClose={handleEditClose}
-            movement={editingMovement}
-            onSuccess={handleEditSuccess}
-            isGroupedOperation={editingMovement.is_grouped_operation}
-          />
-        )}
+      {editingMovement?.inventory_action === 'MOVE' && isPalletOperation(editingMovement) && (
+        <EditPalletMoveDialog
+          open={!!editingMovement}
+          onClose={handleEditClose}
+          movement={editingMovement}
+          onSuccess={handleEditSuccess}
+          isGroupedOperation={editingMovement.is_grouped_operation}
+        />
+      )}
 
       {(editingMovement?.inventory_action === 'DONATED' ||
         editingMovement?.inventory_action === 'DISCARD') &&

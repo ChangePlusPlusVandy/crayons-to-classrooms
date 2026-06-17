@@ -41,14 +41,18 @@ export default function AddItem() {
           packSize = data.newProductData.packSize;
         }
 
-        // Create a product row so the new name appears in the product picker
-        const newProduct = await createProduct({
-          name: productName,
-          value: productValue ?? 0,
-          category: productCategory,
-          item_limit: productItemLimit,
-        });
-        productId = newProduct.id;
+        if (data.newProductData.newSubcategoryName) {
+          // Only create a product when the user explicitly creates a new subcategory.
+          const newProduct = await createProduct({
+            name: data.newProductData.newSubcategoryName,
+            value: productValue ?? 0,
+            category: productCategory,
+            item_limit: productItemLimit,
+          });
+          productId = newProduct.id;
+        } else {
+          productId = data.newProductData.subcategoryProductId;
+        }
       } else {
         const { itemInfo } = data;
         productId = itemInfo.product_id || undefined;

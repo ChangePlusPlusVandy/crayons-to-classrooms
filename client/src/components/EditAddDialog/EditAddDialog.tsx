@@ -20,7 +20,7 @@ import { supabase } from '../../supabaseClient';
 interface EditAddDialogProps {
   open: boolean;
   onClose: () => void;
-  movement: Omit<InventoryMovement, 'product_id'> & { product_id: string };
+  movement: InventoryMovement;
   onSuccess?: () => void;
 }
 
@@ -39,8 +39,8 @@ export function EditAddDialog({ open, onClose, movement, onSuccess }: EditAddDia
 
     async function fetchData() {
       try {
-        if (!movement.product_id || !movement.to_location_id || !movement.item_id) {
-          setFetchError('Cannot edit: movement is missing product, location, or item');
+        if (!movement.to_location_id || !movement.item_id) {
+          setFetchError('Cannot edit: movement is missing location or item');
           return;
         }
         const [itemRow, location] = await Promise.all([
@@ -59,7 +59,7 @@ export function EditAddDialog({ open, onClose, movement, onSuccess }: EditAddDia
     }
 
     fetchData();
-  }, [open, movement.product_id, movement.to_location_id, movement.item_id]);
+  }, [open, movement.to_location_id, movement.item_id]);
 
   const handleSubmit = async (data: AddItemFormData) => {
     const { itemInfo } = data;
