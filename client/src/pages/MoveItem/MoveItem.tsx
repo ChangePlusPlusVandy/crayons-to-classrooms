@@ -41,7 +41,7 @@ export default function MoveItem() {
         throw new Error('Insufficient items in group to move');
       }
 
-      await moveItemsWithMovement({
+      const result = await moveItemsWithMovement({
         item_ids: itemsToMove.map((item) => item.id),
         movement: {
           inventory_action: 'MOVE',
@@ -54,7 +54,11 @@ export default function MoveItem() {
         onProgress: (progress) => setBulkProgress(progress),
       });
 
-      setSuccess(`${quantity} item${quantity > 1 ? 's' : ''} moved successfully!`);
+      if (result.undone) {
+        setSuccess(`Move undone: ${result.itemCount} item(s) returned to original location. No log entry created.`);
+      } else {
+        setSuccess(`${quantity} item${quantity > 1 ? 's' : ''} moved successfully!`);
+      }
       setFormKey((k) => k + 1);
     } catch (err: unknown) {
       console.error('Error moving item:', err);
@@ -82,7 +86,7 @@ export default function MoveItem() {
         throw new Error('No active items found in the source slot.');
       }
 
-      await moveItemsWithMovement({
+      const result = await moveItemsWithMovement({
         item_ids: activeItems.map((item) => item.id),
         movement: {
           inventory_action: 'MOVE',
@@ -95,9 +99,13 @@ export default function MoveItem() {
         onProgress: (progress) => setBulkProgress(progress),
       });
 
-      setSuccess(
-        `${activeItems.length} item${activeItems.length > 1 ? 's' : ''} moved successfully!`
-      );
+      if (result.undone) {
+        setSuccess(`Move undone: ${result.itemCount} item(s) returned to original location. No log entry created.`);
+      } else {
+        setSuccess(
+          `${activeItems.length} item${activeItems.length > 1 ? 's' : ''} moved successfully!`
+        );
+      }
       setFormKey((k) => k + 1);
     } catch (err: unknown) {
       console.error('Error moving pallet:', err);

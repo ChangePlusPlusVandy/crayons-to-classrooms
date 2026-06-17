@@ -174,6 +174,7 @@ export function EditMoveDialog({ open, onClose, movement, onSuccess }: EditMoveD
               onCancel={onClose}
               submitLabel="Save Changes"
               adjustItemGroups={adjustItemGroups}
+              disableSource
             />
           </>
         )}

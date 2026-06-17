@@ -74,6 +74,8 @@ interface RemoveItemFormProps {
   onSubmit: (data: RemoveItemFormData) => Promise<void>;
   onCancel: () => void;
   submitLabel?: string;
+  disableQuantity?: boolean;
+  disableItem?: boolean;
 }
 
 const removalActionOptions = [
@@ -92,6 +94,8 @@ export default function RemoveItemForm({
   onSubmit,
   onCancel,
   submitLabel = 'Remove Item',
+  disableQuantity = false,
+  disableItem = false,
 }: RemoveItemFormProps) {
   const [selectedWarehouse, setSelectedWarehouse] = useState<Warehouse | null>(initialWarehouse);
   const [selectedGroup, setSelectedGroup] = useState<ItemGroupWithLocation | null>(null);
@@ -274,10 +278,14 @@ export default function RemoveItemForm({
           options={groupOptions}
           value={selectedGroup}
           onChange={(_, newValue) => {
+            if (disableItem) return;
             setSelectedGroup(newValue);
             setQuantityToRemove(null);
           }}
-          isOptionEqualToValue={(a, b) => a.name === b.name && a.locationId === b.locationId}
+          disabled={disableItem}
+          isOptionEqualToValue={(a, b) =>
+            a.itemInfoId === b.itemInfoId && a.locationId === b.locationId
+          }
           getOptionLabel={(option) => option.name}
           renderOption={(props, option) => (
             <li {...props} key={`${option.name}|${option.locationId}`}>
@@ -303,7 +311,7 @@ export default function RemoveItemForm({
           type="number"
           value={quantityToRemove ?? ''}
           onChange={(e) => {
-            if (!selectedGroup) return;
+            if (!selectedGroup || disableQuantity) return;
             const raw = e.target.value;
             if (raw === '') {
               setQuantityToRemove(null);
@@ -320,7 +328,7 @@ export default function RemoveItemForm({
           fullWidth
           inputProps={{ min: 0, max: maxRemovable }}
           helperText={selectedGroup ? `Available: ${maxRemovable}` : 'Select an item first'}
-          disabled={!selectedGroup}
+          disabled={!selectedGroup || disableQuantity}
         />
       </FormControl>
 

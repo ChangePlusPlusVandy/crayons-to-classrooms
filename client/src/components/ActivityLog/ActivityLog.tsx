@@ -22,10 +22,12 @@ import VisibilityIcon from '@mui/icons-material/Visibility';
 import { activityLogStyles } from './ActivityLog.styles';
 import { getActivities, ActivityDisplay } from '../../api/activities';
 import { isPalletOperation } from '../../api/palletUtils';
-import { undoInventoryMovement } from '../../api/moveItem';
+import { undoInventoryMovement, undoGroupedInventoryMovement } from '../../api/moveItem';
 import { EditAddDialog } from '../EditAddDialog/EditAddDialog';
 import { EditMoveDialog } from '../EditMoveDialog/EditMoveDialog';
+import { EditPalletMoveDialog } from '../EditPalletMoveDialog/EditPalletMoveDialog';
 import { EditRemoveDialog } from '../EditRemoveDialog/EditRemoveDialog';
+import { EditPalletRemoveDialog } from '../EditPalletRemoveDialog/EditPalletRemoveDialog';
 import { PalletDetailsDialog } from '../PalletDetailsDialog/PalletDetailsDialog';
 
 const ACTION_COLORS: Record<string, string> = {
@@ -147,7 +149,11 @@ export default function ActivityLog() {
 
     setUndoingId(activity.id);
     try {
-      await undoInventoryMovement(activity.id);
+      if (activity.is_grouped_operation) {
+        await undoGroupedInventoryMovement(activity.id);
+      } else {
+        await undoInventoryMovement(activity.id);
+      }
       setSnackbar({
         open: true,
         message: `Successfully undid ${activity.inventory_action} for ${activity.product_name || 'item'}`,
@@ -222,11 +228,10 @@ export default function ActivityLog() {
                     ? 'Entire Pallet'
                     : 'Unknown item');
                 const isUndoable =
-                  (activity.inventory_action === 'MOVE' ||
+                  activity.inventory_action === 'MOVE' ||
                     activity.inventory_action === 'ADD' ||
                     activity.inventory_action === 'DONATED' ||
-                    activity.inventory_action === 'DISCARD') &&
-                  !activity.is_grouped_operation;
+                    activity.inventory_action === 'DISCARD';
 
                 return (
                   <Box key={activity.id} sx={activityLogStyles.activityItem}>
@@ -294,8 +299,7 @@ export default function ActivityLog() {
                       {(activity.inventory_action === 'ADD' ||
                         activity.inventory_action === 'MOVE' ||
                         activity.inventory_action === 'DONATED' ||
-                        activity.inventory_action === 'DISCARD') &&
-                        !activity.is_grouped_operation && (
+                        activity.inventory_action === 'DISCARD') && (
                           <IconButton
                             size="small"
                             aria-label={`Edit ${activity.inventory_action.toLowerCase()} for ${productName}`}
@@ -347,6 +351,7 @@ export default function ActivityLog() {
 
       {editingMovement &&
         editingMovement.inventory_action === 'MOVE' &&
+        !isPalletOperation(editingMovement) &&
         editingMovement.product_id && (
           <EditMoveDialog
             open={!!editingMovement}
@@ -357,8 +362,34 @@ export default function ActivityLog() {
         )}
 
       {editingMovement &&
+        editingMovement.inventory_action === 'MOVE' &&
+        isPalletOperation(editingMovement) && (
+          <EditPalletMoveDialog
+            open={!!editingMovement}
+            onClose={handleEditClose}
+            movement={editingMovement}
+            onSuccess={handleEditSuccess}
+            isGroupedOperation={editingMovement.is_grouped_operation}
+          />
+        )}
+
+      {editingMovement &&
         (editingMovement.inventory_action === 'DONATED' ||
-          editingMovement.inventory_action === 'DISCARD') && (
+          editingMovement.inventory_action === 'DISCARD') &&
+        isPalletOperation(editingMovement) && (
+          <EditPalletRemoveDialog
+            open={!!editingMovement}
+            onClose={handleEditClose}
+            movement={editingMovement}
+            onSuccess={handleEditSuccess}
+            isGroupedOperation={editingMovement.is_grouped_operation}
+          />
+        )}
+
+      {editingMovement &&
+        (editingMovement.inventory_action === 'DONATED' ||
+          editingMovement.inventory_action === 'DISCARD') &&
+        !isPalletOperation(editingMovement) && (
           <EditRemoveDialog
             open={!!editingMovement}
             onClose={handleEditClose}
@@ -412,6 +443,9 @@ export default function ActivityLog() {
           <DialogContentText id="undo-confirm-dialog-description">
             Are you sure you want to undo this {undoConfirmDialog.activity?.inventory_action} action
             for {undoConfirmDialog.activity?.product_name || 'this item'}?
+            {undoConfirmDialog.activity?.is_grouped_operation &&
+              undoConfirmDialog.activity.grouped_batch_count > 1 &&
+              ` This will undo all ${undoConfirmDialog.activity.grouped_batch_count} batches of this operation.`}
           </DialogContentText>
         </DialogContent>
         <DialogActions>

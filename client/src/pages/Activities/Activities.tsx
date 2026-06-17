@@ -23,13 +23,15 @@ import {
 } from '@mui/material';
 import { getActivities, ActivityDisplay } from '../../api/activities';
 import { isPalletOperation } from '../../api/palletUtils';
-import { undoInventoryMovement } from '../../api/moveItem';
+import { undoInventoryMovement, undoGroupedInventoryMovement } from '../../api/moveItem';
 import { activitiesStyles } from './Activities.styles';
 import undoArrow from '../../assets/undo_arrow.svg';
 import modifyPen from '../../assets/modify_pen.svg';
 import { EditAddDialog } from '../../components/EditAddDialog/EditAddDialog';
 import { EditMoveDialog } from '../../components/EditMoveDialog/EditMoveDialog';
+import { EditPalletMoveDialog } from '../../components/EditPalletMoveDialog/EditPalletMoveDialog';
 import { EditRemoveDialog } from '../../components/EditRemoveDialog/EditRemoveDialog';
+import { EditPalletRemoveDialog } from '../../components/EditPalletRemoveDialog/EditPalletRemoveDialog';
 import { PalletDetailsDialog } from '../../components/PalletDetailsDialog/PalletDetailsDialog';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 
@@ -102,16 +104,6 @@ export default function Activities() {
   }, [fetchActivities]);
 
   const handleUndoClick = (activity: ActivityDisplay) => {
-    if (activity.is_grouped_operation) {
-      setSnackbar({
-        open: true,
-        message:
-          'This is a combined bulk activity. Open the individual movement records to undo/edit batches.',
-        severity: 'error',
-      });
-      return;
-    }
-
     if (!activity.id) {
       setSnackbar({
         open: true,
@@ -148,7 +140,11 @@ export default function Activities() {
 
     setUndoingId(activity.id);
     try {
-      await undoInventoryMovement(activity.id);
+      if (activity.is_grouped_operation) {
+        await undoGroupedInventoryMovement(activity.id);
+      } else {
+        await undoInventoryMovement(activity.id);
+      }
       setSnackbar({
         open: true,
         message: `Successfully undid ${activity.inventory_action} for ${activity.product_name || 'item'}`,
@@ -407,7 +403,7 @@ export default function Activities() {
                         <IconButton
                           sx={activitiesStyles.actionButton}
                           onClick={() => handleUndoClick(activity)}
-                          disabled={undoingId === activity.id || activity.is_grouped_operation}
+                          disabled={undoingId === activity.id}
                           aria-label={`Undo ${activity.inventory_action} for ${getProductDisplayName(activity)}`}
                         >
                           {undoingId === activity.id ? (
@@ -424,8 +420,7 @@ export default function Activities() {
                         {(activity.inventory_action === 'ADD' ||
                           activity.inventory_action === 'MOVE' ||
                           activity.inventory_action === 'DONATED' ||
-                          activity.inventory_action === 'DISCARD') &&
-                          !activity.is_grouped_operation && (
+                          activity.inventory_action === 'DISCARD') && (
                             <IconButton
                               sx={activitiesStyles.actionButton}
                               onClick={() => handleEditClick(activity)}
@@ -459,24 +454,50 @@ export default function Activities() {
         />
       )}
 
-      {editingMovement?.inventory_action === 'MOVE' && editingMovement.product_id && (
-        <EditMoveDialog
-          open={!!editingMovement}
-          onClose={handleEditClose}
-          movement={{ ...editingMovement, product_id: editingMovement.product_id }}
-          onSuccess={handleEditSuccess}
-        />
-      )}
+      {editingMovement?.inventory_action === 'MOVE' &&
+        !isPalletOperation(editingMovement) &&
+        editingMovement.product_id && (
+          <EditMoveDialog
+            open={!!editingMovement}
+            onClose={handleEditClose}
+            movement={{ ...editingMovement, product_id: editingMovement.product_id }}
+            onSuccess={handleEditSuccess}
+          />
+        )}
+
+      {editingMovement?.inventory_action === 'MOVE' &&
+        isPalletOperation(editingMovement) && (
+          <EditPalletMoveDialog
+            open={!!editingMovement}
+            onClose={handleEditClose}
+            movement={editingMovement}
+            onSuccess={handleEditSuccess}
+            isGroupedOperation={editingMovement.is_grouped_operation}
+          />
+        )}
 
       {(editingMovement?.inventory_action === 'DONATED' ||
-        editingMovement?.inventory_action === 'DISCARD') && (
-        <EditRemoveDialog
-          open={!!editingMovement}
-          onClose={handleEditClose}
-          movement={editingMovement}
-          onSuccess={handleEditSuccess}
-        />
-      )}
+        editingMovement?.inventory_action === 'DISCARD') &&
+        isPalletOperation(editingMovement) && (
+          <EditPalletRemoveDialog
+            open={!!editingMovement}
+            onClose={handleEditClose}
+            movement={editingMovement}
+            onSuccess={handleEditSuccess}
+            isGroupedOperation={editingMovement.is_grouped_operation}
+          />
+        )}
+
+      {(editingMovement?.inventory_action === 'DONATED' ||
+        editingMovement?.inventory_action === 'DISCARD') &&
+        !isPalletOperation(editingMovement) && (
+          <EditRemoveDialog
+            open={!!editingMovement}
+            onClose={handleEditClose}
+            movement={editingMovement}
+            onSuccess={handleEditSuccess}
+          />
+        )}
 
       <Snackbar
         open={showSuccessAlert}
@@ -523,6 +544,9 @@ export default function Activities() {
           <DialogContentText id="undo-confirm-dialog-description">
             Are you sure you want to undo this {undoConfirmDialog.activity?.inventory_action} action
             for {undoConfirmDialog.activity?.product_name || 'this item'}?
+            {undoConfirmDialog.activity?.is_grouped_operation &&
+              undoConfirmDialog.activity.grouped_batch_count > 1 &&
+              ` This will undo all ${undoConfirmDialog.activity.grouped_batch_count} batches of this operation.`}
           </DialogContentText>
         </DialogContent>
         <DialogActions>

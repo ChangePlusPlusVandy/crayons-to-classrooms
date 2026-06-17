@@ -112,7 +112,7 @@ export const createItemWithMovementSchema = z.object({
 export const editMoveSchema = z.object({
   from_location_id: uuidSchema,
   to_location_id: uuidSchema,
-  product_id: uuidSchema,
+  product_id: uuidSchema.nullable().optional(),
   quantity: z.number().int().positive('Quantity must be a positive integer'),
   performed_by: uuidSchema,
   note: z.string().optional(),
@@ -184,3 +184,15 @@ export const bulkCreateItemsWithMovementSchema = z.object({
 export type BulkCreateItemsWithMovementInput = z.infer<typeof bulkCreateItemsWithMovementSchema>;
 export type MovementIdParamType = z.infer<typeof movementIdParamSchema>;
 export type MoveItemsWithMovementInput = z.infer<typeof moveItemsWithMovementSchema>;
+
+/**
+ * Schema for the detect-reversal pre-check endpoint.
+ * Validates the payload before querying for a matching prior MOVE that would be reversed.
+ */
+export const detectReversalSchema = z.object({
+  from_location_id: uuidSchema,
+  to_location_id: uuidSchema,
+  item_ids: z.array(uuidSchema).nonempty('At least one item_id is required'),
+});
+
+export type DetectReversalInput = z.infer<typeof detectReversalSchema>;

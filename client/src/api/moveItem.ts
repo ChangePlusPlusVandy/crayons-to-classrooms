@@ -31,7 +31,10 @@ function withBulkNoteMarker(
   operationId: string,
   batch: number,
   totalBatches: number
-): string {
+): string | undefined {
+  // Only tag when there are multiple batches — single-batch operations
+  // should not be flagged as grouped so they remain undoable/editable.
+  if (totalBatches <= 1) return sanitizeUserNote(note);
   const marker = `[BULK_OP:${operationId};BATCH:${batch}/${totalBatches}]`;
   const cleanNote = sanitizeUserNote(note);
   return cleanNote ? `${cleanNote} ${marker}` : marker;
@@ -194,6 +197,47 @@ export async function undoInventoryMovement(movementId: string): Promise<void> {
   }
 }
 
+export async function undoGroupedInventoryMovement(movementId: string): Promise<{ batchesUndone: number }> {
+  const response = await authFetch(`${API_BASE_URL}/inventory-movement/${movementId}/undo-group`, {
+    method: 'POST',
+  });
+  if (!response.ok) {
+    let errorMessage = 'Failed to undo grouped movement';
+    try {
+      const data = await response.json();
+      if (data && data.error) {
+        errorMessage = data.error;
+      }
+    } catch {
+      // If JSON parsing fails, use default message
+    }
+    throw new Error(errorMessage);
+  }
+  return response.json();
+}
+
+async function detectReversalPreCheck(
+  from_location_id: string,
+  to_location_id: string,
+  item_ids: string[]
+): Promise<{ match: false } | { match: true; movementId: string; isGrouped: boolean }> {
+  try {
+    const response = await authFetch(`${API_BASE_URL}/inventory-movement/detect-reversal`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from_location_id, to_location_id, item_ids }),
+    });
+    if (!response.ok) return { match: false };
+    return await response.json();
+  } catch {
+    return { match: false };
+  }
+}
+
+export type MoveItemsResult =
+  | { undone: true; itemCount: number }
+  | { undone?: false; updatedCount: number; movement: InventoryMovement };
+
 export async function moveItemsWithMovement(payload: {
   item_ids: string[];
   movement: {
@@ -205,7 +249,24 @@ export async function moveItemsWithMovement(payload: {
     note?: string;
   };
   onProgress?: (progress: BulkOperationProgress) => void;
-}): Promise<{ updatedCount: number; movement: InventoryMovement }> {
+}): Promise<MoveItemsResult> {
+  // Pre-check: if moving from a known source, detect if this reverses a prior move
+  if (payload.movement.from_location_id) {
+    const reversal = await detectReversalPreCheck(
+      payload.movement.from_location_id,
+      payload.movement.to_location_id,
+      payload.item_ids
+    );
+    if (reversal.match) {
+      if (reversal.isGrouped) {
+        await undoGroupedInventoryMovement(reversal.movementId);
+      } else {
+        await undoInventoryMovement(reversal.movementId);
+      }
+      return { undone: true, itemCount: payload.item_ids.length };
+    }
+  }
+
   const idBatches = chunkIds(payload.item_ids, BULK_OPERATION_BATCH_SIZE);
   let totalUpdated = 0;
   let lastMovement: InventoryMovement | null = null;
@@ -236,9 +297,9 @@ export async function moveItemsWithMovement(payload: {
       );
     }
 
-    const result = (await response.json()) as { updatedCount: number; movement: InventoryMovement };
-    totalUpdated += result.updatedCount;
-    lastMovement = result.movement;
+    const typed = (await response.json()) as { updatedCount: number; movement: InventoryMovement };
+    totalUpdated += typed.updatedCount;
+    lastMovement = typed.movement;
     payload.onProgress?.({
       action: 'MOVE',
       batch: i + 1,
