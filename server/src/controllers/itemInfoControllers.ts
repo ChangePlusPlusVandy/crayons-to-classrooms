@@ -52,11 +52,12 @@ const handleValidationError = (error: unknown, res: Response) => {
  *   - limit: Items per page (default 20, max 100)
  *   - warehouse: UUID - filter to items present in this warehouse
  *   - category: string - filter by item_info category
+ *   - fixture: string - filter by item_info fixture
  *   - stock_status: 'in_stock' | 'out_of_stock' - filter by stock availability
  */
 export const getItemsInfoPaginated = async (req: Request, res: Response) => {
   try {
-    const { page, limit, search, warehouse, category, stock_status } =
+    const { page, limit, search, warehouse, category, fixture, stock_status } =
       itemInfoBrowseQuerySchema.parse(req.query);
     const offset = (page - 1) * limit;
 
@@ -85,6 +86,10 @@ export const getItemsInfoPaginated = async (req: Request, res: Response) => {
         conditions.push(`ii.category = $${paramIdx++}`);
         params.push(category);
       }
+    }
+    if (fixture) {
+      conditions.push(`ii.fixture = $${paramIdx++}`);
+      params.push(fixture);
     }
 
     if (stock_status === 'in_stock') {

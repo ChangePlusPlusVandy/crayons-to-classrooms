@@ -69,6 +69,7 @@ export const itemInfoBrowseQuerySchema = z.object({
   search: z.string().optional(),
   warehouse: z.string().uuid().optional(),
   category: z.string().min(1).optional(),
+  fixture: z.string().min(1).optional(),
   stock_status: z.enum(['in_stock', 'out_of_stock']).optional(),
 });
 

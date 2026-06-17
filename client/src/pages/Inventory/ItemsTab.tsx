@@ -26,7 +26,12 @@ import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import FilterListIcon from '@mui/icons-material/FilterList';
 import { useNavigate } from 'react-router-dom';
-import { browseItemsInfo, getItemInfoCategories, ItemInfoBrowseItem } from '../../api/itemInfo';
+import {
+  browseItemsInfo,
+  getItemInfoAll,
+  getItemInfoCategories,
+  ItemInfoBrowseItem,
+} from '../../api/itemInfo';
 import { Warehouse } from '../../types/Warehouse';
 import { ItemDetailsDialog } from '../../components/ItemDetailsDialog/ItemDetailsDialog';
 import { inventoryStyles } from './Inventory.styles';
@@ -57,8 +62,10 @@ export function ItemsTab({
   const [itemSearchInput, setItemSearchInput] = useState('');
   const [itemSearch, setItemSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
+  const [fixtureFilter, setFixtureFilter] = useState('');
   const [stockStatusFilter, setStockStatusFilter] = useState('');
   const [categories, setCategories] = useState<string[]>([]);
+  const [fixtures, setFixtures] = useState<string[]>([]);
   const [detailsItemId, setDetailsItemId] = useState<string | null>(null);
 
   const itemDebounceTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -66,6 +73,21 @@ export function ItemsTab({
   useEffect(() => {
     getItemInfoCategories()
       .then(setCategories)
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    getItemInfoAll()
+      .then((items) => {
+        const uniqueFixtures = Array.from(
+          new Set(
+            items
+              .map((item) => item.fixture?.trim())
+              .filter((fixture): fixture is string => !!fixture)
+          )
+        ).sort((a, b) => a.localeCompare(b));
+        setFixtures(uniqueFixtures);
+      })
       .catch(() => {});
   }, []);
 
@@ -81,6 +103,10 @@ export function ItemsTab({
     setItemPage(1);
   }, [warehouseFilter]);
 
+  useEffect(() => {
+    setItemPage(1);
+  }, [fixtureFilter]);
+
   const fetchItems = useCallback(async () => {
     setItemLoading(true);
     setItemError(null);
@@ -91,6 +117,7 @@ export function ItemsTab({
         search: itemSearch || undefined,
         warehouse: warehouseFilter || undefined,
         category: categoryFilter || undefined,
+        fixture: fixtureFilter || undefined,
         stock_status: (stockStatusFilter as 'in_stock' | 'out_of_stock') || undefined,
       });
       setItems(result.data);
@@ -100,7 +127,7 @@ export function ItemsTab({
     } finally {
       setItemLoading(false);
     }
-  }, [itemPage, itemSearch, warehouseFilter, categoryFilter, stockStatusFilter]);
+  }, [itemPage, itemSearch, warehouseFilter, categoryFilter, fixtureFilter, stockStatusFilter]);
 
   useEffect(() => {
     if (active) fetchItems();
@@ -169,6 +196,24 @@ export function ItemsTab({
               {categories.map((c) => (
                 <MenuItem key={c} value={c}>
                   {c}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <FormControl size="small" sx={inventoryStyles.filterSelect}>
+            <InputLabel>Fixture</InputLabel>
+            <Select
+              value={fixtureFilter}
+              label="Fixture"
+              onChange={(e) => {
+                setFixtureFilter(e.target.value);
+                setItemPage(1);
+              }}
+            >
+              <MenuItem value="">All Fixtures</MenuItem>
+              {fixtures.map((fixture) => (
+                <MenuItem key={fixture} value={fixture}>
+                  {fixture}
                 </MenuItem>
               ))}
             </Select>

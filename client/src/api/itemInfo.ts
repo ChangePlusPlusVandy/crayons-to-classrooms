@@ -10,6 +10,7 @@ export interface ItemInfoBrowseParams {
   search?: string;
   warehouse?: string;
   category?: string;
+  fixture?: string;
   stock_status?: 'in_stock' | 'out_of_stock';
 }
 
@@ -47,6 +48,7 @@ export async function browseItemsInfo(
   if (params.search) searchParams.set('search', params.search);
   if (params.warehouse) searchParams.set('warehouse', params.warehouse);
   if (params.category) searchParams.set('category', params.category);
+  if (params.fixture) searchParams.set('fixture', params.fixture);
   if (params.stock_status) searchParams.set('stock_status', params.stock_status);
 
   const response = await authFetch(`${API_BASE_URL}/item-info/browse?${searchParams.toString()}`);
