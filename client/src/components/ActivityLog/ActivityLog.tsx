@@ -220,13 +220,7 @@ export default function ActivityLog() {
                 const toLabel = activity.to_location_name ?? undefined;
                 const productName =
                   activity.product_name ||
-                  (!activity.product_id &&
-                  activity.quantity > 1 &&
-                  (activity.inventory_action === 'MOVE' ||
-                    activity.inventory_action === 'DONATED' ||
-                    activity.inventory_action === 'DISCARD')
-                    ? 'Entire Pallet'
-                    : 'Unknown item');
+                  (activity.movement_scope === 'pallet' ? 'Entire Pallet' : 'Unknown item');
                 const isUndoable =
                   activity.inventory_action === 'MOVE' ||
                   activity.inventory_action === 'ADD' ||
@@ -275,7 +269,7 @@ export default function ActivityLog() {
                         flexShrink: 0,
                       }}
                     >
-                      {isPalletOperation(activity) && (
+                      {activity.inventory_action !== 'ADD' && isPalletOperation(activity) && (
                         <IconButton
                           size="small"
                           aria-label="View pallet contents"
@@ -349,12 +343,14 @@ export default function ActivityLog() {
 
       {editingMovement &&
         editingMovement.inventory_action === 'MOVE' &&
-        !isPalletOperation(editingMovement) &&
-        editingMovement.product_id && (
+        !isPalletOperation(editingMovement) && (
           <EditMoveDialog
             open={!!editingMovement}
             onClose={handleEditClose}
-            movement={{ ...editingMovement, product_id: editingMovement.product_id }}
+            movement={{
+              ...editingMovement,
+              product_id: editingMovement.product_id ?? '',
+            }}
             onSuccess={handleEditSuccess}
           />
         )}

@@ -44,8 +44,8 @@ export function EditMoveDialog({ open, onClose, movement, onSuccess }: EditMoveD
 
     async function fetchData() {
       try {
-        if (!movement.product_id || !movement.from_location_id || !movement.to_location_id) {
-          setFetchError('Cannot edit: movement is missing product or location');
+        if (!movement.from_location_id || !movement.to_location_id || !movement.item_id) {
+          setFetchError('Cannot edit: movement is missing item or location');
           return;
         }
         const [src, dest, itemRow] = await Promise.all([
@@ -125,7 +125,7 @@ export function EditMoveDialog({ open, onClose, movement, onSuccess }: EditMoveD
       await editMoveMovementTransaction(movement.id!, {
         from_location_id: data.sourceSlot.id,
         to_location_id: data.destinationLocationId,
-        product_id: data.itemGroup.product_id,
+        product_id: data.itemGroup.product_id || undefined,
         quantity: data.quantity,
         performed_by: userId,
         note: data.notes || undefined,

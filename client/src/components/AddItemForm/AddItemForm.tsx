@@ -56,6 +56,7 @@ interface AddItemFormProps {
   onCancel: () => void;
   submitLabel?: string;
   allowNewItem?: boolean;
+  lockItemInfo?: boolean;
 }
 
 export default function AddItemForm({
@@ -69,6 +70,7 @@ export default function AddItemForm({
   onCancel,
   submitLabel = 'Add Item',
   allowNewItem = true,
+  lockItemInfo = false,
 }: AddItemFormProps) {
   // Data states
   const [products, setProducts] = useState<Product[]>([]);
@@ -508,7 +510,14 @@ export default function AddItemForm({
         <AddItemFormLabel htmlFor="item-name-select" required>
           Item Name
         </AddItemFormLabel>
-        {isNewItemMode ? (
+        {lockItemInfo ? (
+          <TextField
+            fullWidth
+            value={selectedItemInfo?.name ?? ''}
+            placeholder="Item name"
+            disabled
+          />
+        ) : isNewItemMode ? (
           <>
             <TextField
               id="item-name-input"

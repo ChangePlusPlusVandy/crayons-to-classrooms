@@ -54,6 +54,8 @@ export const createInventoryMovementSchema = z.object({
   product_id: uuidSchema.nullable().optional(),
   from_location_id: uuidSchema.nullable().optional(),
   to_location_id: uuidSchema.nullable().optional(),
+  movement_scope: z.enum(['item', 'pallet']).optional(),
+  is_batch: z.boolean().optional(),
   quantity: z.number().int().positive('Quantity must be a positive integer'),
   performed_by: uuidSchema,
   note: z.string().optional(),
@@ -144,6 +146,7 @@ export const moveItemsWithMovementSchema = z.object({
   movement: movementFieldsSchema.extend({
     inventory_action: z.literal('MOVE'),
   }),
+  movement_scope: z.enum(['item', 'pallet']).optional(),
 });
 
 /**
@@ -159,6 +162,7 @@ export const removeItemsWithMovementSchema = z.object({
     performed_by: uuidSchema,
     note: z.string().optional(),
   }),
+  movement_scope: z.enum(['item', 'pallet']).optional(),
 });
 
 export type RemoveItemsWithMovementInput = z.infer<typeof removeItemsWithMovementSchema>;

@@ -141,6 +141,7 @@ export function EditAddDialog({ open, onClose, movement, onSuccess }: EditAddDia
               onCancel={onClose}
               submitLabel="Save Changes"
               allowNewItem={false}
+              lockItemInfo
             />
           </>
         )}
