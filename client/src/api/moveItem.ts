@@ -197,7 +197,9 @@ export async function undoInventoryMovement(movementId: string): Promise<void> {
   }
 }
 
-export async function undoGroupedInventoryMovement(movementId: string): Promise<{ batchesUndone: number }> {
+export async function undoGroupedInventoryMovement(
+  movementId: string
+): Promise<{ batchesUndone: number }> {
   const response = await authFetch(`${API_BASE_URL}/inventory-movement/${movementId}/undo-group`, {
     method: 'POST',
   });
@@ -248,6 +250,7 @@ export async function moveItemsWithMovement(payload: {
     performed_by: string;
     note?: string;
   };
+  movement_scope?: 'item' | 'pallet';
   onProgress?: (progress: BulkOperationProgress) => void;
 }): Promise<MoveItemsResult> {
   // Pre-check: if moving from a known source, detect if this reverses a prior move
@@ -281,6 +284,7 @@ export async function moveItemsWithMovement(payload: {
         quantity: batchIds.length,
         note: withBulkNoteMarker(payload.movement.note, operationId, i + 1, idBatches.length),
       },
+      ...(payload.movement_scope && { movement_scope: payload.movement_scope }),
     };
 
     const response = await authFetch(`${API_BASE_URL}/inventory-movement/with-move`, {
@@ -328,6 +332,7 @@ export async function removeItemsWithMovement(payload: {
     performed_by: string;
     note?: string;
   };
+  movement_scope?: 'item' | 'pallet';
   onProgress?: (progress: BulkOperationProgress) => void;
 }): Promise<{ updatedCount: number; movement: InventoryMovement }> {
   const idBatches = chunkIds(payload.item_ids, BULK_OPERATION_BATCH_SIZE);
@@ -344,6 +349,7 @@ export async function removeItemsWithMovement(payload: {
         quantity: batchIds.length,
         note: withBulkNoteMarker(payload.movement.note, operationId, i + 1, idBatches.length),
       },
+      ...(payload.movement_scope && { movement_scope: payload.movement_scope }),
     };
 
     const response = await authFetch(`${API_BASE_URL}/inventory-movement/with-removal`, {

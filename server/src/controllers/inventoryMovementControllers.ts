@@ -128,6 +128,7 @@ export async function getAllMovementsDetailed(req: Request, res: Response): Prom
              b.id,
              b.item_id,
              b.item_ids,
+             b.movement_scope,
              b.product_id,
              b.from_location_id,
              b.to_location_id,
@@ -143,6 +144,7 @@ export async function getAllMovementsDetailed(req: Request, res: Response): Prom
              l.id,
              l.item_id,
              l.item_ids,
+             l.movement_scope,
              CASE
                WHEN a.is_grouped_operation
                  AND (a.distinct_product_count <> 1 OR a.has_null_product_id)
@@ -165,6 +167,13 @@ export async function getAllMovementsDetailed(req: Request, res: Response): Prom
            fr.id,
            fr.item_id,
            fr.item_ids,
+           COALESCE(
+             fr.movement_scope,
+             CASE
+               WHEN fr.is_grouped_operation THEN 'pallet'
+               ELSE 'item'
+             END
+           ) AS movement_scope,
            fr.product_id,
            fr.from_location_id,
            fr.to_location_id,
@@ -176,7 +185,7 @@ export async function getAllMovementsDetailed(req: Request, res: Response): Prom
            fr.is_grouped_operation,
            fr.grouped_batch_count,
            CASE
-             WHEN fr.product_id IS NULL
+             WHEN COALESCE(fr.movement_scope, 'item') = 'pallet'
                AND fr.quantity > 1
                AND fr.inventory_action IN ('MOVE', 'DONATED', 'DISCARD')
              THEN NULL
@@ -525,6 +534,8 @@ export async function createInventoryMovementCore(
     from_location_id,
     to_location_id,
     quantity,
+    movement_scope,
+    is_batch,
     performed_by,
     note,
   } = data;
@@ -586,10 +597,12 @@ export async function createInventoryMovementCore(
     from_location_id,
     to_location_id,
     quantity,
+    movement_scope,
+    is_batch,
     performed_by,
     note
     )
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
     RETURNING *;
     `,
     [
@@ -599,6 +612,8 @@ export async function createInventoryMovementCore(
       normalizedFromLocationId,
       normalizedToLocationId,
       quantity,
+      movement_scope ?? null,
+      is_batch ?? false,
       performed_by,
       note || null,
     ]
@@ -849,6 +864,8 @@ export const createItemWithMovement = async (req: Request, res: Response) => {
       from_location_id: movementData.from_location_id,
       to_location_id: movementData.to_location_id,
       quantity: movementData.quantity,
+      movement_scope: createdItems.length > 1 ? 'pallet' : 'item',
+      is_batch: movementData.quantity > 5000,
       performed_by: movementData.performed_by,
       note: movementData.note,
     };
@@ -939,6 +956,8 @@ export const bulkCreateItemsWithMovement = async (req: Request, res: Response) =
         from_location_id: movementData.from_location_id,
         to_location_id: movementData.to_location_id,
         quantity: movementData.quantity,
+        movement_scope: createdItems.length > 1 ? 'pallet' : 'item',
+        is_batch: movementData.quantity > 5000,
         performed_by: movementData.performed_by,
         note: movementData.note,
       };
@@ -1070,7 +1089,7 @@ export const moveItemsWithMovement = async (req: Request, res: Response) => {
     return res.status(400).json({ error: 'Invalid request body' });
   }
 
-  const { item_ids, movement: movementData } = parsedData;
+  const { item_ids, movement: movementData, movement_scope: clientMovementScope } = parsedData;
   const normalizedFromLocationId = movementData.from_location_id ?? null;
   const client = await pool.connect();
   try {
@@ -1106,6 +1125,8 @@ export const moveItemsWithMovement = async (req: Request, res: Response) => {
       from_location_id: normalizedFromLocationId,
       to_location_id: movementData.to_location_id,
       quantity: updateResult.rowCount,
+      movement_scope: clientMovementScope ?? 'item',
+      is_batch: item_ids.length > 5000,
       performed_by: movementData.performed_by,
       note: movementData.note,
     };
@@ -1154,7 +1175,7 @@ export const removeItemsWithMovement = async (req: Request, res: Response) => {
     return res.status(400).json({ error: 'Invalid request body' });
   }
 
-  const { item_ids, movement: movementData } = parsedData;
+  const { item_ids, movement: movementData, movement_scope: clientMovementScope } = parsedData;
   const normalizedFromLocationId = movementData.from_location_id ?? null;
   const removalStatus = movementData.inventory_action === 'DONATED' ? 'donated' : 'defective';
   const client = await pool.connect();
@@ -1243,6 +1264,8 @@ export const removeItemsWithMovement = async (req: Request, res: Response) => {
       from_location_id: normalizedFromLocationId,
       to_location_id: null,
       quantity: updateResult.rowCount!,
+      movement_scope: clientMovementScope ?? 'item',
+      is_batch: item_ids.length > 5000,
       performed_by: movementData.performed_by,
       note: movementData.note,
     };
@@ -1302,6 +1325,8 @@ export const editInventoryMovementAdd = async (req: Request, res: Response) => {
       from_location_id: movementData.from_location_id,
       to_location_id: movementData.to_location_id,
       quantity: movementData.quantity,
+      movement_scope: createdItems.length > 1 ? 'pallet' : 'item',
+      is_batch: movementData.quantity > 5000,
       performed_by: movementData.performed_by,
       note: movementData.note,
     };
@@ -1354,6 +1379,25 @@ export const editInventoryMovementMove = async (req: Request, res: Response) => 
     const originalMovement = original.rows[0];
     const savedItemIds: string[] | null = originalMovement.item_ids;
     const originalFromLocationId = originalMovement.from_location_id;
+    const movementScope = originalMovement.movement_scope ?? 'item';
+    const originalItemResult = await client.query(
+      'SELECT name, item_info, product_id FROM items WHERE id = $1',
+      [originalMovement.item_id]
+    );
+    if (originalItemResult.rows.length === 0) {
+      throw new NotFoundError('Original item not found');
+    }
+    const originalItem = originalItemResult.rows[0] as {
+      name: string;
+      item_info: string | null;
+      product_id: string | null;
+    };
+
+    const itemIdentityColumn = originalItem.item_info
+      ? { column: 'item_info', value: originalItem.item_info }
+      : originalItem.product_id
+        ? { column: 'product_id', value: originalItem.product_id }
+        : { column: 'name', value: originalItem.name };
 
     // Undo the original MOVE (reverses item locations, deletes movement record)
     await undoInventoryMovementCore({ id }, client);
@@ -1367,7 +1411,7 @@ export const editInventoryMovementMove = async (req: Request, res: Response) => 
 
     let itemIds: string[];
 
-    if (savedItemIds && savedItemIds.length > 0) {
+    if (movementScope === 'pallet' && savedItemIds && savedItemIds.length > 0) {
       const sourceChanged = moveData.from_location_id !== originalFromLocationId;
 
       if (sourceChanged) {
@@ -1399,15 +1443,28 @@ export const editInventoryMovementMove = async (req: Request, res: Response) => 
         itemIds = savedItemIds;
       }
     } else {
-      // Single-item move: fall back to product_id lookup (LIFO order)
-      const productId = moveData.product_id ?? originalMovement.product_id;
-      if (!productId) {
-        throw new InvalidError('product_id is required for non-pallet move edits');
+      // Item-level move: allow quantity changes (restricted by original + current available)
+      const originalQuantity = originalMovement.quantity;
+      const availableAtSource = await client.query(
+        `SELECT COUNT(*) as count FROM items 
+         WHERE ${itemIdentityColumn.column} = $1 AND current_location_id = $2 AND status = 'active'`,
+        [itemIdentityColumn.value, moveData.from_location_id]
+      );
+      const currentCount = parseInt(availableAtSource.rows[0].count, 10);
+      const maxAllowed = currentCount + originalQuantity;
+
+      if (moveData.quantity > maxAllowed) {
+        throw new InvalidError(
+          `Cannot move ${moveData.quantity} items: only ${maxAllowed} available (${currentCount} current + ${originalQuantity} original)`
+        );
       }
 
       const itemsAtSource = await client.query(
-        'SELECT id FROM items WHERE product_id = $1 AND current_location_id = $2 ORDER BY created_at DESC LIMIT $3',
-        [productId, moveData.from_location_id, moveData.quantity]
+        `SELECT id FROM items
+         WHERE ${itemIdentityColumn.column} = $1 AND current_location_id = $2 AND status = 'active'
+         ORDER BY created_at DESC, id DESC
+         LIMIT $3`,
+        [itemIdentityColumn.value, moveData.from_location_id, moveData.quantity]
       );
 
       if (itemsAtSource.rows.length < moveData.quantity) {
@@ -1431,23 +1488,25 @@ export const editInventoryMovementMove = async (req: Request, res: Response) => 
 
     // Create new MOVE movement record
     const representativeItemId = itemIds[0];
-    const isPallet = savedItemIds && savedItemIds.length > 0;
     const fullMovementData: CreateInventoryInput = {
       inventory_action: 'MOVE',
       item_id: representativeItemId,
-      product_id: isPallet
-        ? originalMovement.product_id
-        : (moveData.product_id ?? originalMovement.product_id),
-      from_location_id: isPallet ? moveData.from_location_id : moveData.from_location_id,
+      product_id:
+        movementScope === 'pallet'
+          ? originalMovement.product_id
+          : (moveData.product_id ?? originalMovement.product_id),
+      from_location_id: moveData.from_location_id,
       to_location_id: moveData.to_location_id,
       quantity: itemIds.length,
+      movement_scope: movementScope,
+      is_batch: itemIds.length > 5000,
       performed_by: moveData.performed_by,
       note: moveData.note,
     };
     const createdMovement = await createInventoryMovementCore(fullMovementData, client);
 
     // Preserve item_ids on the new movement for pallet operations
-    if (isPallet) {
+    if (movementScope === 'pallet') {
       await client.query('UPDATE "inventory movement" SET item_ids = $1::uuid[] WHERE id = $2', [
         itemIds,
         createdMovement.id,
@@ -1499,9 +1558,14 @@ export const editInventoryMovementRemove = async (req: Request, res: Response) =
     }
 
     const originalMovement = original.rows[0];
+    const movementScope = originalMovement.movement_scope ?? 'item';
 
-    // Pallet removal path: when item_ids is populated
-    if (originalMovement.item_ids && originalMovement.item_ids.length > 0) {
+    // Pallet removal path: when movement_scope is 'pallet'
+    if (
+      movementScope === 'pallet' &&
+      originalMovement.item_ids &&
+      originalMovement.item_ids.length > 0
+    ) {
       const locationChanged = originalMovement.from_location_id !== removeData.from_location_id;
 
       if (locationChanged) {
@@ -1590,6 +1654,8 @@ export const editInventoryMovementRemove = async (req: Request, res: Response) =
           from_location_id: removeData.from_location_id,
           to_location_id: null,
           quantity: newItemIds.length,
+          movement_scope: 'pallet',
+          is_batch: newItemIds.length > 5000,
           performed_by: removeData.performed_by,
           note: removeData.note,
         };
@@ -1648,6 +1714,25 @@ export const editInventoryMovementRemove = async (req: Request, res: Response) =
     // Single-item removal path: compute delta and adjust item counts
     const oldQty: number = originalMovement.quantity;
     const newQty: number = removeData.quantity;
+
+    // For item-level movements, validate quantity is not exceeding max available
+    if (movementScope === 'item') {
+      const originalQuantity = oldQty;
+      const availableAtSource = await client.query(
+        `SELECT COUNT(*) as count FROM items 
+         WHERE name = (SELECT name FROM items WHERE id = $1) AND current_location_id = $2 AND status = 'active'`,
+        [originalMovement.item_id, removeData.from_location_id]
+      );
+      const currentCount = parseInt(availableAtSource.rows[0].count, 10);
+      const maxAllowed = currentCount + originalQuantity;
+
+      if (newQty > maxAllowed) {
+        throw new InvalidError(
+          `Cannot remove ${newQty} items: only ${maxAllowed} available (${currentCount} current + ${originalQuantity} original)`
+        );
+      }
+    }
+
     const delta = newQty - oldQty;
     const actionChanged = originalMovement.inventory_action !== removeData.inventory_action;
 
@@ -2306,6 +2391,8 @@ export const editGroupedMoveMovement = async (req: Request, res: Response) => {
       from_location_id: moveData.from_location_id,
       to_location_id: moveData.to_location_id,
       quantity: allItemIds.length,
+      movement_scope: 'pallet',
+      is_batch: allItemIds.length > 5000,
       performed_by: moveData.performed_by,
       note: moveData.note,
     };
@@ -2475,6 +2562,8 @@ export const editGroupedRemoveMovement = async (req: Request, res: Response) => 
       from_location_id: removeData.from_location_id,
       to_location_id: null,
       quantity: allItemIds.length,
+      movement_scope: 'pallet',
+      is_batch: allItemIds.length > 5000,
       performed_by: removeData.performed_by,
       note: removeData.note,
     };

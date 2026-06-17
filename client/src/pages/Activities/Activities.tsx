@@ -39,13 +39,7 @@ const PAGE_SIZE = 10;
 
 function getProductDisplayName(activity: ActivityDisplay): string {
   if (activity.product_name) return activity.product_name;
-  if (
-    !activity.product_id &&
-    activity.quantity > 1 &&
-    (activity.inventory_action === 'MOVE' ||
-      activity.inventory_action === 'DONATED' ||
-      activity.inventory_action === 'DISCARD')
-  ) {
+  if (activity.movement_scope === 'pallet') {
     return 'Entire Pallet';
   }
   return 'Unknown item';
@@ -390,7 +384,7 @@ export default function Activities() {
                         )}
                       </TableCell>
                       <TableCell sx={activitiesStyles.tableCell} align="right">
-                        {isPalletOperation(activity) && (
+                        {activity.inventory_action !== 'ADD' && isPalletOperation(activity) && (
                           <IconButton
                             sx={activitiesStyles.actionButton}
                             onClick={() => handleViewPalletDetails(activity)}
@@ -453,16 +447,17 @@ export default function Activities() {
         />
       )}
 
-      {editingMovement?.inventory_action === 'MOVE' &&
-        !isPalletOperation(editingMovement) &&
-        editingMovement.product_id && (
-          <EditMoveDialog
-            open={!!editingMovement}
-            onClose={handleEditClose}
-            movement={{ ...editingMovement, product_id: editingMovement.product_id }}
-            onSuccess={handleEditSuccess}
-          />
-        )}
+      {editingMovement?.inventory_action === 'MOVE' && !isPalletOperation(editingMovement) && (
+        <EditMoveDialog
+          open={!!editingMovement}
+          onClose={handleEditClose}
+          movement={{
+            ...editingMovement,
+            product_id: editingMovement.product_id ?? '',
+          }}
+          onSuccess={handleEditSuccess}
+        />
+      )}
 
       {editingMovement?.inventory_action === 'MOVE' && isPalletOperation(editingMovement) && (
         <EditPalletMoveDialog

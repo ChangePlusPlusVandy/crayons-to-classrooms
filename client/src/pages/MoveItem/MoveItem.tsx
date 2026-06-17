@@ -51,11 +51,14 @@ export default function MoveItem() {
           performed_by: user!.id,
           note: notes || undefined,
         },
+        movement_scope: 'item',
         onProgress: (progress) => setBulkProgress(progress),
       });
 
       if (result.undone) {
-        setSuccess(`Move undone: ${result.itemCount} item(s) returned to original location. No log entry created.`);
+        setSuccess(
+          `Move undone: ${result.itemCount} item(s) returned to original location. No log entry created.`
+        );
       } else {
         setSuccess(`${quantity} item${quantity > 1 ? 's' : ''} moved successfully!`);
       }
@@ -96,11 +99,14 @@ export default function MoveItem() {
           performed_by: user!.id,
           note: notes || undefined,
         },
+        movement_scope: 'pallet',
         onProgress: (progress) => setBulkProgress(progress),
       });
 
       if (result.undone) {
-        setSuccess(`Move undone: ${result.itemCount} item(s) returned to original location. No log entry created.`);
+        setSuccess(
+          `Move undone: ${result.itemCount} item(s) returned to original location. No log entry created.`
+        );
       } else {
         setSuccess(
           `${activeItems.length} item${activeItems.length > 1 ? 's' : ''} moved successfully!`

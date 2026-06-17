@@ -31,6 +31,7 @@ interface EditRemoveDialogProps {
 
 export function EditRemoveDialog({ open, onClose, movement, onSuccess }: EditRemoveDialogProps) {
   const { user } = useAuth();
+  const isPalletMovement = movement.movement_scope === 'pallet';
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState('');
   const [warehouse, setWarehouse] = useState<Warehouse | null>(null);
@@ -122,8 +123,8 @@ export function EditRemoveDialog({ open, onClose, movement, onSuccess }: EditRem
             onSubmit={handleSubmit}
             onCancel={onClose}
             submitLabel="Save Changes"
-            disableQuantity
-            disableItem
+            disableQuantity={isPalletMovement}
+            disableItem={isPalletMovement}
           />
         )}
       </DialogContent>

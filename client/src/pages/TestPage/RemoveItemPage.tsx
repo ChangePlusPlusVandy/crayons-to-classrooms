@@ -149,6 +149,7 @@ export default function RemoveItemPage() {
           performed_by: user!.id,
           note: notes || undefined,
         },
+        movement_scope: 'item',
         onProgress: (progress) => setBulkProgress(progress),
       });
 
@@ -197,6 +198,7 @@ export default function RemoveItemPage() {
           performed_by: user!.id,
           note: palletNotes || undefined,
         },
+        movement_scope: 'pallet',
         onProgress: (progress) => setBulkProgress(progress),
       });
 
