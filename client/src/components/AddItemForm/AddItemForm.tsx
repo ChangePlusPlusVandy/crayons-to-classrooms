@@ -37,6 +37,7 @@ export interface AddItemFormData {
     name: string;
     category: string;
     subcategoryProductId?: string;
+    newSubcategoryName?: string;
     limit?: number;
     value?: number;
     packSize?: number;
